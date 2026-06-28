@@ -1,8 +1,15 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
-  // Use 192.168.40.225 to access your PC's backend from a physical phone on the same Wi-Fi
-  static const String baseUrl = 'http://192.168.40.225:5000/api';
+  static const bool isProduction = true;
+  
+  // Production URL (update this once Render deployment is finished)
+  static const String _productionUrl = 'https://wms-backend-sb54.onrender.com/api';
+  
+  // Local network URL for testing
+  static const String _localUrl = 'http://192.168.40.225:5000/api';
+
+  static const String baseUrl = isProduction ? _productionUrl : _localUrl;
 
   // Auth
   static const String login = '/auth/login';
