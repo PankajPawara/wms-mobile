@@ -1,0 +1,108 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../core/storage/secure_storage.dart';
+import '../models/user_model.dart';
+import '../repositories/auth_repository.dart';
+
+part 'auth_provider.g.dart';
+
+enum AuthStatus { unknown, authenticated, unauthenticated }
+
+class AuthState {
+  final AuthStatus status;
+  final UserModel? user;
+  final bool isFirstLogin;
+  final String? error;
+  final bool isLoading;
+
+  const AuthState({
+    this.status = AuthStatus.unknown,
+    this.user,
+    this.isFirstLogin = false,
+    this.error,
+    this.isLoading = false,
+  });
+
+  AuthState copyWith({
+    AuthStatus? status,
+    UserModel? user,
+    bool? isFirstLogin,
+    String? error,
+    bool? isLoading,
+  }) {
+    return AuthState(
+      status: status ?? this.status,
+      user: user ?? this.user,
+      isFirstLogin: isFirstLogin ?? this.isFirstLogin,
+      error: error,
+      isLoading: isLoading ?? this.isLoading,
+    );
+  }
+}
+
+@riverpod
+class AuthNotifier extends _$AuthNotifier {
+  @override
+  AuthState build() {
+    _checkAuthStatus();
+    return const AuthState();
+  }
+
+  Future<void> _checkAuthStatus() async {
+    final storage = ref.read(secureStorageProvider);
+    final isLoggedIn = await storage.isLoggedIn();
+    if (isLoggedIn) {
+      try {
+        final user = await ref.read(authRepositoryProvider).getMe();
+        state = AuthState(
+          status: AuthStatus.authenticated,
+          user: user,
+          isFirstLogin: user.isFirstLogin,
+        );
+      } catch (_) {
+        state = const AuthState(status: AuthStatus.unauthenticated);
+      }
+    } else {
+      state = const AuthState(status: AuthStatus.unauthenticated);
+    }
+  }
+
+  Future<bool> login(String employeeId, String password) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await ref
+          .read(authRepositoryProvider)
+          .login(employeeId, password);
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: result.user,
+        isFirstLogin: result.isFirstLogin,
+        isLoading: false,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> changePassword(
+      String currentPassword, String newPassword) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await ref
+          .read(authRepositoryProvider)
+          .changePassword(currentPassword, newPassword);
+      state = state.copyWith(isLoading: false, isFirstLogin: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  Future<void> logout() async {
+    await ref.read(authRepositoryProvider).logout();
+    state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+}
