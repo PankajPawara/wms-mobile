@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../repositories/order_repository.dart';
 
 class PickingSummaryScreen extends ConsumerWidget {
   final String orderId;
@@ -33,9 +34,9 @@ class PickingSummaryScreen extends ConsumerWidget {
                   Text(
                     'Picking Complete!',
                     style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.success),
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.success),
                   ),
                   Text(
                     'All items have been picked.',
@@ -48,7 +49,15 @@ class PickingSummaryScreen extends ConsumerWidget {
             AppButton(
               label: 'Submit for Checking',
               icon: Icons.verified_outlined,
-              onPressed: () => context.go('/home'),
+              onPressed: () async {
+                final id = int.tryParse(orderId);
+                if (id != null) {
+                  await ref.read(orderRepositoryProvider).updateOrderStatus(id, 'pending_checking');
+                }
+                if (context.mounted) {
+                  context.go('/home');
+                }
+              },
             ),
             const SizedBox(height: AppDimensions.sm),
             AppButton(

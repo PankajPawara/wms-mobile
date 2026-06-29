@@ -9,6 +9,8 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../repositories/order_repository.dart';
+import '../../../core/database/app_database.dart';
 
 class PickingScreen extends ConsumerStatefulWidget {
   final String orderId;
@@ -26,44 +28,50 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
   String? _lastScanResult;
   bool _lastScanCorrect = false;
 
-  // Dummy items for UI demo — replace with real provider
-  final List<Map<String, dynamic>> _items = [
-    {
-      'part_no': '22201-KON-DU2',
-      'description': 'DISK CLUTCH FRICTION',
-      'location': 'A2-15',
-      'required_qty': 10,
-      'picked_qty': 7,
-      'status': 'pending',
-    },
-    {
-      'part_no': '31500-KWN-921',
-      'description': 'BATTERY 12V 3AH',
-      'location': 'B1-03',
-      'required_qty': 5,
-      'picked_qty': 5,
-      'status': 'picked',
-    },
-  ];
+  List<OrderItem> _items = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final id = int.tryParse(widget.orderId);
+    if (id != null) {
+      final items = await ref.read(orderRepositoryProvider).getLocalOrderItems(id);
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   int get _currentIndex =>
-      _items.indexWhere((i) => i['status'] == 'pending');
-  bool get _allDone => _items.every((i) => i['status'] == 'picked');
+      _items.indexWhere((i) => i.status == 'pending');
+  bool get _allDone => _items.isNotEmpty && _items.every((i) => i.status == 'picked');
 
   void _onBarcodeDetected(BarcodeCapture capture) {
     final barcode = capture.barcodes.firstOrNull?.rawValue ?? '';
     if (_currentIndex < 0) return;
     final current = _items[_currentIndex];
-    final expected = current['part_no'] as String;
+    final expected = current.partNo;
 
     if (barcode.toUpperCase() == expected.toUpperCase()) {
       HapticFeedback.mediumImpact();
+      final picked = current.pickedQty + 1;
+      final status = picked >= current.requiredQty ? 'picked' : 'pending';
+      
+      ref.read(orderRepositoryProvider).updateOrderItemQty(
+        itemId: current.id,
+        pickedQty: picked,
+        status: status,
+      ).then((_) => _loadItems());
+
       setState(() {
-        final picked = (current['picked_qty'] as int) + 1;
-        current['picked_qty'] = picked;
-        if (picked >= (current['required_qty'] as int)) {
-          current['status'] = 'picked';
-        }
         _lastScanResult = expected;
         _lastScanCorrect = true;
       });
@@ -84,6 +92,12 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final current =
         _currentIndex >= 0 ? _items[_currentIndex] : null;
 
@@ -96,7 +110,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
             padding: const EdgeInsets.only(right: AppDimensions.md),
             child: Center(
               child: Text(
-                '${_items.where((i) => i['status'] == 'picked').length}/${_items.length}',
+                '${_items.where((i) => i.status == 'picked').length}/${_items.length}',
                 style: const TextStyle(
                     fontWeight: FontWeight.bold, color: AppColors.primary),
               ),
@@ -128,12 +142,12 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: AppDimensions.xs),
                     Text(
-                      current['part_no'] as String,
+                      current.partNo,
                       style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      current['description'] as String,
+                      current.description ?? '',
                       style: const TextStyle(
                           color: AppColors.textSecondary, fontSize: 13),
                     ),
@@ -144,14 +158,14 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                             color: AppColors.primary, size: 16),
                         const SizedBox(width: 4),
                         Text(
-                          current['location'] as String,
+                          current.location,
                           style: const TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w600),
                         ),
                         const Spacer(),
                         Text(
-                          '${current['picked_qty']}/${current['required_qty']} picked',
+                          '${current.pickedQty}/${current.requiredQty} picked',
                           style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -161,8 +175,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     ),
                     const SizedBox(height: AppDimensions.sm),
                     LinearProgressIndicator(
-                      value: (current['picked_qty'] as int) /
-                          (current['required_qty'] as int),
+                      value: current.requiredQty > 0 ? current.pickedQty / current.requiredQty : 0,
                       backgroundColor: AppColors.border,
                       valueColor: const AlwaysStoppedAnimation<Color>(
                           AppColors.primary),
@@ -202,7 +215,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     child: Text(
                       _lastScanCorrect
                           ? AppStrings.correctProduct
-                          : '${AppStrings.wrongProduct} Expected: ${current?['part_no']}',
+                          : '${AppStrings.wrongProduct} Expected: ${current?.partNo}',
                       style: TextStyle(
                           color: _lastScanCorrect
                               ? AppColors.success
@@ -247,11 +260,11 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                             crossAxisAlignment:
                                 CrossAxisAlignment.start,
                             children: [
-                              Text(item['part_no'] as String,
+                              Text(item.partNo,
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 13)),
-                              Text(item['location'] as String,
+                              Text(item.location,
                                   style: const TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textSecondary)),
@@ -259,10 +272,10 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                           ),
                         ),
                         Text(
-                            '${item['picked_qty']}/${item['required_qty']}',
+                            '${item.pickedQty}/${item.requiredQty}',
                             style: const TextStyle(fontSize: 13)),
                         const SizedBox(width: AppDimensions.sm),
-                        StatusBadge(status: item['status'] as String),
+                        StatusBadge(status: item.status),
                       ],
                     ),
                   ),

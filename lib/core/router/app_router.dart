@@ -13,6 +13,7 @@ import '../../features/memo_ocr/screens/ocr_review_screen.dart';
 import '../../features/picking/screens/picking_screen.dart';
 import '../../features/picking/screens/picking_summary_screen.dart';
 import '../../features/checking/screens/checking_screen.dart';
+import '../../features/checking/screens/checking_list_screen.dart';
 import '../../features/history/screens/history_screen.dart';
 import '../../features/history/screens/order_details_screen.dart';
 import '../../features/history/screens/picked_items_screen.dart';
@@ -65,7 +66,7 @@ GoRouter appRouter(AppRouterRef ref) {
         path: '/checking/:orderId',
         builder: (context, state) => CheckingScreen(orderId: state.pathParameters['orderId']!),
       ),
-      GoRoute(path: '/checking-list', builder: (_, __) => const CheckingListPlaceholder()),
+      GoRoute(path: '/checking-list', builder: (_, __) => const CheckingListScreen()),
       GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
       GoRoute(
         path: '/order/:orderId',
@@ -78,15 +79,4 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
     ],
   );
-}
-
-class CheckingListPlaceholder extends StatelessWidget {
-  const CheckingListPlaceholder({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Verification')),
-      body: const Center(child: Text('Verification list coming soon')),
-    );
-  }
 }

@@ -6,6 +6,9 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../shared/widgets/app_bottom_nav.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/network/api_endpoints.dart';
 
 enum _ScanState { scanning, searching, found, notFound, multipleLocations }
 
@@ -59,23 +62,59 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       _scannedBarcode = barcode;
       _state = _ScanState.searching;
     });
-    // Simulate API delay
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    // TODO: Replace with real API call to /inventory/barcode/:barcode
-    // Mock: show found for demo
-    setState(() {
-      _foundProduct = {
-        'partNo': barcode,
-        'description': 'Disk Clutch Friction',
-        'stock': 12,
-        'location': 'A2-15-03',
-        'locationLabel': 'Rack A2, Shelf 15, Bin 03',
-        'area': 'MAIN WAREHOUSE',
-        'multipleLocations': false,
-      };
-      _state = _ScanState.found;
-    });
+
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final match = await (db.select(db.inventory)
+            ..where((t) => t.barcode.equals(barcode)))
+          .getSingleOrNull();
+
+      if (match != null) {
+        if (!mounted) return;
+        setState(() {
+          _foundProduct = {
+            'partNo': match.partNo,
+            'description': match.description ?? '',
+            'location': match.location,
+            'locationLabel': 'Location: ${match.location}',
+            'area': 'MAIN WAREHOUSE',
+            'multipleLocations': false,
+          };
+          _state = _ScanState.found;
+        });
+        return;
+      }
+
+      final api = ref.read(apiClientProvider);
+      final response = await api.get(ApiEndpoints.inventoryBarcode(barcode));
+      final data = response['data'] as Map<String, dynamic>?;
+      final product = data?['product'] as Map<String, dynamic>?;
+
+      if (product != null) {
+        if (!mounted) return;
+        setState(() {
+          _foundProduct = {
+            'partNo': product['part_no'] ?? '',
+            'description': product['description'] ?? '',
+            'location': product['location'] ?? '',
+            'locationLabel': 'Location: ${product['location'] ?? ''}',
+            'area': 'MAIN WAREHOUSE',
+            'multipleLocations': false,
+          };
+          _state = _ScanState.found;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _state = _ScanState.notFound;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _state = _ScanState.notFound;
+      });
+    }
   }
 
   void _scanAnother() {

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
+import '../repositories/inventory_repository.dart';
+import '../../picking/repositories/order_repository.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -117,14 +119,14 @@ class SettingsScreen extends ConsumerWidget {
                 iconColor: const Color(0xFF16A34A),
                 title: 'Database Summary',
                 subtitle: 'View database information',
-                onTap: () {}),
+                onTap: () => _showDatabaseSummary(context, ref)),
             _SettingsItem(
                 icon: Icons.refresh_rounded,
                 iconBg: const Color(0xFFDCFCE7),
                 iconColor: const Color(0xFF16A34A),
                 title: 'Re-import Database',
                 subtitle: 'Replace existing data',
-                onTap: () {},
+                onTap: () => _runManualSync(context, ref),
                 showDivider: false),
           ]),
           const SizedBox(height: 16),
@@ -196,6 +198,56 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  void _showDatabaseSummary(BuildContext context, WidgetRef ref) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final summary = await ref.read(inventoryRepositoryProvider).getDatabaseSummary();
+    if (!context.mounted) return;
+    context.pop(); // dismiss loader
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Database Summary'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Inventory Records: ${summary['inventory']}'),
+            const SizedBox(height: 6),
+            Text('Sync Queue Items: ${summary['sync_queue']}'),
+            const SizedBox(height: 6),
+            Text('Orders Cache Count: ${summary['orders']}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _runManualSync(BuildContext context, WidgetRef ref) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Synchronising data with WMS Server...'), duration: Duration(seconds: 1)),
+    );
+
+    final updated = await ref.read(inventoryRepositoryProvider).syncInventory(force: true);
+    await ref.read(orderRepositoryProvider).syncOrdersFromServer();
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(updated ? 'Sync complete. Inventory updated!' : 'Sync complete. Local database up to date!')),
     );
   }
 }

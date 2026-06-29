@@ -7,6 +7,8 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../../picking/repositories/order_repository.dart';
+import '../../../core/database/app_database.dart';
 
 class CheckingScreen extends ConsumerStatefulWidget {
   final String orderId;
@@ -17,32 +19,51 @@ class CheckingScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckingScreenState extends ConsumerState<CheckingScreen> {
-  // Dummy items — replace with real provider
-  final List<Map<String, dynamic>> _items = [
-    {
-      'part_no': '22201-KON-DU2',
-      'description': 'DISK CLUTCH FRICTION',
-      'location': 'A2-15',
-      'required_qty': 10,
-      'picked_qty': 10,
-      'checked_qty': 0,
-      'unit_price': 250.0,
-      'status': 'pending',
-    },
-  ];
+  List<OrderItem> _items = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final id = int.tryParse(widget.orderId);
+    if (id != null) {
+      final items = await ref.read(orderRepositoryProvider).getLocalOrderItems(id);
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   bool get _allChecked =>
-      _items.every((i) => i['status'] == 'checked');
+      _items.isNotEmpty && _items.every((i) => i.status == 'checked' || i.status == 'missing');
 
-  void _markChecked(int index, int qty) {
-    setState(() {
-      _items[index]['checked_qty'] = qty;
-      _items[index]['status'] = qty > 0 ? 'checked' : 'missing';
-    });
+  void _markChecked(int index, int qty) async {
+    final item = _items[index];
+    final status = qty >= item.pickedQty ? 'checked' : (qty == 0 ? 'missing' : 'pending');
+    
+    await ref.read(orderRepositoryProvider).updateOrderItemQty(
+      itemId: item.id,
+      checkedQty: qty,
+      status: status,
+    );
+    await _loadItems();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text('Checking — ${widget.orderId}')),
       body: Column(
@@ -55,8 +76,8 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
                   const SizedBox(height: AppDimensions.sm),
               itemBuilder: (context, index) {
                 final item = _items[index];
-                final picked = item['picked_qty'] as int;
-                final checked = item['checked_qty'] as int;
+                final picked = item.pickedQty;
+                final checked = item.checkedQty;
                 return Container(
                   padding: const EdgeInsets.all(AppDimensions.md),
                   decoration: BoxDecoration(
@@ -72,16 +93,15 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              item['part_no'] as String,
+                              item.partNo,
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 15),
                             ),
                           ),
-                          StatusBadge(
-                              status: item['status'] as String),
+                          StatusBadge(status: item.status),
                         ],
                       ),
-                      Text(item['description'] as String,
+                      Text(item.description ?? '',
                           style: const TextStyle(
                               color: AppColors.textSecondary, fontSize: 13)),
                       const SizedBox(height: AppDimensions.sm),
@@ -135,7 +155,15 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
             child: AppButton(
               label: AppStrings.completeChecking,
               icon: Icons.verified_rounded,
-              onPressed: _allChecked ? () => context.go('/home') : null,
+              onPressed: _allChecked ? () async {
+                final id = int.tryParse(widget.orderId);
+                if (id != null) {
+                  await ref.read(orderRepositoryProvider).updateOrderStatus(id, 'checked');
+                }
+                if (context.mounted) {
+                  context.go('/home');
+                }
+              } : null,
             ),
           ),
         ],

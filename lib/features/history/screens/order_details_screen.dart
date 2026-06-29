@@ -1,13 +1,79 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_dimensions.dart';
+import '../../picking/repositories/order_repository.dart';
+import '../../../core/database/app_database.dart';
 
-class OrderDetailsScreen extends StatelessWidget {
+class OrderDetailsScreen extends ConsumerStatefulWidget {
   final String orderId;
   const OrderDetailsScreen({super.key, required this.orderId});
 
   @override
+  ConsumerState<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
+}
+
+class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
+  Order? _order;
+  List<OrderItem> _items = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrderDetails();
+  }
+
+  Future<void> _loadOrderDetails() async {
+    setState(() => _isLoading = true);
+    final id = int.tryParse(widget.orderId);
+    if (id != null) {
+      final repo = ref.read(orderRepositoryProvider);
+      final order = await repo.getLocalOrderById(id);
+      final items = await repo.getLocalOrderItems(id);
+      if (mounted) {
+        setState(() {
+          _order = order;
+          _items = items;
+          _isLoading = false;
+        });
+      }
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Order Details')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_order == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Order Details')),
+        body: const Center(child: Text('Order not found')),
+      );
+    }
+
+    final order = _order!;
+    final totalItems = _items.length;
+    final pickedItems = _items.where((i) => i.status == 'picked' || i.status == 'checked').length;
+    final notFoundItems = _items.where((i) => i.status == 'missing').length;
+
+    final (statusLabel, statusColor, statusBg) = switch (order.status) {
+      'draft' => ('Draft', AppColors.textSecondary, AppColors.border),
+      'picking' => ('Picking', AppColors.warning, AppColors.warningLight),
+      'pending_checking' => ('Pending Checking', AppColors.info, AppColors.infoLight),
+      'checked' => ('Verified', AppColors.success, AppColors.successLight),
+      'cancelled' => ('Cancelled', AppColors.danger, AppColors.dangerLight),
+      _ => ('Unknown', AppColors.textSecondary, AppColors.border),
+    };
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
@@ -21,12 +87,6 @@ class OrderDetailsScreen extends StatelessWidget {
         title: const Text('Order Details',
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -49,24 +109,29 @@ class OrderDetailsScreen extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.successLight,
+                          color: statusBg,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.check_circle_rounded,
-                                color: AppColors.success, size: 14),
-                            SizedBox(width: 4),
-                            Text('Completed',
-                                style: TextStyle(
-                                    color: AppColors.success,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600)),
+                            Icon(
+                              order.status == 'checked' ? Icons.check_circle_rounded : Icons.info_outline,
+                              color: statusColor,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              statusLabel,
+                              style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600),
+                            ),
                           ],
                         ),
                       ),
                       const Spacer(),
-                      Text('Memo No. #$orderId',
+                      Text('Memo No. #${order.memoNumber}',
                           style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -74,14 +139,9 @@ class OrderDetailsScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _DetailRow(label: 'Customer', value: 'Tirupati Auto Spare Parts'),
-                  _DetailRow(label: 'Area', value: 'Mandsaur', bold: true),
-                  _DetailRow(
-                      label: 'Picked By',
-                      value: 'Pankaj Pawara (EMP001)\n18 Jun 2026, 11:42 AM'),
-                  _DetailRow(
-                      label: 'Verified By',
-                      value: 'Rakesh Sharma (EMP002)\n18 Jun 2026, 12:15 PM'),
+                  _DetailRow(label: 'Customer', value: order.customerName ?? '-'),
+                  _DetailRow(label: 'Area', value: order.customerLocation ?? '-', bold: true),
+                  _DetailRow(label: 'Created At', value: order.createdAt),
                 ],
               ),
             ),
@@ -92,18 +152,18 @@ class OrderDetailsScreen extends StatelessWidget {
               children: [
                 Expanded(
                     child: _StatBox(
-                        label: 'Total Items', value: '20', color: Colors.black)),
+                        label: 'Total Items', value: '$totalItems', color: Colors.black)),
                 const SizedBox(width: 8),
                 Expanded(
                     child: _StatBox(
                         label: 'Picked Items',
-                        value: '18',
+                        value: '$pickedItems',
                         color: AppColors.success)),
                 const SizedBox(width: 8),
                 Expanded(
                     child: _StatBox(
                         label: 'Not Found',
-                        value: '2',
+                        value: '$notFoundItems',
                         color: AppColors.danger)),
               ],
             ),
@@ -123,12 +183,9 @@ class OrderDetailsScreen extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 15, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  _SummaryRow(label: 'Status', value: 'Completed',
-                      valueColor: AppColors.success),
+                  _SummaryRow(label: 'Status', value: statusLabel, valueColor: statusColor),
                   _SummaryRow(
-                      label: 'Picked Time', value: '18 Jun 2026, 11:42 AM'),
-                  _SummaryRow(
-                      label: 'Verified Time', value: '18 Jun 2026, 12:15 PM'),
+                      label: 'Total Value', value: '₹${order.finalAmount.toStringAsFixed(2)}'),
                 ],
               ),
             ),
@@ -149,7 +206,7 @@ class OrderDetailsScreen extends StatelessWidget {
                           fontSize: 15, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   GestureDetector(
-                    onTap: () => context.push('/order/$orderId/items'),
+                    onTap: () => context.push('/order/${order.id}/items'),
                     child: Row(
                       children: [
                         Container(
@@ -163,7 +220,7 @@ class OrderDetailsScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
-                          child: Text('View Picked Items',
+                          child: Text('View Items List',
                               style: TextStyle(
                                   fontSize: 14, fontWeight: FontWeight.w500)),
                         ),
@@ -175,6 +232,40 @@ class OrderDetailsScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Start Picking/Checking Button
+            if (order.status == 'draft' || order.status == 'picking')
+              ElevatedButton(
+                onPressed: () async {
+                  if (order.status == 'draft') {
+                    await ref.read(orderRepositoryProvider).updateOrderStatus(order.id, 'picking');
+                  }
+                  if (context.mounted) {
+                    context.push('/picking/${order.id}').then((_) => _loadOrderDetails());
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Start Picking', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            if (order.status == 'pending_checking')
+              ElevatedButton(
+                onPressed: () {
+                  context.push('/checking/${order.id}').then((_) => _loadOrderDetails());
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Start Verification', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
           ],
         ),
       ),
