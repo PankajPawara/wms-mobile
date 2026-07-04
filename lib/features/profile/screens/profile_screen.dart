@@ -10,6 +10,7 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final user = ref.watch(authNotifierProvider).user;
     final name = user?.name ?? 'User';
     final role = user?.role == 'admin' ? 'Administrator' : 'Warehouse Assistant';
@@ -25,11 +26,11 @@ class ProfileScreen extends ConsumerWidget {
         context.go('/settings');
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF3F4F6),
+        backgroundColor: colorScheme.surfaceContainerLowest,
         appBar: AppBar(
-          title: const Text('My Profile'),
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.textPrimary,
+          title: Text('My Profile', style: TextStyle(color: colorScheme.onSurface)),
+          backgroundColor: colorScheme.surface,
+          foregroundColor: colorScheme.onSurface,
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -43,7 +44,7 @@ class ProfileScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
               ),
               child: Column(
@@ -60,13 +61,13 @@ class ProfileScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   Text(
                     name,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                   ),
                   const SizedBox(height: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
+                      color: AppColors.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
                     ),
                     child: Text(
@@ -80,22 +81,23 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // Profile info card
-            _buildSectionLabel('ACCOUNT INFORMATION'),
+            _buildSectionLabel(context, 'ACCOUNT INFORMATION'),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
               ),
               child: Column(
                 children: [
-                  _buildProfileItem(Icons.badge_outlined, 'Employee ID', empId),
-                  const Divider(height: 1, indent: 56),
-                  _buildProfileItem(Icons.email_outlined, 'Email Address', email),
-                  const Divider(height: 1, indent: 56),
-                  _buildProfileItem(Icons.phone_outlined, 'Mobile Number', mobile),
-                  const Divider(height: 1, indent: 56),
+                  _buildProfileItem(context, Icons.badge_outlined, 'Employee ID', empId),
+                  Divider(height: 1, indent: 56, color: colorScheme.outlineVariant),
+                  _buildProfileItem(context, Icons.email_outlined, 'Email Address', email),
+                  Divider(height: 1, indent: 56, color: colorScheme.outlineVariant),
+                  _buildProfileItem(context, Icons.phone_outlined, 'Mobile Number', mobile),
+                  Divider(height: 1, indent: 56, color: colorScheme.outlineVariant),
                   _buildProfileItem(
+                    context,
                     Icons.check_circle_outline_rounded,
                     'Account Status',
                     status.toUpperCase(),
@@ -107,25 +109,25 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 24),
 
             // Security card
-            _buildSectionLabel('SECURITY'),
+            _buildSectionLabel(context, 'SECURITY'),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
               ),
               child: ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFEF3C7),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.lock_reset_outlined, color: Color(0xFFD97706), size: 20),
+                  child: const Icon(Icons.lock_reset_outlined, color: AppColors.warning, size: 20),
                 ),
-                title: const Text('Change Account Password', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Update login security key', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textDisabled),
+                title: Text('Change Account Password', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: colorScheme.onSurface)),
+                subtitle: Text('Update login security key', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11)),
+                trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.outline),
                 onTap: () => context.push('/change-password'),
               ),
             ),
@@ -135,25 +137,31 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionLabel(String label) {
+  Widget _buildSectionLabel(BuildContext context, String label) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         label,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 0.8),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.outline,
+          letterSpacing: 0.8,
+        ),
       ),
     );
   }
 
-  Widget _buildProfileItem(IconData icon, String label, String value, {Color? valueColor}) {
+  Widget _buildProfileItem(BuildContext context, IconData icon, String label, String value, {Color? valueColor}) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: AppColors.primaryLight,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: AppColors.primary, size: 20),
@@ -163,14 +171,14 @@ class ProfileScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11)),
                 const SizedBox(height: 3),
                 Text(
                   value,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: valueColor ?? AppColors.textPrimary,
+                    color: valueColor ?? colorScheme.onSurface,
                   ),
                 ),
               ],

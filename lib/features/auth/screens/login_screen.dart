@@ -238,18 +238,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFEE2E2),
+                                  color: Theme.of(context).colorScheme.errorContainer,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.error_outline,
-                                        color: Color(0xFFDC2626), size: 18),
+                                    Icon(Icons.error_outline,
+                                        color: Theme.of(context).colorScheme.onErrorContainer, size: 18),
                                     const SizedBox(width: 8),
                                     Expanded(
                                         child: Text(authState.error!,
-                                            style: const TextStyle(
-                                                color: Color(0xFFDC2626), fontSize: 13))),
+                                            style: TextStyle(
+                                                color: Theme.of(context).colorScheme.onErrorContainer, fontSize: 13))),
                                   ],
                                 ),
                               ),
@@ -384,10 +384,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
-                                            color: AppColors.textPrimary)),
+                                            color: Theme.of(context).colorScheme.onSurface)),
                                     Text('All data is encrypted and safe',
                                         style: TextStyle(
-                                            fontSize: 11, color: AppColors.textSecondary)),
+                                            fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                   ],
                                 ),
                               ],
