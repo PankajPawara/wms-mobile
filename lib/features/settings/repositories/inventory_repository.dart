@@ -53,6 +53,8 @@ class InventoryRepository {
                 barcode: item['barcode'] ?? '',
                 description: Value(item['description']),
                 location: item['location'] ?? '',
+                price: Value(double.tryParse(item['price']?.toString() ?? '') ?? 0.0),
+                stock: Value(int.tryParse(item['stock']?.toString() ?? '') ?? 0),
                 version: serverVersion,
               ),
               mode: InsertMode.insertOrReplace,
@@ -69,10 +71,50 @@ class InventoryRepository {
             lastUpdated: DateTime.now().toIso8601String(),
           ),
         );
+
+        // Record success sync status
+        await _db.into(_db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(
+            key: 'last_sync_status',
+            value: 'success',
+          ),
+        );
+        await _db.into(_db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(
+            key: 'last_sync_time',
+            value: DateTime.now().toIso8601String(),
+          ),
+        );
+        await _db.into(_db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(
+            key: 'last_sync_error',
+            value: '',
+          ),
+        );
         return true;
       }
-    } catch (_) {
-      // Ignore network errors or bad responses
+    } catch (e) {
+      // Record failed sync status
+      try {
+        await _db.into(_db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(
+            key: 'last_sync_status',
+            value: 'failed',
+          ),
+        );
+        await _db.into(_db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(
+            key: 'last_sync_time',
+            value: DateTime.now().toIso8601String(),
+          ),
+        );
+        await _db.into(_db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(
+            key: 'last_sync_error',
+            value: e.toString(),
+          ),
+        );
+      } catch (_) {}
     }
     return false;
   }

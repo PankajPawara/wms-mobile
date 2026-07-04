@@ -52,18 +52,41 @@ class AuthNotifier extends _$AuthNotifier {
     final storage = ref.read(secureStorageProvider);
     final isLoggedIn = await storage.isLoggedIn();
     if (isLoggedIn) {
-      try {
-        final user = await ref.read(authRepositoryProvider).getMe();
+      final cachedUser = await storage.getUser();
+      if (cachedUser['id'] != null) {
+        final user = UserModel(
+          id: cachedUser['id']!,
+          employeeId: cachedUser['employeeId'] ?? '',
+          name: cachedUser['name'] ?? '',
+          role: cachedUser['role'] ?? 'employee',
+          email: '',
+          mobile: '',
+          status: 'active',
+          isFirstLogin: false,
+        );
         state = AuthState(
           status: AuthStatus.authenticated,
           user: user,
-          isFirstLogin: user.isFirstLogin,
+          isFirstLogin: false,
         );
-      } catch (_) {
-        state = const AuthState(status: AuthStatus.unauthenticated);
+
+        _updateUserFromServerQuietly();
+        return;
       }
-    } else {
-      state = const AuthState(status: AuthStatus.unauthenticated);
+    }
+    state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  Future<void> _updateUserFromServerQuietly() async {
+    try {
+      final user = await ref.read(authRepositoryProvider).getMe();
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: user,
+        isFirstLogin: user.isFirstLogin,
+      );
+    } catch (_) {
+      // Keep existing cached state on connection error
     }
   }
 

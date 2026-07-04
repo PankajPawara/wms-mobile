@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../providers/auth_provider.dart';
+import '../../notifications/providers/notification_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -17,7 +18,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _employeeIdController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _rememberMe = false;
+  bool _rememberMe = true;
 
   @override
   void dispose() {
@@ -40,6 +41,94 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go('/home');
       }
     }
+  }
+
+  void _showForgotPasswordDialog() {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Forgot Password?'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Enter your Employee ID. A password reset request will be sent to the administrator.',
+                      style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: controller,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'Employee ID',
+                        hintText: 'e.g. EMP001',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        prefixIcon: const Icon(Icons.badge_outlined),
+                      ),
+                      validator: (value) => value == null || value.trim().isEmpty
+                          ? 'Employee ID is required'
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => context.pop(),
+                  child: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setState(() => isSubmitting = true);
+                          final empId = controller.text.trim().toUpperCase();
+                          final success = await ref
+                              .read(notificationNotifierProvider.notifier)
+                              .requestPasswordReset(empId);
+                          if (context.mounted) {
+                            context.pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(success
+                                    ? 'Request submitted successfully! Notify your admin.'
+                                    : 'Failed to submit request. Verify Employee ID or try again.'),
+                                backgroundColor: success ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                              ),
+                            );
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -115,9 +204,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Expanded(
                   child: Container(
                     width: double.infinity,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(32),
                         topRight: Radius.circular(32),
                       ),
@@ -129,18 +218,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text(
+                            Text(
                               'Login to your account',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF111827),
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
+                            Text(
                               'Enter your credentials to continue',
-                              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                             const SizedBox(height: 24),
 
@@ -221,24 +310,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                           borderRadius: BorderRadius.circular(5),
                                         ),
                                         child: _rememberMe
-                                            ? const Icon(Icons.check,
-                                                color: Colors.white, size: 14)
+                                            ? Icon(Icons.check,
+                                                color: Theme.of(context).colorScheme.onPrimary, size: 14)
                                             : null,
                                       ),
                                       const SizedBox(width: 8),
-                                      const Text('Remember Me',
+                                      Text('Remember Me',
                                           style: TextStyle(
-                                              fontSize: 13, color: Color(0xFF374151))),
+                                              fontSize: 13, color: Theme.of(context).colorScheme.onSurface)),
                                     ],
                                   ),
                                 ),
                                 const Spacer(),
-                                Text(
-                                  'Forgot Password?',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
+                                GestureDetector(
+                                  onTap: _showForgotPasswordDialog,
+                                  child: Text(
+                                    'Forgot Password?',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -274,19 +366,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                             const SizedBox(height: 20),
 
-                            // OR divider
-                            Row(
-                              children: [
-                                const Expanded(child: Divider()),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  child: Text('OR',
-                                      style: TextStyle(
-                                          color: Colors.grey[400], fontSize: 12)),
-                                ),
-                                const Expanded(child: Divider()),
-                              ],
-                            ),
+                            // Divider separator
+                            const Divider(),
                             const SizedBox(height: 16),
 
                             // Secure access note
@@ -347,30 +428,31 @@ class _LoginField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       validator: validator,
       textCapitalization: textCapitalization,
-      style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
+      style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
         prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
         suffixIcon: suffixIcon != null
             ? Padding(padding: const EdgeInsets.only(right: 12), child: suffixIcon)
             : null,
         suffixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
         filled: true,
-        fillColor: const Color(0xFFF9FAFB),
+        fillColor: colorScheme.surfaceContainerHighest,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -378,11 +460,11 @@ class _LoginField extends StatelessWidget {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFDC2626)),
+          borderSide: BorderSide(color: colorScheme.error),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+          borderSide: BorderSide(color: colorScheme.error, width: 1.5),
         ),
       ),
     );

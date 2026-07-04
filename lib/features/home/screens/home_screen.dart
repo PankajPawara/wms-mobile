@@ -1,215 +1,202 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
-import '../../../shared/widgets/app_bottom_nav.dart';
+import '../../notifications/providers/notification_provider.dart';
+import '../../../core/database/app_database.dart';
 
-class HomeScreen extends ConsumerWidget {
+// ── Top-level provider (MUST be outside the class) ──────────────────────────
+final _watchOrdersProvider = StreamProvider<List<Order>>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.select(db.orders).watch();
+});
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(notificationNotifierProvider.notifier).refresh();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final authState = ref.watch(authNotifierProvider);
     final user = authState.user;
     final userName = user?.name ?? 'User';
     final role = user?.role == 'admin' ? 'Administrator' : 'Warehouse Assistant';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      body: Column(
-        children: [
-          // Purple Gradient Header
-          _HomeHeader(userName: userName, role: role),
-
-          // Scrollable Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-              child: Column(
-                children: [
-                  _ImportCard(onTap: () {}),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ActionCard(
-                          icon: Icons.list_alt_rounded,
-                          iconColor: AppColors.cardBlueDark,
-                          bgColor: AppColors.cardBlue,
-                          title: 'Pickup List',
-                          subtitle: 'Create pickup list\nfrom memo/image',
-                          arrowColor: AppColors.cardBlueDark,
-                          onTap: () => context.push('/memo-capture'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _ActionCard(
-                          icon: Icons.verified_rounded,
-                          iconColor: AppColors.cardGreenDark,
-                          bgColor: AppColors.cardGreen,
-                          title: 'Pickup Verification',
-                          subtitle: 'Verify picked items\nusing scan',
-                          arrowColor: AppColors.cardGreenDark,
-                          onTap: () => context.push('/checking-list'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-                  _ScanFab(onTap: () => context.push('/scan-to-find')),
-                ],
-              ),
-            ),
-          ),
-
-          // Bottom Navigation
-          _HomeBottomNav(),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeHeader extends StatelessWidget {
-  final String userName;
-  final String role;
-  const _HomeHeader({required this.userName, required this.role});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF5B21B6), Color(0xFF4C1D95)],
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.only(top: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Welcome Card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryMid],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.person_rounded, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Welcome,',
-                      style: TextStyle(
-                          color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w400),
-                    ),
-                    Text(
-                      userName,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      role,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome back,',
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 13),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            userName,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            role,
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              Stack(
+            ),
+            const SizedBox(height: 20),
+
+            // Order Status Summary (Total, Completed, In Progress)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Consumer(
+                builder: (context, ref, child) {
+                  final ordersAsync = ref.watch(_watchOrdersProvider);
+                  return ordersAsync.maybeWhen(
+                    data: (orders) {
+                      final total = orders.length;
+                      final completed =
+                          orders.where((o) => o.status == 'checked').length;
+                      final inProgress = orders
+                          .where((o) =>
+                              o.status == 'picking' || o.status == 'draft')
+                          .length;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _SummaryCard(
+                                title: 'Total Orders',
+                                count: total,
+                                icon: Icons.inventory_2_outlined,
+                                color: AppColors.primary,
+                                bgColor: AppColors.primary.withValues(alpha: 0.08),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _SummaryCard(
+                                title: 'Completed',
+                                count: completed,
+                                icon: Icons.check_circle_outline_rounded,
+                                color: AppColors.success,
+                                bgColor: AppColors.success.withValues(alpha: 0.08),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _SummaryCard(
+                                title: 'In Progress',
+                                count: inProgress,
+                                icon: Icons.pending_actions_rounded,
+                                color: AppColors.warning,
+                                bgColor:
+                                    AppColors.warning.withValues(alpha: 0.08),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    orElse: () => const SizedBox.shrink(),
+                  );
+                },
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded,
-                        color: Colors.white, size: 28),
-                    onPressed: () {},
+                  Expanded(
+                    child: _ActionCard(
+                      icon: Icons.list_alt_rounded,
+                      iconColor: AppColors.cardBlueDark,
+                      bgColor: AppColors.cardBlue,
+                      title: 'Pickup List',
+                      subtitle: 'Create pickup list\nfrom memo/image',
+                      arrowColor: AppColors.cardBlueDark,
+                      onTap: () => context.push('/memo-capture'),
+                    ),
                   ),
-                  Positioned(
-                    right: 10,
-                    top: 8,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: const BoxDecoration(
-                          color: Color(0xFFEF4444), shape: BoxShape.circle),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ActionCard(
+                      icon: Icons.verified_rounded,
+                      iconColor: AppColors.cardGreenDark,
+                      bgColor: AppColors.cardGreen,
+                      title: 'Checking',
+                      subtitle: 'Verify picked items\nusing scan',
+                      arrowColor: AppColors.cardGreenDark,
+                      onTap: () => context.push('/checking-list'),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ImportCard extends StatelessWidget {
-  final VoidCallback onTap;
-  const _ImportCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEDE9FD),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.folder_open_rounded,
-                  color: AppColors.primary, size: 26),
             ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Import Excel File',
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF111827)),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Import or update product & location data',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.arrow_forward_rounded,
-                  color: Colors.white, size: 18),
-            ),
+            const SizedBox(height: 28),
+            _ScanFab(onTap: () => context.push('/scan-to-find')),
           ],
         ),
       ),
@@ -238,6 +225,7 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -261,13 +249,20 @@ class _ActionCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               title,
-              style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface),
             ),
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280), height: 1.4),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.4),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 12),
             Container(
@@ -277,7 +272,8 @@ class _ActionCard extends StatelessWidget {
                 color: arrowColor,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+              child: const Icon(Icons.arrow_forward_rounded,
+                  color: Colors.white, size: 16),
             ),
           ],
         ),
@@ -293,153 +289,170 @@ class _ScanFab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            CustomPaint(
-              size: const Size(double.infinity, 120),
-              painter: _WavePainter(),
-            ),
-            GestureDetector(
-              onTap: onTap,
-              child: Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const RadialGradient(
-                    colors: [Color(0xFF7C3AED), Color(0xFF5B21B6)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.5),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                  border: Border.all(color: Colors.white, width: 4),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 36),
-                    SizedBox(height: 4),
-                    Text(
-                      'Scan',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+        // Wave top — passes color via constructor parameter
+        CustomPaint(
+          size: const Size(double.infinity, 40),
+          painter: _WavePainter(color: AppColors.primaryDark),
+        ),
+        // Solid purple section
+        Container(
+          width: double.infinity,
+          color: AppColors.primaryDark,
+          padding: const EdgeInsets.only(bottom: 28),
+          child: Column(
+            children: [
+              Transform.translate(
+                offset: const Offset(0, -25),
+                child: GestureDetector(
+                  onTap: onTap,
+                  child: Container(
+                    width: 110,
+                    height: 110,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const RadialGradient(
+                        colors: [AppColors.primaryMid, AppColors.primaryDark],
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                      border: Border.all(color: Colors.white, width: 4),
                     ),
-                  ],
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.qr_code_scanner_rounded,
+                            color: Colors.white, size: 36),
+                        SizedBox(height: 4),
+                        Text(
+                          'Scan',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'Scan product barcode\nto find or verify',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.4),
+              const Text(
+                'Scan product barcode\nto find or verify',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
+/// Wave painter with injected color for proper theme support
 class _WavePainter extends CustomPainter {
+  final Color color;
+  const _WavePainter({required this.color});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF5B21B6)
+      ..color = color
       ..style = PaintingStyle.fill;
 
     final path = Path();
-    path.moveTo(0, 60);
-    path.quadraticBezierTo(size.width * 0.25, 20, size.width * 0.5, 40);
-    path.quadraticBezierTo(size.width * 0.75, 60, size.width, 20);
+    path.moveTo(0, size.height);
+    path.quadraticBezierTo(size.width * 0.25, 10, size.width * 0.5, 20);
+    path.quadraticBezierTo(size.width * 0.75, 30, size.width, 0);
     path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
     path.close();
     canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(_) => false;
+  bool shouldRepaint(_WavePainter old) => old.color != color;
 }
 
-class _HomeBottomNav extends StatelessWidget {
+class _SummaryCard extends StatelessWidget {
+  final String title;
+  final int count;
+  final IconData icon;
+  final Color color;
+  final Color bgColor;
+
+  const _SummaryCard({
+    required this.title,
+    required this.count,
+    required this.icon,
+    required this.color,
+    required this.bgColor,
+  });
+
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Color(0x14000000), blurRadius: 12, offset: Offset(0, -2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
+        border: Border.all(color: colorScheme.outlineVariant, width: 1),
       ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 60,
-          child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _Tab(icon: Icons.home_rounded, label: 'Home', active: true, onTap: () {}),
-              _Tab(
-                  icon: Icons.search_rounded,
-                  label: 'Search',
-                  active: false,
-                  onTap: () => context.push('/scan-to-find')),
-              _Tab(
-                  icon: Icons.history_rounded,
-                  label: 'History',
-                  active: false,
-                  onTap: () => context.push('/history')),
-              _Tab(
-                  icon: Icons.settings_outlined,
-                  label: 'Settings',
-                  active: false,
-                  onTap: () => context.push('/settings')),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 16),
+              ),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Tab extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-  const _Tab({required this.icon, required this.label, required this.active, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon,
-                color: active ? AppColors.primary : const Color(0xFF9CA3AF), size: 24),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                color: active ? AppColors.primary : const Color(0xFF9CA3AF),
-              ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
             ),
-          ],
-        ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

@@ -19,7 +19,7 @@ class AppStrings {
   // Home
   static const String importFile = 'Import Inventory File';
   static const String pickupList = 'Pickup List';
-  static const String pickupVerification = 'Pickup Verification';
+  static const String pickupVerification = 'Checking';
   static const String scanProduct = 'Scan Product';
 
   // Scan to Find
