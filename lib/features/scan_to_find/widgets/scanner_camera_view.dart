@@ -11,7 +11,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/barcode_util.dart';
 
 class ScannerCameraView extends StatefulWidget {
-  final Function(String partNo) onResult;
+  final Future<bool> Function(String result, bool isOcr) onResult;
   final Widget Function(BuildContext context, CameraController controller) builder;
 
   const ScannerCameraView({
@@ -139,9 +139,12 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
         for (final barcode in barcodes) {
           final rawVal = barcode.rawValue;
           if (rawVal != null && rawVal.isNotEmpty) {
-            _stopLiveFeed(); // Stop on success
-            widget.onResult(rawVal);
-            return; // We are done!
+            final success = await widget.onResult(rawVal, false);
+            if (success) {
+              _stopLiveFeed(); // Stop on success
+              return; // We are done!
+            }
+            // If false, continue streaming to allow OCR or another barcode
           }
         }
       }
@@ -154,9 +157,13 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
         
         final partNumbers = BarcodeUtil.extractPartNumbers(recognizedText.text);
         if (partNumbers.isNotEmpty) {
-          _stopLiveFeed(); // Stop on success
-          widget.onResult(partNumbers.first);
-          return; // We are done!
+          for (final partNo in partNumbers) {
+            final success = await widget.onResult(partNo, true);
+            if (success) {
+              _stopLiveFeed(); // Stop on success
+              return; // We are done!
+            }
+          }
         }
       }
     } catch (e) {

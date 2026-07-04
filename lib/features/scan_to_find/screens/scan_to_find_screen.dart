@@ -166,7 +166,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     super.dispose();
   }
 
-  Future<void> _searchProduct(String barcode) async {
+  Future<bool> _searchProduct(String barcode, bool isOcr) async {
     setState(() {
       _scannedBarcode = barcode;
       _state = _ScanState.searching;
@@ -174,21 +174,35 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
     try {
       final db = ref.read(appDatabaseProvider);
-      final queryBarcode = barcode.trim().toUpperCase().replaceAll('O', '0');
+      var queryBarcode = barcode.trim().toUpperCase().replaceAll('O', '0');
       
-      final matches = await (db.select(db.inventory)
+      var matches = await (db.select(db.inventory)
             ..where((t) => 
               CustomExpression<bool>("REPLACE(UPPER(barcode), 'O', '0') LIKE '%$queryBarcode%' OR REPLACE(UPPER(part_no), 'O', '0') LIKE '%$queryBarcode%'")
             ))
           .get();
 
+      if (matches.isEmpty && isOcr) {
+        // Run fuzzy match
+        final allParts = await db.select(db.inventory).get();
+        final partNumbersList = allParts.map((e) => e.partNo).toList();
+        final bestMatch = BarcodeUtil.findBestMatch(queryBarcode, partNumbersList);
+        if (bestMatch != null) {
+           queryBarcode = bestMatch;
+           matches = await (db.select(db.inventory)
+                ..where((t) => t.partNo.equals(bestMatch)))
+              .get();
+        }
+      }
+
       if (matches.isNotEmpty) {
         ScanFeedback.triggerSuccess();
         _addRecordToHistory(matches.first.partNo);
-        if (!mounted) return;
+        if (!mounted) return true;
         if (matches.length == 1) {
           final match = matches.first;
           setState(() {
+            _scannedBarcode = match.partNo; // update to the matched part no
             _foundProduct = {
               'partNo': match.partNo,
               'description': match.description ?? '',
@@ -205,7 +219,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
             _state = _ScanState.multipleLocations;
           });
         }
-        return;
+        return true;
       }
 
       final api = ref.read(apiClientProvider);
@@ -216,8 +230,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       if (product != null) {
         ScanFeedback.triggerSuccess();
         _addRecordToHistory(product['part_no'] ?? '');
-        if (!mounted) return;
+        if (!mounted) return true;
         setState(() {
+          _scannedBarcode = product['part_no'] ?? queryBarcode;
           _foundProduct = {
             'partNo': product['part_no'] ?? '',
             'description': product['description'] ?? '',
@@ -228,19 +243,47 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           };
           _state = _ScanState.found;
         });
+        return true;
       } else {
-        ScanFeedback.triggerError();
-        if (!mounted) return;
-        setState(() {
-          _state = _ScanState.notFound;
-        });
+        if (!mounted) return false;
+        if (!isOcr) {
+           // For barcode, we just return false and keep scanning
+           setState(() {
+             _state = _ScanState.scanning; // Go back to scanning silently
+           });
+           return false;
+        } else {
+           ScanFeedback.triggerError();
+           setState(() {
+             _state = _ScanState.scanning;
+             _isManualMode = true;
+             _manualController.text = _scannedBarcode;
+             _manualSearchQuery = _scannedBarcode;
+             _searchByField = 'Part No';
+           });
+           _performManualSearch();
+           return false;
+        }
       }
     } catch (e) {
-      ScanFeedback.triggerError();
-      if (!mounted) return;
-      setState(() {
-        _state = _ScanState.notFound;
-      });
+      if (!mounted) return false;
+      if (!isOcr) {
+         setState(() {
+           _state = _ScanState.scanning; // Go back to scanning silently
+         });
+         return false;
+      } else {
+         ScanFeedback.triggerError();
+         setState(() {
+           _state = _ScanState.scanning;
+           _isManualMode = true;
+           _manualController.text = _scannedBarcode;
+           _manualSearchQuery = _scannedBarcode;
+           _searchByField = 'Part No';
+         });
+         _performManualSearch();
+         return false;
+      }
     }
   }
   void _setTorch(bool turnOn) {
@@ -324,8 +367,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       children: [
         ScannerCameraView(
           key: _scannerKey,
-          onResult: (result) {
-            _searchProduct(result);
+          onResult: (result, isOcr) {
+            return _searchProduct(result, isOcr);
           },
           builder: (context, controller) {
             return CameraPreview(controller);
@@ -815,25 +858,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                 ),
                 const SizedBox(height: 20),
 
-                SizedBox(
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Map directions coming soon'), duration: Duration(seconds: 1)),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const Text('Get Directions',
-                        style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-                const SizedBox(height: 10),
+
 
                 SizedBox(
                   height: 50,
@@ -1183,7 +1208,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           if (mounted) {
             Navigator.pop(context);
           }
-          await _searchProduct(rawVal);
+          await _searchProduct(rawVal, false);
           return;
         }
       }
@@ -1199,12 +1224,12 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       }
 
       if (partNumbers.isNotEmpty) {
-        await _searchProduct(partNumbers.first);
+        await _searchProduct(partNumbers.first, true);
       } else {
         final reg = RegExp(r'\b\d{8,14}\b');
         final matches = reg.allMatches(recognizedText.text);
         if (matches.isNotEmpty) {
-          await _searchProduct(matches.first.group(0)!);
+          await _searchProduct(matches.first.group(0)!, true);
         } else {
           _showScanFailedDialog();
         }
@@ -1528,30 +1553,6 @@ class _SearchChip extends StatelessWidget {
       backgroundColor: const Color(0xFFF3F4F6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       padding: const EdgeInsets.symmetric(horizontal: 4),
-    );
-  }
-}
-
-class _FloatingControlBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool active;
-  const _FloatingControlBtn({required this.icon, required this.onTap, this.active = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: active ? AppColors.primary : Colors.black54,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white24, width: 1),
-        ),
-        child: Icon(icon, color: Colors.white, size: 20),
-      ),
     );
   }
 }
