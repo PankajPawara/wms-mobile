@@ -22,17 +22,18 @@ class InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(AppDimensions.md),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: colorScheme.outlineVariant),
           boxShadow: [
             BoxShadow(
-              color: AppColors.cardShadow,
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -40,29 +41,29 @@ class InfoCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            if (icon != null) ...
-              [
-                Container(
-                  padding: const EdgeInsets.all(AppDimensions.sm),
-                  decoration: BoxDecoration(
-                    color: (iconColor ?? AppColors.primary).withValues(alpha: 0.1),
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusSm),
-                  ),
-                  child: Icon(icon,
-                      color: iconColor ?? AppColors.primary, size: 20),
+            if (icon != null) ...[
+              Container(
+                padding: const EdgeInsets.all(AppDimensions.sm),
+                decoration: BoxDecoration(
+                  color:
+                      (iconColor ?? AppColors.primary).withValues(alpha: 0.1),
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusSm),
                 ),
-                const SizedBox(width: AppDimensions.md),
-              ],
+                child: Icon(icon,
+                    color: iconColor ?? AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: AppDimensions.md),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -71,7 +72,7 @@ class InfoCard extends StatelessWidget {
                     value,
                     style: TextStyle(
                       fontSize: 15,
-                      color: valueColor ?? AppColors.textPrimary,
+                      color: valueColor ?? colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -79,8 +80,8 @@ class InfoCard extends StatelessWidget {
               ),
             ),
             if (onTap != null)
-              const Icon(Icons.chevron_right,
-                  color: AppColors.textSecondary, size: 20),
+              Icon(Icons.chevron_right,
+                  color: colorScheme.onSurfaceVariant, size: 20),
           ],
         ),
       ),

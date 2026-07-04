@@ -14,7 +14,11 @@ class PickingSummaryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Picking Summary')),
+      appBar: AppBar(
+        title: const Text('Picking Summary', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: AppColors.primary,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(AppDimensions.md),
         child: Column(

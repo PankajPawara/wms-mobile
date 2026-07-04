@@ -30,34 +30,43 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
 
   Future<void> _loadItems() async {
     final id = int.tryParse(widget.orderId);
-    if (id != null) {
-      final items = await ref.read(orderRepositoryProvider).getLocalOrderItems(id);
-      if (mounted) {
-        setState(() {
-          _items = items;
-          _isLoading = false;
-        });
-      }
+    if (id == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    final items =
+        await ref.read(orderRepositoryProvider).getLocalOrderItems(id);
+    if (mounted) {
+      setState(() {
+        _items = items;
+        _isLoading = false;
+      });
     }
   }
 
   bool get _allChecked =>
-      _items.isNotEmpty && _items.every((i) => i.status == 'checked' || i.status == 'missing');
+      _items.isNotEmpty &&
+      _items.every((i) => i.status == 'checked' || i.status == 'missing');
 
+  /// Fixed status logic: 0 qty → missing, qty >= picked → checked, else pending
   void _markChecked(int index, int qty) async {
     final item = _items[index];
-    final status = qty >= item.pickedQty ? 'checked' : (qty == 0 ? 'missing' : 'pending');
-    
+    final status =
+        qty == 0 ? 'missing' : (qty >= item.pickedQty ? 'checked' : 'pending');
+
     await ref.read(orderRepositoryProvider).updateOrderItemQty(
-      itemId: item.id,
-      checkedQty: qty,
-      status: status,
-    );
-    await _loadItems();
+          itemId: item.id,
+          checkedQty: qty,
+          status: status,
+        );
+    // Guard mounted before calling setState inside _loadItems
+    if (mounted) await _loadItems();
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -65,7 +74,17 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text('Checking — ${widget.orderId}')),
+      appBar: AppBar(
+        title: Text('Checking — ${widget.orderId}'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 17,
+        ),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -81,10 +100,10 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
                 return Container(
                   padding: const EdgeInsets.all(AppDimensions.md),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colorScheme.surface,
                     borderRadius:
                         BorderRadius.circular(AppDimensions.radiusMd),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: colorScheme.outlineVariant),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,8 +121,9 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
                         ],
                       ),
                       Text(item.description ?? '',
-                          style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 13)),
+                          style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 13)),
                       const SizedBox(height: AppDimensions.sm),
                       Row(
                         children: [
@@ -150,20 +170,30 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
             ),
           ),
           Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(AppDimensions.md),
+            color: colorScheme.surface,
+            padding: EdgeInsets.fromLTRB(
+              AppDimensions.md,
+              AppDimensions.md,
+              AppDimensions.md,
+              AppDimensions.md + MediaQuery.of(context).padding.bottom,
+            ),
             child: AppButton(
               label: AppStrings.completeChecking,
               icon: Icons.verified_rounded,
-              onPressed: _allChecked ? () async {
-                final id = int.tryParse(widget.orderId);
-                if (id != null) {
-                  await ref.read(orderRepositoryProvider).updateOrderStatus(id, 'checked');
-                }
-                if (context.mounted) {
-                  context.go('/home');
-                }
-              } : null,
+              onPressed: _allChecked
+                  ? () async {
+                      final id = int.tryParse(widget.orderId);
+                      if (id != null) {
+                        await ref
+                            .read(orderRepositoryProvider)
+                            .updateOrderStatus(id, 'checked');
+                      }
+                      // Navigate back to checking list (not home) to preserve navigation stack
+                      if (context.mounted) {
+                        context.go('/checking-list');
+                      }
+                    }
+                  : null,
             ),
           ),
         ],
