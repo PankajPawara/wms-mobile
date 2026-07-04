@@ -46,46 +46,67 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Order Details')),
+        appBar: AppBar(
+          title: const Text('Order Details'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_order == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Order Details')),
+        appBar: AppBar(
+          title: const Text('Order Details'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
         body: const Center(child: Text('Order not found')),
       );
     }
 
     final order = _order!;
     final totalItems = _items.length;
-    final pickedItems = _items.where((i) => i.status == 'picked' || i.status == 'checked').length;
-    final notFoundItems = _items.where((i) => i.status == 'missing').length;
+    final pickedItems = _items
+        .where((i) => i.status == 'picked' || i.status == 'checked')
+        .length;
+    final notFoundItems =
+        _items.where((i) => i.status == 'missing').length;
 
     final (statusLabel, statusColor, statusBg) = switch (order.status) {
       'draft' => ('Draft', AppColors.textSecondary, AppColors.border),
       'picking' => ('Picking', AppColors.warning, AppColors.warningLight),
-      'pending_checking' => ('Pending Checking', AppColors.info, AppColors.infoLight),
+      'pending_checking' =>
+        ('Pending Checking', AppColors.info, AppColors.infoLight),
       'checked' => ('Verified', AppColors.success, AppColors.successLight),
       'cancelled' => ('Cancelled', AppColors.danger, AppColors.dangerLight),
       _ => ('Unknown', AppColors.textSecondary, AppColors.border),
     };
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF111827),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 20),
           onPressed: () => context.pop(),
         ),
         title: const Text('Order Details',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -97,7 +118,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -115,7 +136,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                         child: Row(
                           children: [
                             Icon(
-                              order.status == 'checked' ? Icons.check_circle_rounded : Icons.info_outline,
+                              order.status == 'checked'
+                                  ? Icons.check_circle_rounded
+                                  : Icons.info_outline,
                               color: statusColor,
                               size: 14,
                             ),
@@ -131,16 +154,26 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                         ),
                       ),
                       const Spacer(),
-                      Text('Memo No. #${order.memoNumber}',
-                          style: const TextStyle(
+                      Flexible(
+                        child: Text(
+                          'Memo No. #${order.memoNumber}',
+                          style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF374151))),
+                              color: colorScheme.onSurface),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _DetailRow(label: 'Customer', value: order.customerName ?? '-'),
-                  _DetailRow(label: 'Area', value: order.customerLocation ?? '-', bold: true),
+                  _DetailRow(
+                      label: 'Customer', value: order.customerName ?? '-'),
+                  _DetailRow(
+                      label: 'Area',
+                      value: order.customerLocation ?? '-',
+                      bold: true),
                   _DetailRow(label: 'Created At', value: order.createdAt),
                 ],
               ),
@@ -152,7 +185,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
               children: [
                 Expanded(
                     child: _StatBox(
-                        label: 'Total Items', value: '$totalItems', color: Colors.black)),
+                        label: 'Total Items',
+                        value: '$totalItems',
+                        color: colorScheme.onSurface)),
                 const SizedBox(width: 8),
                 Expanded(
                     child: _StatBox(
@@ -173,7 +208,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -183,9 +218,13 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                       style: TextStyle(
                           fontSize: 15, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  _SummaryRow(label: 'Status', value: statusLabel, valueColor: statusColor),
                   _SummaryRow(
-                      label: 'Total Value', value: '₹${order.finalAmount.toStringAsFixed(2)}'),
+                      label: 'Status',
+                      value: statusLabel,
+                      valueColor: statusColor),
+                  _SummaryRow(
+                      label: 'Total Value',
+                      value: '₹${order.finalAmount.toStringAsFixed(2)}'),
                 ],
               ),
             ),
@@ -195,7 +234,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -224,8 +263,8 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                               style: TextStyle(
                                   fontSize: 14, fontWeight: FontWeight.w500)),
                         ),
-                        const Icon(Icons.chevron_right_rounded,
-                            color: Color(0xFF9CA3AF)),
+                        Icon(Icons.chevron_right_rounded,
+                            color: colorScheme.outline),
                       ],
                     ),
                   ),
@@ -234,37 +273,48 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Start Picking/Checking Button
+            // Start Picking Button
             if (order.status == 'draft' || order.status == 'picking')
               ElevatedButton(
                 onPressed: () async {
                   if (order.status == 'draft') {
-                    await ref.read(orderRepositoryProvider).updateOrderStatus(order.id, 'picking');
+                    await ref
+                        .read(orderRepositoryProvider)
+                        .updateOrderStatus(order.id, 'picking');
                   }
-                  if (context.mounted) {
-                    context.push('/picking/${order.id}').then((_) => _loadOrderDetails());
-                  }
+                  if (!context.mounted) return;
+                  await context.push('/picking/${order.id}');
+                  if (mounted) _loadOrderDetails();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Start Picking', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: const Text('Start Picking',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
+
+            // Start Checking Button
             if (order.status == 'pending_checking')
               ElevatedButton(
-                onPressed: () {
-                  context.push('/checking/${order.id}').then((_) => _loadOrderDetails());
+                onPressed: () async {
+                  await context.push('/checking/${order.id}');
+                  if (mounted) _loadOrderDetails();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Start Verification', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: const Text('Start Checking',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
           ],
         ),
@@ -282,6 +332,7 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -290,8 +341,9 @@ class _DetailRow extends StatelessWidget {
           SizedBox(
             width: 100,
             child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF6B7280))),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant)),
           ),
           Expanded(
             child: Text(value,
@@ -299,7 +351,7 @@ class _DetailRow extends StatelessWidget {
                     fontSize: 13,
                     fontWeight:
                         bold ? FontWeight.bold : FontWeight.w500,
-                    color: const Color(0xFF111827),
+                    color: colorScheme.onSurface,
                     height: 1.4)),
           ),
         ],
@@ -317,10 +369,11 @@ class _StatBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -332,8 +385,10 @@ class _StatBox extends StatelessWidget {
                   color: color)),
           const SizedBox(height: 2),
           Text(label,
-              style: const TextStyle(
-                  fontSize: 11, color: Color(0xFF6B7280))),
+              style: TextStyle(
+                  fontSize: 11, color: colorScheme.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -349,19 +404,20 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
           Expanded(
               child: Text(label,
-                  style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF6B7280)))),
+                  style: TextStyle(
+                      fontSize: 13, color: colorScheme.onSurfaceVariant))),
           Text(value,
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: valueColor ?? const Color(0xFF111827))),
+                  color: valueColor ?? colorScheme.onSurface)),
         ],
       ),
     );
