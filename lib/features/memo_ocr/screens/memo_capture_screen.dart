@@ -10,6 +10,7 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/barcode_util.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/empty_state_placeholder.dart';
 
 class MemoCaptureScreen extends ConsumerStatefulWidget {
   const MemoCaptureScreen({super.key});
@@ -41,47 +42,72 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
       _error = null;
     });
 
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
-      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
       final inputImage = InputImage.fromFile(_imageFile!);
       final recognizedText = await textRecognizer.processImage(inputImage);
-      await textRecognizer.close();
 
       final rawText = recognizedText.text;
-      final partNumbers = BarcodeUtil.extractPartNumbers(rawText);
+      final parsedItems = BarcodeUtil.parseOcrText(rawText);
 
-      if (partNumbers.isEmpty) {
-        setState(() {
-          _error = 'No Honda part numbers found in the image. Try a clearer photo.';
-          _isProcessing = false;
-        });
+      if (parsedItems.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _error = 'No Honda part numbers found in the image. Try a clearer photo.';
+            _isProcessing = false;
+          });
+        }
         return;
       }
 
-      final items = partNumbers
-          .map((p) => {'part_no': p, 'required_qty': 1})
+      final customerName = BarcodeUtil.extractCustomerName(rawText) ?? 'OCR Generated Order';
+      final customerLocation = BarcodeUtil.extractArea(rawText) ?? 'Warehouse Floor';
+      // Use full millisecond timestamp for uniqueness (no modulo collision risk)
+      final memoNumber = BarcodeUtil.extractMemoNumber(rawText) ?? 'MEMO-OCR-${DateTime.now().millisecondsSinceEpoch}';
+
+      final items = parsedItems
+          .map((item) => {
+                'part_no': item['part_no'],
+                'required_qty': item['quantity'],
+                'price': item['price'],
+                'description': item['description'],
+                'location': item['location'],
+                'stock': item['stock'],
+              })
           .toList();
 
-      setState(() => _isProcessing = false);
       if (mounted) {
-        context.push('/ocr-review', extra: {'items': items});
+        setState(() => _isProcessing = false);
+        context.push('/ocr-review', extra: {
+          'items': items,
+          'customerName': customerName,
+          'customerLocation': customerLocation,
+          'memoNumber': memoNumber,
+        });
       }
     } catch (e) {
-      setState(() {
-        _error = 'OCR failed: ${e.toString()}';
-        _isProcessing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'OCR failed: ${e.toString()}';
+          _isProcessing = false;
+        });
+      }
+    } finally {
+      // Always close the recognizer to prevent resource leaks
+      await textRecognizer.close();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.captureMemo),
-        backgroundColor: Colors.white,
-      ),
-      body: SafeArea(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go('/home');
+      },
+      child: Scaffold(
+        body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppDimensions.md),
           child: Column(
@@ -145,19 +171,23 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
                   ),
                 ],
               const SizedBox(height: AppDimensions.md),
-              AppButton(
-                label: _isProcessing
-                    ? AppStrings.extracting
-                    : AppStrings.generatePickupList,
-                icon: Icons.document_scanner_outlined,
-                onPressed: _imageFile == null || _isProcessing
-                    ? null
-                    : _processOcr,
-                isLoading: _isProcessing,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 84), // Spacing to avoid overlap with floating bottom nav
+                child: AppButton(
+                  label: _isProcessing
+                      ? AppStrings.extracting
+                      : AppStrings.generatePickupList,
+                  icon: Icons.document_scanner_outlined,
+                  onPressed: _imageFile == null || _isProcessing
+                      ? null
+                      : _processOcr,
+                  isLoading: _isProcessing,
+                ),
               ),
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -166,82 +196,41 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
 class _EmptyImageState extends StatelessWidget {
   final VoidCallback onCamera;
   final VoidCallback onGallery;
-  const _EmptyImageState(
-      {required this.onCamera, required this.onGallery});
+  const _EmptyImageState({required this.onCamera, required this.onGallery});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.border.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-        border:
-            Border.all(color: AppColors.border, style: BorderStyle.solid),
-      ),
-      child: Column(
+    return EmptyStatePlaceholder(
+      icon: Icons.document_scanner_outlined,
+      title: 'Generate Pickup List',
+      subtitle: 'Capture or upload an order memo image to automatically extract items, descriptions, locations, prices, and stock counts.',
+      action: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.document_scanner_outlined,
-              size: 64, color: AppColors.textSecondary),
-          const SizedBox(height: AppDimensions.md),
-          const Text(
-            'Capture or upload the order memo',
-            style: TextStyle(
-                color: AppColors.textSecondary, fontSize: 14),
+          ElevatedButton.icon(
+            onPressed: onCamera,
+            icon: const Icon(Icons.camera_alt_rounded),
+            label: const Text('Camera'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            ),
           ),
-          const SizedBox(height: AppDimensions.lg),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _SourceButton(
-                icon: Icons.camera_alt_rounded,
-                label: 'Camera',
-                onTap: onCamera,
-              ),
-              const SizedBox(width: AppDimensions.md),
-              _SourceButton(
-                icon: Icons.photo_library_outlined,
-                label: 'Gallery',
-                onTap: onGallery,
-              ),
-            ],
+          const SizedBox(width: 16),
+          OutlinedButton.icon(
+            onPressed: onGallery,
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('Gallery'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SourceButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const _SourceButton(
-      {required this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppDimensions.lg, vertical: AppDimensions.md),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: AppColors.primary, size: 28),
-            const SizedBox(height: AppDimensions.xs),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
       ),
     );
   }

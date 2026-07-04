@@ -26,6 +26,8 @@ class Inventory extends Table {
   TextColumn get barcode => text()();
   TextColumn get description => text().nullable()();
   TextColumn get location => text()();
+  RealColumn get price => real().withDefault(const Constant(0.0))();
+  IntColumn get stock => integer().withDefault(const Constant(0))();
   TextColumn get version => text()();
 }
 
@@ -102,7 +104,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -110,8 +112,8 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
         },
         onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            // Drop and recreate inventory table to remove unique constraint on barcode
+          if (from < 3) {
+            // Drop and recreate inventory table to add price and stock columns
             await m.drop(inventory);
             await m.create(inventory);
           }
