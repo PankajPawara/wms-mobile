@@ -40,7 +40,7 @@ class MainLayout extends ConsumerWidget {
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Exit', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  child: Text('Exit', style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -107,8 +107,8 @@ class NotificationBell extends ConsumerWidget {
                 right: 10,
                 child: Container(
                   padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.error,
                     shape: BoxShape.circle,
                   ),
                   constraints: const BoxConstraints(
