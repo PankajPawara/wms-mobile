@@ -51,10 +51,8 @@ class WmsApp extends ConsumerWidget {
         ),
         cardTheme: CardThemeData(
           elevation: 0,
-          color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: AppColors.border),
           ),
         ),
       ),

@@ -1372,14 +1372,14 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Recent Searches',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4B5563)),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                   ),
                                   if (_recentQueries.isNotEmpty)
                                     TextButton(
                                       onPressed: _clearSearchHistory,
-                                      child: const Text('Clear', style: TextStyle(fontSize: 12, color: Colors.red)),
+                                      child: Text('Clear', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error)),
                                     ),
                                 ],
                               ),
@@ -1396,7 +1396,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                   children: _recentQueries.map((query) {
                                     return ActionChip(
                                       label: Text(query, style: const TextStyle(fontSize: 12)),
-                                      backgroundColor: AppColors.primaryLight,
+                                      backgroundColor: AppColors.primary.withValues(alpha: 0.10),
                                       side: BorderSide.none,
                                       onPressed: () {
                                         _manualController.text = query;
@@ -1457,7 +1457,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFEDE9FD),
+                                          color: AppColors.primary.withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Row(
@@ -1545,12 +1545,12 @@ class _SearchChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FilterChip(
-      label: Text(label, style: TextStyle(fontSize: 12, color: selected ? Colors.white : const Color(0xFF4B5563))),
+      label: Text(label, style: TextStyle(fontSize: 12, color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface)),
       selected: selected,
       onSelected: onSelected,
       selectedColor: AppColors.primary,
       checkmarkColor: Colors.white,
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       padding: const EdgeInsets.symmetric(horizontal: 4),
     );

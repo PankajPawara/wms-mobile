@@ -173,10 +173,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: _ActionCard(
                       icon: Icons.list_alt_rounded,
                       iconColor: AppColors.cardBlueDark,
-                      bgColor: AppColors.cardBlue,
                       title: 'Pickup List',
                       subtitle: 'Create pickup list\nfrom memo/image',
-                      arrowColor: AppColors.cardBlueDark,
                       onTap: () => context.push('/memo-capture'),
                     ),
                   ),
@@ -185,10 +183,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: _ActionCard(
                       icon: Icons.verified_rounded,
                       iconColor: AppColors.cardGreenDark,
-                      bgColor: AppColors.cardGreen,
                       title: 'Checking',
                       subtitle: 'Verify picked items\nusing scan',
-                      arrowColor: AppColors.cardGreenDark,
                       onTap: () => context.push('/checking-list'),
                     ),
                   ),
@@ -207,19 +203,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _ActionCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
-  final Color bgColor;
   final String title;
   final String subtitle;
-  final Color arrowColor;
   final VoidCallback onTap;
 
   const _ActionCard({
     required this.icon,
     required this.iconColor,
-    required this.bgColor,
     required this.title,
     required this.subtitle,
-    required this.arrowColor,
     required this.onTap,
   });
 
@@ -231,7 +223,7 @@ class _ActionCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: bgColor,
+          color: iconColor.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -241,7 +233,7 @@ class _ActionCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
+                color: iconColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: iconColor, size: 26),
@@ -269,7 +261,7 @@ class _ActionCard extends StatelessWidget {
               width: 30,
               height: 30,
               decoration: BoxDecoration(
-                color: arrowColor,
+                color: iconColor,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.arrow_forward_rounded,

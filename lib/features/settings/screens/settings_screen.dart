@@ -92,21 +92,18 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsGroup(items: [
               _SettingsItem(
                   icon: Icons.file_upload_outlined,
-                  iconBg: const Color(0xFFDCFCE7),
                   iconColor: const Color(0xFF16A34A),
                   title: 'Import Excel File',
                   subtitle: 'Import or update inventory data',
                   onTap: () => _showImportExcelDialog(context)),
               _SettingsItem(
                   icon: Icons.storage_rounded,
-                  iconBg: const Color(0xFFDCFCE7),
                   iconColor: const Color(0xFF16A34A),
                   title: 'Database & Sync Diagnostics',
                   subtitle: 'Sync logs and SQLite catalog viewer',
                   onTap: () => context.push('/diagnostics')),
               _SettingsItem(
                   icon: Icons.refresh_rounded,
-                  iconBg: const Color(0xFFDCFCE7),
                   iconColor: const Color(0xFF16A34A),
                   title: 'Re-import Database',
                   subtitle: 'Replace existing data',
@@ -121,14 +118,12 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsGroup(items: [
               _SettingsItem(
                   icon: Icons.qr_code_scanner_rounded,
-                  iconBg: const Color(0xFFDBEAFE),
                   iconColor: const Color(0xFF1D4ED8),
                   title: 'Scanner Test (Diagnostic)',
                   subtitle: 'Test camera, barcode, OCR etc.',
                   onTap: () => context.push('/scan-to-find')),
               _SettingsItem(
                   icon: Icons.history_rounded,
-                  iconBg: const Color(0xFFFEF3C7),
                   iconColor: const Color(0xFFD97706),
                   title: 'History',
                   subtitle: 'View all orders and status',
@@ -143,14 +138,12 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsGroup(items: [
               _SettingsItem(
                   icon: Icons.document_scanner_rounded,
-                  iconBg: const Color(0xFFDBEAFE),
                   iconColor: const Color(0xFF1D4ED8),
                   title: 'Scanner Settings',
                   subtitle: 'Configure scanner preferences',
                   onTap: () => _showScannerSettingsSheet(context, ref)),
               _SettingsItem(
                   icon: Icons.text_fields_rounded,
-                  iconBg: const Color(0xFFDCFCE7),
                   iconColor: const Color(0xFF16A34A),
                   title: 'OCR Settings',
                   subtitle: 'Configure OCR preferences',
@@ -165,10 +158,9 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsGroup(items: [
               _SettingsItem(
                   icon: Icons.palette_outlined,
-                  iconBg: const Color(0xFFEDE9FD),
                   iconColor: AppColors.primary,
                   title: 'App Theme',
-                  subtitle: 'Switch between Light, Dark, or System mode',
+                  subtitle: 'Switch between Light and Dark mode',
                   onTap: () => _showThemeSettingsSheet(context, ref),
                   showDivider: false),
             ]),
@@ -180,14 +172,12 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsGroup(items: [
               _SettingsItem(
                   icon: Icons.help_outline_rounded,
-                  iconBg: const Color(0xFFDBEAFE),
                   iconColor: const Color(0xFF1D4ED8),
                   title: 'Help & Support',
                   subtitle: 'User guide and contact admin',
                   onTap: () => _showHelpSupportDialog(context)),
               _SettingsItem(
                   icon: Icons.info_outline_rounded,
-                  iconBg: const Color(0xFFF3F4F6),
                   iconColor: const Color(0xFF6B7280),
                   title: 'About',
                   subtitle: 'App information and version',
@@ -198,7 +188,6 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsGroup(items: [
               _SettingsItem(
                 icon: Icons.logout_rounded,
-                iconBg: const Color(0xFFFEE2E2),
                 iconColor: const Color(0xFFDC2626),
                 title: 'Log Out',
                 subtitle: 'Sign out of your account on this device',
@@ -278,7 +267,7 @@ class SettingsScreen extends ConsumerWidget {
             const Text('Build: v2.0-stable'),
             const Text('Engine: SQLite (drift) + MongoDB Sync'),
             const SizedBox(height: 12),
-            Text('© 2026 Honda Spare Parts Warehouse', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            Text('© 2026 Honda Spare Parts Warehouse', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ),
         actions: [
@@ -554,7 +543,6 @@ class _SettingsGroup extends StatelessWidget {
 
 class _SettingsItem extends StatelessWidget {
   final IconData icon;
-  final Color iconBg;
   final Color iconColor;
   final String title;
   final String subtitle;
@@ -563,7 +551,6 @@ class _SettingsItem extends StatelessWidget {
 
   const _SettingsItem({
     required this.icon,
-    required this.iconBg,
     required this.iconColor,
     required this.title,
     required this.subtitle,
@@ -586,7 +573,7 @@ class _SettingsItem extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: iconBg,
+                    color: iconColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(icon, color: iconColor, size: 20),
