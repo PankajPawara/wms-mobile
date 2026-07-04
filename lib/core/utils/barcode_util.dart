@@ -248,4 +248,57 @@ class BarcodeUtil {
 
     return results;
   }
+
+  /// Fuzzy match an OCR scanned part number against a list of known valid part numbers
+  /// (e.g., from the local database) allowing for common OCR confusions.
+  static String? findBestMatch(String query, List<String> availableParts) {
+    if (query.isEmpty || availableParts.isEmpty) return null;
+
+    final upperQuery = query.toUpperCase();
+    
+    // Exact match first
+    for (final part in availableParts) {
+      if (part.toUpperCase() == upperQuery) {
+        return part;
+      }
+    }
+    
+    // Normalize string to wildcard string by replacing common confused characters
+    String normalizeFuzzy(String s) {
+      // Confusions:
+      // O, 0, Q -> 0
+      // 2, Z -> 2
+      // 1, I, l -> 1
+      // 5, S -> 5
+      // 8, B -> 8
+      return s
+          .replaceAll(RegExp(r'[OQ]'), '0')
+          .replaceAll('Z', '2')
+          .replaceAll(RegExp(r'[Il]'), '1')
+          .replaceAll('S', '5')
+          .replaceAll('B', '8');
+    }
+
+    final queryFuzzy = normalizeFuzzy(upperQuery);
+    
+    String? bestMatch;
+    int matches = 0;
+    
+    for (final part in availableParts) {
+      final partUpper = part.toUpperCase();
+      if (partUpper.length == upperQuery.length) {
+        if (normalizeFuzzy(partUpper) == queryFuzzy) {
+          bestMatch = part;
+          matches++;
+        }
+      }
+    }
+    
+    // If exactly one fuzzy match was found, return it as confident correction
+    if (matches == 1) {
+      return bestMatch;
+    }
+    
+    return null;
+  }
 }
