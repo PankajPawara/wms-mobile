@@ -399,19 +399,6 @@ class SettingsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               RadioListTile<ThemeMode>(
-                title: const Text('System Default'),
-                subtitle: const Text('Follow your device system configuration'),
-                value: ThemeMode.system,
-                groupValue: currentMode,
-                activeColor: AppColors.primary,
-                onChanged: (val) {
-                  if (val != null) {
-                    ref.read(themeModeProvider.notifier).setThemeMode(val);
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-              RadioListTile<ThemeMode>(
                 title: const Text('Light Mode'),
                 subtitle: const Text('Sleek high contrast light layout'),
                 value: ThemeMode.light,

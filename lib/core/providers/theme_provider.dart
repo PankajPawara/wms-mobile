@@ -12,22 +12,20 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   );
   static const _themeKey = 'wms_theme_mode';
 
-  ThemeModeNotifier() : super(ThemeMode.system) {
+  ThemeModeNotifier() : super(ThemeMode.light) {
     _loadTheme();
   }
 
   Future<void> _loadTheme() async {
     try {
       final val = await _storage.read(key: _themeKey);
-      if (val == 'light') {
-        state = ThemeMode.light;
-      } else if (val == 'dark') {
+      if (val == 'dark') {
         state = ThemeMode.dark;
       } else {
-        state = ThemeMode.system;
+        state = ThemeMode.light;
       }
     } catch (_) {
-      state = ThemeMode.system;
+      state = ThemeMode.light;
     }
   }
 
