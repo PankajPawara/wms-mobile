@@ -21,6 +21,7 @@ import '../../features/history/screens/picked_items_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/settings/screens/diagnostics_screen.dart';
+import '../../features/scan_to_find/screens/ai_vision_test_screen.dart';
 import '../../shared/widgets/app_bottom_nav.dart';
 
 part 'app_router.g.dart';
@@ -107,6 +108,7 @@ GoRouter appRouter(AppRouterRef ref) {
       ),
       GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
+      GoRoute(path: '/ai-vision-test', builder: (_, __) => const AIVisionTestScreen()),
     ],
   );
 }

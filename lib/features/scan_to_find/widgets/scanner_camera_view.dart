@@ -99,6 +99,7 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     }
     await _controller?.dispose();
     _controller = null;
+    if (mounted) setState(() {});
   }
 
   @override

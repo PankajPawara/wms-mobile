@@ -139,6 +139,17 @@ class InventoryRepository {
       'sync_queue': syncResult ?? 0,
     };
   }
+
+  Future<List<String>> getAllPartNumbers() async {
+    final query = _db.selectOnly(_db.inventory)..addColumns([_db.inventory.partNo]);
+    final result = await query.map((row) => row.read(_db.inventory.partNo)).get();
+    return result.where((e) => e != null).cast<String>().toList();
+  }
+
+  Future<List<dynamic>> searchByPartNo(String query) async {
+    final results = await (_db.select(_db.inventory)..where((t) => t.partNo.equals(query))).get();
+    return results; // Returns List<InventoryData> which has .location property
+  }
 }
 
 @riverpod

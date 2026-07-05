@@ -271,7 +271,9 @@ class BarcodeUtil {
       // 1, I, l -> 1
       // 5, S -> 5
       // 8, B -> 8
+      // Ignore dashes and spaces
       return s
+          .replaceAll(RegExp(r'[-.\s]'), '')
           .replaceAll(RegExp(r'[OQ]'), '0')
           .replaceAll('Z', '2')
           .replaceAll(RegExp(r'[Il]'), '1')
@@ -286,11 +288,9 @@ class BarcodeUtil {
     
     for (final part in availableParts) {
       final partUpper = part.toUpperCase();
-      if (partUpper.length == upperQuery.length) {
-        if (normalizeFuzzy(partUpper) == queryFuzzy) {
-          bestMatch = part;
-          matches++;
-        }
+      if (normalizeFuzzy(partUpper) == queryFuzzy) {
+        bestMatch = part;
+        matches++;
       }
     }
     
