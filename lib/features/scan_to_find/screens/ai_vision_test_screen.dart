@@ -197,16 +197,18 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     if (_mode == AIVisionMode.memo) {
       return '''
 Analyze this order memo and extract all line items into a JSON array. 
+CRITICAL INSTRUCTION: You must read the data strictly ROW by ROW. Trace your eyes horizontally across each row from left to right. Do NOT mix columns from different rows! 
+The table columns are: SR, PART No, DESCRIPTION, M.R.P., QTY, LOCATION, PACK, STOCK.
 For each item, extract: 
 - `part_no`
 - `description` (the name of the part)
 - `location`
 - `mrp`
 - `qty`
-- `in_stock`
-- `pack_of`
+- `in_stock` (from the STOCK column)
+- `pack_of` (from the PACK column)
 
-Correct any obvious character ambiguities in part numbers based on standard LLLLL-LLL-LLL Honda formats (e.g. O vs 0, S vs 5, Z vs 2).
+Correct any obvious character ambiguities in part numbers based on standard LLLLL-LLL-LLL Honda formats (e.g. O vs 0, S vs 5, Z vs 2). Ignore stray vertical lines like `|` or `1` at the edges of columns.
 
 Additionally, check the ENTIRE memo for handwritten priority keywords such as 'porter', 'leva aavshe', 'urgent', 'asap'.
 If any of these priority keywords are found, set a `priority` flag to true in a top-level wrapper object.
@@ -215,7 +217,7 @@ Strictly return a JSON object with this structure:
 {
   "priority": true/false,
   "items": [
-    { "part_no": "...", "description": "...", ... }
+    { "part_no": "...", "description": "...", "location": "...", "mrp": 12.3, "qty": 1, "in_stock": 1, "pack_of": 1 }
   ]
 }
 ''';
@@ -274,7 +276,7 @@ Return the result strictly as a JSON object with this structure:
     setState(() {
       _hasPriority = priority;
       _parsedItems = validatedItems;
-      _resultText = 'Extracted \${validatedItems.length} items. Priority: \$priority';
+      _resultText = 'Extracted ${validatedItems.length} items. Priority: $priority';
     });
   }
 
@@ -334,36 +336,29 @@ Return the result strictly as a JSON object with this structure:
                 ),
                 const SizedBox(height: 16),
 
-                 Row(
+                 Wrap(
+                   spacing: 8,
+                   runSpacing: 8,
                    children: [
-                     Expanded(
-                       child: AppButton(
-                         label: 'Camera',
-                         icon: Icons.camera_alt_rounded,
-                         variant: AppButtonVariant.secondary,
-                         onPressed: _isProcessing ? null : () => _pickImage(ImageSource.camera),
-                       ),
+                     AppButton(
+                       label: 'Camera',
+                       icon: Icons.camera_alt_rounded,
+                       variant: AppButtonVariant.secondary,
+                       onPressed: _isProcessing ? null : () => _pickImage(ImageSource.camera),
                      ),
-                     const SizedBox(width: 8),
-                     Expanded(
-                       child: AppButton(
-                         label: 'Gallery',
-                         icon: Icons.photo_library_rounded,
-                         variant: AppButtonVariant.secondary,
-                         onPressed: _isProcessing ? null : () => _pickImage(ImageSource.gallery),
-                       ),
+                     AppButton(
+                       label: 'Gallery',
+                       icon: Icons.photo_library_rounded,
+                       variant: AppButtonVariant.secondary,
+                       onPressed: _isProcessing ? null : () => _pickImage(ImageSource.gallery),
                      ),
-                     if (_imageFiles.isNotEmpty) ...[
-                       const SizedBox(width: 8),
-                       Expanded(
-                         child: AppButton(
-                           label: 'Clear',
-                           icon: Icons.clear,
-                           variant: AppButtonVariant.danger,
-                           onPressed: _isProcessing ? null : _clearImages,
-                         ),
+                     if (_imageFiles.isNotEmpty)
+                       AppButton(
+                         label: 'Clear',
+                         icon: Icons.clear,
+                         variant: AppButtonVariant.danger,
+                         onPressed: _isProcessing ? null : _clearImages,
                        ),
-                     ]
                    ],
                  ),
                 const SizedBox(height: 16),
@@ -459,24 +454,30 @@ Return the result strictly as a JSON object with this structure:
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         // Header: Part No & Validation
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              item['part_no']?.toString() ?? 'N/A', 
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                            ),
-                                            if (item['_validation_status'] != null)
-                                              Text(
-                                                item['_validation_status'],
-                                                style: TextStyle(
-                                                  color: Color(item['_validation_color'] ?? Colors.grey.toARGB32()),
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
+                                         Row(
+                                           crossAxisAlignment: CrossAxisAlignment.start,
+                                           children: [
+                                             Expanded(
+                                               child: Text(
+                                                 item['part_no']?.toString() ?? 'N/A', 
+                                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             if (item['_validation_status'] != null)
+                                               Expanded(
+                                                 child: Text(
+                                                   item['_validation_status'],
+                                                   textAlign: TextAlign.right,
+                                                   style: TextStyle(
+                                                     color: Color(item['_validation_color'] ?? Colors.grey.toARGB32()),
+                                                     fontSize: 11,
+                                                     fontWeight: FontWeight.w600,
+                                                   ),
+                                                 ),
+                                               ),
+                                           ],
+                                         ),
                                         
                                         if (item['description'] != null) ...[
                                           const SizedBox(height: 4),
