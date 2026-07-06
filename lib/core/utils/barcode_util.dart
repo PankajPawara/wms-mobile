@@ -1,6 +1,18 @@
 class BarcodeUtil {
   BarcodeUtil._();
 
+  static String cleanExtractedPartNo(String input) {
+    String cleaned = input.replaceAll(' ', '').toUpperCase();
+    int firstDashIdx = cleaned.indexOf('-');
+    if (firstDashIdx > 5) {
+      String beforeDash = cleaned.substring(0, firstDashIdx);
+      String afterDash = cleaned.substring(firstDashIdx);
+      beforeDash = beforeDash.substring(beforeDash.length - 5);
+      cleaned = beforeDash + afterDash;
+    }
+    return cleaned;
+  }
+
   // Honda part number pattern: e.g. 22201-KON-DU2
   // Prefix: 4-6 chars, middle: 3 chars, suffix: 3-5 chars
   static final RegExp _hondaPartPattern =

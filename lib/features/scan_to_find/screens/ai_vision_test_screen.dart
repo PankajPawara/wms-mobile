@@ -245,7 +245,11 @@ Return the result strictly as a JSON object with this structure:
     List<Map<String, dynamic>> validatedItems = [];
 
     for (var item in items) {
-      final extractedPartNo = item['part_no']?.toString() ?? '';
+      String rawPartNo = item['part_no']?.toString() ?? '';
+      final extractedPartNo = BarcodeUtil.cleanExtractedPartNo(rawPartNo);
+      
+      // Update the item so the UI displays the cleaned version
+      item['part_no'] = extractedPartNo;
       
       // Attempt Fuzzy Match
       final bestMatch = BarcodeUtil.findBestMatch(extractedPartNo, allDbParts);
