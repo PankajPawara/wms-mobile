@@ -1,179 +1,193 @@
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'dart:math';
 import 'barcode_util.dart';
 
+/// Parses Honda pickup order memo OCR text.
+///
+/// Memo table column order (left to right):
+///   Sr No | Part No | Description | MRP (ends in .00) | Qty | Location (3 digits + 1 letter)
+///
+/// ML Kit frequently:
+///   - Reads `|` as `1`
+///   - Confuses `L`/`I` with `1` and `O` with `0` in the 5-digit numeric prefix
+///
+/// Strategy:
+///   1. Flatten ALL TextElements, sort by Y then X.
+///   2. Group into rows using a Y-tolerance.
+///   3. For each row, scan for a Honda part number (anchor).
+///   4. From the part number position, scan RIGHT for:
+///        - MRP: a number ending in `.00` (e.g. 62.00, 818.00)
+///        - QTY: a small integer (1–99) immediately after MRP
+///        - Location: exactly 4 chars matching `\d{3}[A-Z]`, possibly with
+///          a spurious leading `1` (which was a `|`) → strip it.
+///   5. Everything between part no and MRP → description.
 class LocalOcrParser {
-  /// Parses the RecognizedText using geometric row grouping to prevent mixed-column hallucinations.
+  static const double _rowTolerance = 14.0;
+
+  /// Valid location pattern: exactly 3 digits then 1 uppercase letter, e.g. 003K, 023X, 069M
+  static final RegExp _locPattern = RegExp(r'^\d{3}[A-Z]$', caseSensitive: false);
+
+  /// MRP ends in .00 and is > 0
+  static final RegExp _mrpPattern = RegExp(r'^(\d+)\.00$');
+
+  // ─── Public API ────────────────────────────────────────────────────────────
+
   static List<Map<String, dynamic>> parseTable(RecognizedText recognizedText) {
-    List<Map<String, dynamic>> items = [];
+    final List<Map<String, dynamic>> items = [];
 
     // 1. Flatten all elements
-    List<TextElement> allElements = [];
-    for (TextBlock block in recognizedText.blocks) {
-      for (TextLine line in block.lines) {
+    final List<TextElement> allElements = [];
+    for (final block in recognizedText.blocks) {
+      for (final line in block.lines) {
         allElements.addAll(line.elements);
       }
     }
-
     if (allElements.isEmpty) return items;
 
-    // 2. Sort by Y coordinate (top to bottom)
-    allElements.sort((a, b) => a.boundingBox.center.dy.compareTo(b.boundingBox.center.dy));
+    // 2. Sort by Y coordinate
+    allElements.sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
 
-    // 3. Group into rows
-    List<List<TextElement>> rows = [];
-    List<TextElement> currentRow = [allElements.first];
-    
-    // Use a tolerance based on the height of the elements. 
-    // Roughly half the height of a typical element.
-    double rowTolerance = 15.0; 
+    // 3. Group into rows by Y proximity
+    final List<List<TextElement>> rows = _groupIntoRows(allElements);
 
-    for (int i = 1; i < allElements.length; i++) {
-      final element = allElements[i];
-      final currentCenterY = currentRow.map((e) => e.boundingBox.center.dy).reduce((a, b) => a + b) / currentRow.length;
-      
-      if ((element.boundingBox.center.dy - currentCenterY).abs() <= rowTolerance) {
-        currentRow.add(element);
-      } else {
-        rows.add(currentRow);
-        currentRow = [element];
-      }
-    }
-    if (currentRow.isNotEmpty) {
-      rows.add(currentRow);
-    }
-
-    // 4. Sort each row horizontally and extract data
-    for (var row in rows) {
+    // 4. Extract from each row
+    for (final row in rows) {
       row.sort((a, b) => a.boundingBox.left.compareTo(b.boundingBox.left));
-      
-      int partIdx = -1;
-      String extractedPartNo = '';
-      
-      // Find the Part Number
-      for (int i = 0; i < row.length; i++) {
-        final text = row[i].text.toUpperCase();
-        // Allow for concatenated errors like "150350-K24-G00"
-        final cleaned = BarcodeUtil.cleanExtractedPartNo(text);
-        if (BarcodeUtil.isHondaPartNo(cleaned)) {
-          partIdx = i;
-          extractedPartNo = cleaned;
-          break;
-        }
-      }
-
-      if (partIdx != -1) {
-        // We found a part number row!
-        String description = '';
-        double mrp = 0.0;
-        int qty = 1;
-        String location = '';
-        
-        // Check if the row contains pipes
-        String afterPartNoText = row.sublist(partIdx + 1).map((e) => e.text).join(' ');
-        
-        if (afterPartNoText.contains('|')) {
-          List<String> cols = afterPartNoText.split('|').map((s) => s.trim()).toList();
-          
-          if (cols.isNotEmpty) {
-            String descCol = cols[0];
-            
-            // Sometimes MRP is missed as a column separator and left in the description column
-            final decimalMatch = RegExp(r'\b\d+\.\d{2}\b').firstMatch(descCol);
-            if (decimalMatch != null) {
-              mrp = double.tryParse(decimalMatch.group(0)!) ?? 0.0;
-              descCol = descCol.replaceAll(decimalMatch.group(0)!, '').trim();
-            }
-            description = descCol;
-            
-            for (int i = 1; i < cols.length; i++) {
-               String col = cols[i];
-               if (col.isEmpty) continue;
-               
-               // Look for MRP if not found yet
-               if (mrp == 0.0) {
-                 final mrpMatch = RegExp(r'\b\d+\.\d{2}\b').firstMatch(col);
-                 if (mrpMatch != null) {
-                    mrp = double.tryParse(mrpMatch.group(0)!) ?? 0.0;
-                    col = col.replaceAll(mrpMatch.group(0)!, '').trim();
-                 }
-               }
-
-               final intVal = int.tryParse(col);
-               if (intVal != null && intVal > 0 && intVal < 100 && qty == 1) {
-                 qty = intVal;
-               } else {
-                 final locMatch = RegExp(r'\b([A-Z0-9]{3,5})\b', caseSensitive: false).firstMatch(col);
-                 if (locMatch != null && RegExp(r'[A-Z]', caseSensitive: false).hasMatch(locMatch.group(1)!)) {
-                   location = locMatch.group(1)!.toUpperCase();
-                 } else if (qty == 1) {
-                   // Fallback for QTY mixed with other text
-                   final qtyMatch = RegExp(r'\b(\d{1,2})\b').firstMatch(col);
-                   if (qtyMatch != null) {
-                      qty = int.parse(qtyMatch.group(1)!);
-                   }
-                 }
-               }
-            }
-          }
-        } else {
-          int mrpIdx = -1;
-          
-          // Scan elements to the right of Part No for MRP (the first decimal number or large integer)
-          for (int i = partIdx + 1; i < row.length; i++) {
-            String text = row[i].text;
-            // Clean common OCR errors in numbers
-            text = text.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1').replaceAll(',', '.');
-            
-            final decimalMatch = RegExp(r'^\d+\.\d{2}$').firstMatch(text);
-            if (decimalMatch != null || (int.tryParse(text) != null && int.parse(text) > 100)) {
-               mrp = double.tryParse(text) ?? 0.0;
-               mrpIdx = i;
-               break;
-            }
-          }
-          
-          // Description is everything between Part No and MRP
-          if (mrpIdx != -1 && mrpIdx > partIdx + 1) {
-            description = row.sublist(partIdx + 1, mrpIdx).map((e) => e.text).join(' ');
-          } else if (mrpIdx == -1 && row.length > partIdx + 1) {
-            // No MRP found, description is just the next few elements
-            description = row.sublist(partIdx + 1, min(partIdx + 4, row.length)).map((e) => e.text).join(' ');
-          }
-          
-          // QTY is usually the element immediately following MRP
-          int qtyIdx = -1;
-          if (mrpIdx != -1 && mrpIdx + 1 < row.length) {
-            String text = row[mrpIdx + 1].text.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1');
-            final parsedQty = int.tryParse(text);
-            if (parsedQty != null && parsedQty < 100) {
-              qty = parsedQty;
-              qtyIdx = mrpIdx + 1;
-            }
-          }
-          
-          // Location is usually the element following QTY
-          int startLocSearchIdx = (qtyIdx != -1) ? qtyIdx + 1 : ((mrpIdx != -1) ? mrpIdx + 1 : partIdx + 1);
-          for (int i = startLocSearchIdx; i < row.length; i++) {
-            String text = row[i].text;
-            // Location format e.g. 002N, 014G, 073J
-            if (RegExp(r'^[A-Z0-9]{3,5}$', caseSensitive: false).hasMatch(text)) {
-               location = text.toUpperCase();
-               break;
-            }
-          }
-        }
-        
-        items.add({
-          'part_no': extractedPartNo,
-          'description': description,
-          'mrp': mrp,
-          'qty': qty,
-          'location': location,
-        });
-      }
+      final item = _extractFromRow(row);
+      if (item != null) items.add(item);
     }
 
     return items;
+  }
+
+  // ─── Private helpers ────────────────────────────────────────────────────────
+
+  static List<List<TextElement>> _groupIntoRows(List<TextElement> sorted) {
+    final rows = <List<TextElement>>[];
+    var current = [sorted.first];
+
+    for (int i = 1; i < sorted.length; i++) {
+      final el = sorted[i];
+      final rowCenter = current.map((e) => e.boundingBox.center.dy).reduce((a, b) => a + b) / current.length;
+      if ((el.boundingBox.center.dy - rowCenter).abs() <= _rowTolerance) {
+        current.add(el);
+      } else {
+        rows.add(current);
+        current = [el];
+      }
+    }
+    if (current.isNotEmpty) rows.add(current);
+    return rows;
+  }
+
+  static Map<String, dynamic>? _extractFromRow(List<TextElement> row) {
+    // ── Step 1: Find the Honda part number ──────────────────────────────────
+    int partIdx = -1;
+    String partNo = '';
+
+    for (int i = 0; i < row.length; i++) {
+      final raw = row[i].text;
+      // Remove OCR pipe artefacts and spaces before matching
+      final cleaned = BarcodeUtil.cleanExtractedPartNo(raw);
+      if (BarcodeUtil.isHondaPartNo(cleaned)) {
+        partIdx = i;
+        partNo = cleaned;
+        break;
+      }
+    }
+
+    if (partIdx == -1) return null;
+
+    // ── Step 2: Collect all text tokens to the right of the part number ─────
+    final List<String> tokens = row.sublist(partIdx + 1).map((e) => e.text.trim()).where((t) => t.isNotEmpty).toList();
+
+    // ── Step 3: Scan tokens for MRP (a number ending in .00) ────────────────
+    // Also normalise common OCR confusions on digit tokens
+    int mrpTokenIdx = -1;
+    double mrp = 0.0;
+
+    for (int i = 0; i < tokens.length; i++) {
+      final normalized = _normalizeDigitToken(tokens[i]);
+      final m = _mrpPattern.firstMatch(normalized);
+      if (m != null) {
+        mrp = double.parse(normalized);
+        mrpTokenIdx = i;
+        break;
+      }
+    }
+
+    // ── Step 4: Build description (tokens between part no and MRP) ──────────
+    String description = '';
+    if (mrpTokenIdx > 0) {
+      // Collect tokens before MRP, strip leading OCR pipe artefacts (`1` that
+      // are actually `|`, detected as token equal to "1" or "|")
+      final descTokens = tokens.sublist(0, mrpTokenIdx).where((t) {
+        // Drop tokens that look like OCR pipe artefacts
+        return !RegExp(r'^\|?1?\|?$').hasMatch(t);
+      }).toList();
+      description = descTokens.join(' ').trim();
+    }
+
+    // ── Step 5: QTY – small integer token immediately after MRP ─────────────
+    int qty = 1;
+    int qtyTokenIdx = -1;
+    if (mrpTokenIdx != -1 && mrpTokenIdx + 1 < tokens.length) {
+      final rawQty = _normalizeDigitToken(tokens[mrpTokenIdx + 1]);
+      final parsed = int.tryParse(rawQty);
+      if (parsed != null && parsed >= 1 && parsed <= 99) {
+        qty = parsed;
+        qtyTokenIdx = mrpTokenIdx + 1;
+      }
+    }
+
+    // ── Step 6: Location – exactly 4 chars: 3 digits + 1 letter ────────────
+    String location = '';
+    final int locSearchStart = (qtyTokenIdx != -1) ? qtyTokenIdx + 1 : (mrpTokenIdx != -1 ? mrpTokenIdx + 1 : 0);
+    for (int i = locSearchStart; i < tokens.length; i++) {
+      final candidate = _extractLocation(tokens[i]);
+      if (candidate != null) {
+        location = candidate;
+        break;
+      }
+    }
+
+    return {
+      'part_no': partNo,
+      'description': description,
+      'mrp': mrp,
+      'qty': qty,
+      'location': location,
+    };
+  }
+
+  /// Normalise a token that should be purely numeric.
+  /// Replaces `O`/`o` → `0`, `I`/`l`/`|` → `1`, commas → periods.
+  static String _normalizeDigitToken(String t) {
+    return t
+        .replaceAll(RegExp(r'[Oo]'), '0')
+        .replaceAll(RegExp(r'[IlL\|]'), '1')
+        .replaceAll(',', '.');
+  }
+
+  /// Attempt to extract a valid 4-char location code (3 digits + 1 letter)
+  /// from a raw OCR token.  The token may have a spurious leading `1` (which
+  /// was a `|`) or a trailing `|`.
+  static String? _extractLocation(String raw) {
+    // Strip common noise characters
+    String s = raw.replaceAll(RegExp(r'[\|\s]'), '').toUpperCase();
+
+    // Direct hit
+    if (_locPattern.hasMatch(s)) return s;
+
+    // If 5 chars and starts with '1' → the `1` was a `|`, strip it
+    if (s.length == 5 && s.startsWith('1')) {
+      final candidate = s.substring(1);
+      if (_locPattern.hasMatch(candidate)) return candidate;
+    }
+
+    // Regex scan inside a longer token
+    final m = RegExp(r'(\d{3}[A-Z])', caseSensitive: false).firstMatch(s);
+    if (m != null) return m.group(1)!.toUpperCase();
+
+    return null;
   }
 }

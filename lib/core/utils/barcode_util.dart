@@ -2,21 +2,46 @@ class BarcodeUtil {
   BarcodeUtil._();
 
   static String cleanExtractedPartNo(String input) {
-    String cleaned = input.replaceAll(RegExp(r'[\s\|]'), '').toUpperCase();
-    int firstDashIdx = cleaned.indexOf('-');
+    // Strip pipes, spaces, normalise to uppercase
+    String cleaned = input.replaceAll(RegExp(r'[\s|]'), '').toUpperCase();
+    final firstDashIdx = cleaned.indexOf('-');
     if (firstDashIdx > -1) {
       String beforeDash = cleaned.substring(0, firstDashIdx);
-      String afterDash = cleaned.substring(firstDashIdx);
+      final afterDash = cleaned.substring(firstDashIdx);
       
-      // Aggressively fix OCR errors in the 5-digit prefix
-      beforeDash = beforeDash.replaceAll('L', '1').replaceAll('I', '1').replaceAll('O', '0').replaceAll('S', '5');
+      // Replace all characters that are visually confused for digits in the 5-digit prefix
+      beforeDash = beforeDash
+          .replaceAll('L', '1')
+          .replaceAll('I', '1')
+          .replaceAll('O', '0')
+          .replaceAll('S', '5');
       
+      // Prefix must be exactly 5 digits — strip any excess from the front
       if (beforeDash.length > 5) {
         beforeDash = beforeDash.substring(beforeDash.length - 5);
       }
       cleaned = beforeDash + afterDash;
     }
     return cleaned;
+  }
+
+  /// Sanitise an OCR-extracted warehouse location code.
+  /// Valid format: exactly 3 numeric digits followed by 1 uppercase letter, e.g. 003K, 069M.
+  /// Common OCR error: leading `1` is actually a `|` column separator → strip it.
+  static String cleanLocation(String raw) {
+    final s = raw.replaceAll(RegExp(r'[|\s]'), '').toUpperCase();
+    final validPattern = RegExp(r'^\d{3}[A-Z]$');
+    if (validPattern.hasMatch(s)) return s;
+    // Spurious leading `1` from OCR reading `|` as `1`
+    if (s.length == 5 && s.startsWith('1')) {
+      final candidate = s.substring(1);
+      if (validPattern.hasMatch(candidate)) return candidate;
+    }
+    // Extract the first valid 4-char location from a mixed string
+    final m = RegExp(r'(\d{3}[A-Z])').firstMatch(s);
+    if (m != null) return m.group(1)!;
+    // Return empty if nothing valid found
+    return '';
   }
 
   // Honda part number pattern: e.g. 22201-KON-DU2

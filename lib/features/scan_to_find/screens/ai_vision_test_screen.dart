@@ -142,6 +142,10 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
       
       // Update the item so the UI displays the cleaned version
       item['part_no'] = extractedPartNo;
+
+      // Sanitise OCR location: strip spurious leading `1` (read as `|`) and validate 3-digit+1-letter format
+      final rawLoc = item['location']?.toString() ?? '';
+      item['location'] = BarcodeUtil.cleanLocation(rawLoc);
       
       // Attempt Fuzzy Match
       final bestMatch = BarcodeUtil.findBestMatch(extractedPartNo, allDbParts);
