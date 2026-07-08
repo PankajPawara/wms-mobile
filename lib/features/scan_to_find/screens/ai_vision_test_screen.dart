@@ -27,6 +27,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
   String _resultText = '';
   List<dynamic> _parsedItems = [];
   bool _hasPriority = false;
+  bool _showControls = true;
 
   @override
   void dispose() {
@@ -200,76 +201,101 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
       body: Column(
         children: [
           // Controls Area
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: theme.colorScheme.surfaceContainerLowest,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                CheckboxListTile(
-                  title: const Text('Mark as Priority (Porter/Urgent)'),
-                  value: _hasPriority,
-                  onChanged: (bool? value) {
-                    setState(() {
-                      _hasPriority = value ?? false;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-                const SizedBox(height: 16),
-                
-                SegmentedButton<AIVisionMode>(
-                  segments: const [
-                    ButtonSegment(value: AIVisionMode.memo, label: Text('Memo (Pickup List)')),
-                    ButtonSegment(value: AIVisionMode.redLabel, label: Text('Red Label (Checking)')),
-                  ],
-                  selected: {_mode},
-                  onSelectionChanged: (Set<AIVisionMode> newSelection) {
-                    setState(() {
-                      _mode = newSelection.first;
-                      _resultText = '';
-                      _parsedItems = [];
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: !_showControls ? const SizedBox.shrink() : Container(
+              padding: const EdgeInsets.all(16),
+              color: theme.colorScheme.surfaceContainerLowest,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CheckboxListTile(
+                    title: const Text('Mark as Priority (Porter/Urgent)'),
+                    value: _hasPriority,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _hasPriority = value ?? false;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  SegmentedButton<AIVisionMode>(
+                    segments: const [
+                      ButtonSegment(value: AIVisionMode.memo, label: Text('Memo (Pickup List)')),
+                      ButtonSegment(value: AIVisionMode.redLabel, label: Text('Red Label (Checking)')),
+                    ],
+                    selected: {_mode},
+                    onSelectionChanged: (Set<AIVisionMode> newSelection) {
+                      setState(() {
+                        _mode = newSelection.first;
+                        _resultText = '';
+                        _parsedItems = [];
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
 
-                 Wrap(
-                   spacing: 8,
-                   runSpacing: 8,
-                   children: [
-                     AppButton(
-                       label: 'Camera',
-                       icon: Icons.camera_alt_rounded,
-                       variant: AppButtonVariant.secondary,
-                       onPressed: _isProcessing ? null : () => _pickImage(ImageSource.camera),
-                     ),
-                     AppButton(
-                       label: 'Gallery',
-                       icon: Icons.photo_library_rounded,
-                       variant: AppButtonVariant.secondary,
-                       onPressed: _isProcessing ? null : () => _pickImage(ImageSource.gallery),
-                     ),
-                     if (_imageFiles.isNotEmpty)
+                   Wrap(
+                     spacing: 8,
+                     runSpacing: 8,
+                     children: [
                        AppButton(
-                         label: 'Clear',
-                         icon: Icons.clear,
-                         variant: AppButtonVariant.danger,
-                         onPressed: _isProcessing ? null : _clearImages,
+                         label: 'Camera',
+                         icon: Icons.camera_alt_rounded,
+                         variant: AppButtonVariant.secondary,
+                         onPressed: _isProcessing ? null : () => _pickImage(ImageSource.camera),
                        ),
-                   ],
-                 ),
-                const SizedBox(height: 16),
-                
-                AppButton(
-                  label: _isProcessing ? 'Processing with AI...' : 'Process Image',
-                  icon: Icons.auto_awesome_rounded,
-                  isLoading: _isProcessing,
-                  onPressed: (_imageFiles.isNotEmpty && !_isProcessing) ? _processImage : null,
+                       AppButton(
+                         label: 'Gallery',
+                         icon: Icons.photo_library_rounded,
+                         variant: AppButtonVariant.secondary,
+                         onPressed: _isProcessing ? null : () => _pickImage(ImageSource.gallery),
+                       ),
+                       if (_imageFiles.isNotEmpty)
+                         AppButton(
+                           label: 'Clear',
+                           icon: Icons.clear,
+                           variant: AppButtonVariant.danger,
+                           onPressed: _isProcessing ? null : _clearImages,
+                         ),
+                     ],
+                   ),
+                  const SizedBox(height: 16),
+                  
+                  AppButton(
+                    label: _isProcessing ? 'Processing with AI...' : 'Process Image',
+                    icon: Icons.auto_awesome_rounded,
+                    isLoading: _isProcessing,
+                    onPressed: (_imageFiles.isNotEmpty && !_isProcessing) ? () {
+                        // Collapse controls when processing starts to show results
+                        setState(() {
+                           _showControls = false;
+                        });
+                        _processImage();
+                    } : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          InkWell(
+            onTap: () => setState(() => _showControls = !_showControls),
+            child: Container(
+              height: 24,
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: Center(
+                child: Icon(
+                  _showControls ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ],
+              ),
             ),
           ),
           

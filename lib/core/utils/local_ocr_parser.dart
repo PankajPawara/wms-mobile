@@ -69,49 +69,98 @@ class LocalOcrParser {
         int qty = 1;
         String location = '';
         
-        int mrpIdx = -1;
+        // Check if the row contains pipes
+        String afterPartNoText = row.sublist(partIdx + 1).map((e) => e.text).join(' ');
         
-        // Scan elements to the right of Part No for MRP (the first decimal number or large integer)
-        for (int i = partIdx + 1; i < row.length; i++) {
-          String text = row[i].text;
-          // Clean common OCR errors in numbers
-          text = text.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1').replaceAll(',', '.');
+        if (afterPartNoText.contains('|')) {
+          List<String> cols = afterPartNoText.split('|').map((s) => s.trim()).toList();
           
-          final decimalMatch = RegExp(r'^\d+\.\d{2}$').firstMatch(text);
-          if (decimalMatch != null || (int.tryParse(text) != null && int.parse(text) > 100)) {
-             mrp = double.tryParse(text) ?? 0.0;
-             mrpIdx = i;
-             break;
+          if (cols.isNotEmpty) {
+            String descCol = cols[0];
+            
+            // Sometimes MRP is missed as a column separator and left in the description column
+            final decimalMatch = RegExp(r'\b\d+\.\d{2}\b').firstMatch(descCol);
+            if (decimalMatch != null) {
+              mrp = double.tryParse(decimalMatch.group(0)!) ?? 0.0;
+              descCol = descCol.replaceAll(decimalMatch.group(0)!, '').trim();
+            }
+            description = descCol;
+            
+            for (int i = 1; i < cols.length; i++) {
+               String col = cols[i];
+               if (col.isEmpty) continue;
+               
+               // Look for MRP if not found yet
+               if (mrp == 0.0) {
+                 final mrpMatch = RegExp(r'\b\d+\.\d{2}\b').firstMatch(col);
+                 if (mrpMatch != null) {
+                    mrp = double.tryParse(mrpMatch.group(0)!) ?? 0.0;
+                    col = col.replaceAll(mrpMatch.group(0)!, '').trim();
+                 }
+               }
+
+               final intVal = int.tryParse(col);
+               if (intVal != null && intVal > 0 && intVal < 100 && qty == 1) {
+                 qty = intVal;
+               } else {
+                 final locMatch = RegExp(r'\b([A-Z0-9]{3,5})\b', caseSensitive: false).firstMatch(col);
+                 if (locMatch != null && RegExp(r'[A-Z]', caseSensitive: false).hasMatch(locMatch.group(1)!)) {
+                   location = locMatch.group(1)!.toUpperCase();
+                 } else if (qty == 1) {
+                   // Fallback for QTY mixed with other text
+                   final qtyMatch = RegExp(r'\b(\d{1,2})\b').firstMatch(col);
+                   if (qtyMatch != null) {
+                      qty = int.parse(qtyMatch.group(1)!);
+                   }
+                 }
+               }
+            }
           }
-        }
-        
-        // Description is everything between Part No and MRP
-        if (mrpIdx != -1 && mrpIdx > partIdx + 1) {
-          description = row.sublist(partIdx + 1, mrpIdx).map((e) => e.text).join(' ');
-        } else if (mrpIdx == -1 && row.length > partIdx + 1) {
-          // No MRP found, description is just the next few elements
-          description = row.sublist(partIdx + 1, min(partIdx + 4, row.length)).map((e) => e.text).join(' ');
-        }
-        
-        // QTY is usually the element immediately following MRP
-        int qtyIdx = -1;
-        if (mrpIdx != -1 && mrpIdx + 1 < row.length) {
-          String text = row[mrpIdx + 1].text.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1');
-          final parsedQty = int.tryParse(text);
-          if (parsedQty != null && parsedQty < 100) {
-            qty = parsedQty;
-            qtyIdx = mrpIdx + 1;
+        } else {
+          int mrpIdx = -1;
+          
+          // Scan elements to the right of Part No for MRP (the first decimal number or large integer)
+          for (int i = partIdx + 1; i < row.length; i++) {
+            String text = row[i].text;
+            // Clean common OCR errors in numbers
+            text = text.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1').replaceAll(',', '.');
+            
+            final decimalMatch = RegExp(r'^\d+\.\d{2}$').firstMatch(text);
+            if (decimalMatch != null || (int.tryParse(text) != null && int.parse(text) > 100)) {
+               mrp = double.tryParse(text) ?? 0.0;
+               mrpIdx = i;
+               break;
+            }
           }
-        }
-        
-        // Location is usually the element following QTY
-        int startLocSearchIdx = (qtyIdx != -1) ? qtyIdx + 1 : ((mrpIdx != -1) ? mrpIdx + 1 : partIdx + 1);
-        for (int i = startLocSearchIdx; i < row.length; i++) {
-          String text = row[i].text;
-          // Location format e.g. 002N, 014G, 073J
-          if (RegExp(r'^[A-Z0-9]{3,5}$', caseSensitive: false).hasMatch(text)) {
-             location = text.toUpperCase();
-             break;
+          
+          // Description is everything between Part No and MRP
+          if (mrpIdx != -1 && mrpIdx > partIdx + 1) {
+            description = row.sublist(partIdx + 1, mrpIdx).map((e) => e.text).join(' ');
+          } else if (mrpIdx == -1 && row.length > partIdx + 1) {
+            // No MRP found, description is just the next few elements
+            description = row.sublist(partIdx + 1, min(partIdx + 4, row.length)).map((e) => e.text).join(' ');
+          }
+          
+          // QTY is usually the element immediately following MRP
+          int qtyIdx = -1;
+          if (mrpIdx != -1 && mrpIdx + 1 < row.length) {
+            String text = row[mrpIdx + 1].text.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1');
+            final parsedQty = int.tryParse(text);
+            if (parsedQty != null && parsedQty < 100) {
+              qty = parsedQty;
+              qtyIdx = mrpIdx + 1;
+            }
+          }
+          
+          // Location is usually the element following QTY
+          int startLocSearchIdx = (qtyIdx != -1) ? qtyIdx + 1 : ((mrpIdx != -1) ? mrpIdx + 1 : partIdx + 1);
+          for (int i = startLocSearchIdx; i < row.length; i++) {
+            String text = row[i].text;
+            // Location format e.g. 002N, 014G, 073J
+            if (RegExp(r'^[A-Z0-9]{3,5}$', caseSensitive: false).hasMatch(text)) {
+               location = text.toUpperCase();
+               break;
+            }
           }
         }
         

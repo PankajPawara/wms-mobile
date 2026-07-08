@@ -2,12 +2,18 @@ class BarcodeUtil {
   BarcodeUtil._();
 
   static String cleanExtractedPartNo(String input) {
-    String cleaned = input.replaceAll(' ', '').toUpperCase();
+    String cleaned = input.replaceAll(RegExp(r'[\s\|]'), '').toUpperCase();
     int firstDashIdx = cleaned.indexOf('-');
-    if (firstDashIdx > 5) {
+    if (firstDashIdx > -1) {
       String beforeDash = cleaned.substring(0, firstDashIdx);
       String afterDash = cleaned.substring(firstDashIdx);
-      beforeDash = beforeDash.substring(beforeDash.length - 5);
+      
+      // Aggressively fix OCR errors in the 5-digit prefix
+      beforeDash = beforeDash.replaceAll('L', '1').replaceAll('I', '1').replaceAll('O', '0').replaceAll('S', '5');
+      
+      if (beforeDash.length > 5) {
+        beforeDash = beforeDash.substring(beforeDash.length - 5);
+      }
       cleaned = beforeDash + afterDash;
     }
     return cleaned;
