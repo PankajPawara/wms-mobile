@@ -146,6 +146,18 @@ class InventoryRepository {
     return result.where((e) => e != null).cast<String>().toList();
   }
 
+  Future<Map<String, String>> getAllPartLocations() async {
+    final query = _db.selectOnly(_db.inventory)..addColumns([_db.inventory.partNo, _db.inventory.location]);
+    final result = await query.map((row) {
+      return MapEntry(
+        row.read(_db.inventory.partNo) ?? '',
+        row.read(_db.inventory.location) ?? ''
+      );
+    }).get();
+    
+    return Map.fromEntries(result.where((e) => e.key.isNotEmpty));
+  }
+
   Future<List<dynamic>> searchByPartNo(String query) async {
     final results = await (_db.select(_db.inventory)..where((t) => t.partNo.equals(query))).get();
     return results; // Returns List<InventoryData> which has .location property

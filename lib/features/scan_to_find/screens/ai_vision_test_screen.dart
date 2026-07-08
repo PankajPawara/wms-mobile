@@ -153,7 +153,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     final List<dynamic> items = parsedData['items'] ?? [];
 
     final repo = ref.read(inventoryRepositoryProvider);
-    final allDbParts = await repo.getAllPartNumbers();
+    final dbPartLocations = await repo.getAllPartLocations();
 
     List<Map<String, dynamic>> validatedItems = [];
 
@@ -166,22 +166,21 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
 
       // Sanitise OCR location: strip spurious leading `1` (read as `|`) and validate 3-digit+1-letter format
       final rawLoc = item['location']?.toString() ?? '';
-      item['location'] = BarcodeUtil.cleanLocation(rawLoc);
+      final cleanedLoc = BarcodeUtil.cleanLocation(rawLoc);
+      item['location'] = cleanedLoc;
       
-      // Attempt Fuzzy Match
-      final bestMatch = BarcodeUtil.findBestMatch(extractedPartNo, allDbParts);
+      // Attempt Advanced Fuzzy Match using Location constraint
+      final bestMatch = BarcodeUtil.findBestMatchWithLocation(extractedPartNo, cleanedLoc, dbPartLocations);
       
       String validationStatus = 'Unknown (Not in DB)';
       Color statusColor = Colors.orange;
 
       if (bestMatch != null) {
-        // Fetch actual location from DB
-        final dbItem = await repo.searchByPartNo(bestMatch);
-        if (dbItem.isNotEmpty) {
-          validationStatus = 'Verified ($bestMatch)';
-          statusColor = Colors.green;
-          item['location_db'] = dbItem.first.location; // inject true location
-        }
+        // Fetch actual location from our pre-fetched map
+        final dbLoc = dbPartLocations[bestMatch];
+        validationStatus = 'Verified ($bestMatch)';
+        statusColor = Colors.green;
+        item['location_db'] = dbLoc; // inject true location
       } else {
         if (extractedPartNo.isEmpty) {
           validationStatus = 'Failed to extract part no';

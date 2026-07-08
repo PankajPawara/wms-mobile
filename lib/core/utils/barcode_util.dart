@@ -314,6 +314,24 @@ class BarcodeUtil {
     return results;
   }
 
+  /// Normalize string to wildcard string by replacing common confused characters
+  static String _normalizeFuzzy(String s) {
+    // Confusions:
+    // O, 0, Q -> 0
+    // 2, Z -> 2
+    // 1, I, l, L -> 1
+    // 5, S -> 5
+    // 8, B -> 8
+    // Ignore dashes and spaces
+    return s
+        .replaceAll(RegExp(r'[-.\s]'), '')
+        .replaceAll(RegExp(r'[OQ]'), '0')
+        .replaceAll('Z', '2')
+        .replaceAll(RegExp(r'[IlL]'), '1')
+        .replaceAll('S', '5')
+        .replaceAll('B', '8');
+  }
+
   /// Fuzzy match an OCR scanned part number against a list of known valid part numbers
   /// (e.g., from the local database) allowing for common OCR confusions.
   static String? findBestMatch(String query, List<String> availableParts) {
@@ -328,32 +346,14 @@ class BarcodeUtil {
       }
     }
     
-    // Normalize string to wildcard string by replacing common confused characters
-    String normalizeFuzzy(String s) {
-      // Confusions:
-      // O, 0, Q -> 0
-      // 2, Z -> 2
-      // 1, I, l -> 1
-      // 5, S -> 5
-      // 8, B -> 8
-      // Ignore dashes and spaces
-      return s
-          .replaceAll(RegExp(r'[-.\s]'), '')
-          .replaceAll(RegExp(r'[OQ]'), '0')
-          .replaceAll('Z', '2')
-          .replaceAll(RegExp(r'[Il]'), '1')
-          .replaceAll('S', '5')
-          .replaceAll('B', '8');
-    }
-
-    final queryFuzzy = normalizeFuzzy(upperQuery);
+    final queryFuzzy = _normalizeFuzzy(upperQuery);
     
     String? bestMatch;
     int matches = 0;
     
     for (final part in availableParts) {
       final partUpper = part.toUpperCase();
-      if (normalizeFuzzy(partUpper) == queryFuzzy) {
+      if (_normalizeFuzzy(partUpper) == queryFuzzy) {
         bestMatch = part;
         matches++;
       }
@@ -364,6 +364,86 @@ class BarcodeUtil {
       return bestMatch;
     }
     
+    return null;
+  }
+
+  /// Advanced fuzzy match that utilizes the OCR location to confidently correct part numbers
+  /// that might have ambiguous fuzzy matches or extreme OCR mangling (e.g., G->6, D->0).
+  static String? findBestMatchWithLocation(
+    String queryPartNo, 
+    String queryLocation, 
+    Map<String, String> dbPartLocations
+  ) {
+    if (queryPartNo.isEmpty || dbPartLocations.isEmpty) return null;
+
+    final upperQueryPart = queryPartNo.toUpperCase();
+    final upperQueryLoc = queryLocation.toUpperCase();
+    
+    // 1. Exact match on part number
+    if (dbPartLocations.containsKey(upperQueryPart)) {
+      return upperQueryPart;
+    }
+    
+    final queryFuzzy = _normalizeFuzzy(upperQueryPart);
+    
+    String? bestMatch;
+    int matches = 0;
+    
+    // 2. Standard Fuzzy Match (O->0, L->1, etc.)
+    for (final entry in dbPartLocations.entries) {
+      final partUpper = entry.key.toUpperCase();
+      if (_normalizeFuzzy(partUpper) == queryFuzzy) {
+        bestMatch = entry.key;
+        matches++;
+      }
+    }
+    
+    if (matches == 1) {
+      return bestMatch;
+    }
+
+    // 3. If multiple fuzzy matches, tie-break using location
+    if (matches > 1 && upperQueryLoc.isNotEmpty) {
+      for (final entry in dbPartLocations.entries) {
+        final partUpper = entry.key.toUpperCase();
+        final locUpper = entry.value.toUpperCase();
+        
+        if (_normalizeFuzzy(partUpper) == queryFuzzy && locUpper == upperQueryLoc) {
+           return entry.key; // Strongest match
+        }
+      }
+    }
+
+    // 4. Extreme Fuzzy Match constrained by Location
+    // If we have a location, we can afford a much looser fuzzy match against ONLY the parts at that location
+    if (matches == 0 && upperQueryLoc.isNotEmpty) {
+      final partsAtLoc = dbPartLocations.entries
+          .where((e) => e.value.toUpperCase() == upperQueryLoc)
+          .toList();
+          
+      // Even looser normalization: G <-> 6, D <-> 0, U <-> V
+      String normalizeExtreme(String s) {
+        return _normalizeFuzzy(s)
+            .replaceAll('G', '6')
+            .replaceAll('D', '0')
+            .replaceAll('U', 'V');
+      }
+      
+      final extremeQuery = normalizeExtreme(upperQueryPart);
+      String? locBestMatch;
+      int locMatches = 0;
+      
+      for (final entry in partsAtLoc) {
+         if (normalizeExtreme(entry.key.toUpperCase()) == extremeQuery) {
+            locBestMatch = entry.key;
+            locMatches++;
+         }
+      }
+      
+      // If exactly one part at this location looks like the OCR part, take it
+      if (locMatches == 1) return locBestMatch;
+    }
+
     return null;
   }
 }
