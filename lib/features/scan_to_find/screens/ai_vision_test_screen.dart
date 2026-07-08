@@ -1,6 +1,6 @@
-
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
@@ -28,6 +28,9 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
   List<dynamic> _parsedItems = [];
   bool _hasPriority = false;
   bool _showControls = true;
+  // Debug: raw OCR output for root-cause analysis
+  String _rawOcrDebug = '';
+  bool _showDebugPanel = false;
 
   @override
   void dispose() {
@@ -86,6 +89,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       List<Map<String, dynamic>> allExtractedItems = [];
+      final rawDebugBuffer = StringBuffer();
 
       for (int i = 0; i < _imageFiles.length; i++) {
         setState(() {
@@ -95,12 +99,29 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
         final inputImage = InputImage.fromFile(_imageFiles[i]);
         final recognizedText = await textRecognizer.processImage(inputImage);
 
+        // ── Build raw debug dump ──────────────────────────────────────────────
+        rawDebugBuffer.writeln('═══ IMAGE ${i + 1} ═══');
+        for (int bi = 0; bi < recognizedText.blocks.length; bi++) {
+          final block = recognizedText.blocks[bi];
+          rawDebugBuffer.writeln('  [BLOCK $bi] y=${block.boundingBox.top.toInt()}–${block.boundingBox.bottom.toInt()}');
+          for (int li = 0; li < block.lines.length; li++) {
+            final line = block.lines[li];
+            rawDebugBuffer.writeln('    [LINE $li] y=${line.boundingBox.top.toInt()}  "${line.text}"');
+            for (int ei = 0; ei < line.elements.length; ei++) {
+              final el = line.elements[ei];
+              rawDebugBuffer.writeln('      [EL $ei] x=${el.boundingBox.left.toInt()} w=${el.boundingBox.width.toInt()}  "${el.text}"');
+            }
+          }
+        }
+        rawDebugBuffer.writeln();
+
         // Feed geometry to LocalOcrParser
         final items = LocalOcrParser.parseTable(recognizedText);
         allExtractedItems.addAll(items);
       }
 
       setState(() {
+        _rawOcrDebug = rawDebugBuffer.toString();
         _resultText = 'Validating against database...';
       });
 
@@ -344,8 +365,9 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Status bar + debug toggle
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             color: theme.colorScheme.surfaceContainerHighest,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -360,10 +382,76 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
                                     ),
                                     child: const Text('PRIORITY', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
                                   ),
+                                if (_rawOcrDebug.isNotEmpty) ...[
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => setState(() => _showDebugPanel = !_showDebugPanel),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _showDebugPanel ? Colors.amber.withValues(alpha: 0.25) : Colors.grey.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.amber.withValues(alpha: 0.6)),
+                                      ),
+                                      child: Text(
+                                        _showDebugPanel ? 'Hide OCR' : 'Raw OCR',
+                                        style: const TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
-                          
+
+                          // Raw OCR Debug Panel
+                          if (_showDebugPanel && _rawOcrDebug.isNotEmpty)
+                            Container(
+                              constraints: const BoxConstraints(maxHeight: 260),
+                              color: const Color(0xFF1A1A2E),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Toolbar
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    color: const Color(0xFF16213E),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.bug_report, color: Colors.amber, size: 14),
+                                        const SizedBox(width: 6),
+                                        const Text('Raw ML Kit OCR Output', style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
+                                        const Spacer(),
+                                        GestureDetector(
+                                          onTap: () {
+                                            Clipboard.setData(ClipboardData(text: _rawOcrDebug));
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('OCR debug text copied to clipboard'), duration: Duration(seconds: 2)),
+                                            );
+                                          },
+                                          child: const Row(children: [
+                                            Icon(Icons.copy, color: Colors.white54, size: 14),
+                                            SizedBox(width: 4),
+                                            Text('Copy', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                                          ]),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Scrollable raw text
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      padding: const EdgeInsets.all(10),
+                                      child: SelectableText(
+                                        _rawOcrDebug,
+                                        style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF00FF88), height: 1.4),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
                           Expanded(
                             child: ListView.separated(
                               padding: const EdgeInsets.all(12),
