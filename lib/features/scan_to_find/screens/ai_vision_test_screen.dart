@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../settings/repositories/inventory_repository.dart';
 import '../../../core/utils/barcode_util.dart';
 import '../../../core/utils/local_ocr_parser.dart';
+import '../../../core/services/gemini_fallback_service.dart';
 import '../../../shared/widgets/app_button.dart';
 
 enum AIVisionMode { memo, redLabel }
@@ -19,6 +21,7 @@ class AIVisionTestScreen extends ConsumerStatefulWidget {
 }
 
 class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
+  final ImagePicker _picker = ImagePicker();
   
   AIVisionMode _mode = AIVisionMode.memo;
   List<File> _imageFiles = [];
@@ -52,6 +55,22 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     }
   }
 
+  Future<void> _pickGalleryImage() async {
+    try {
+      final List<XFile> pickedFiles = await _picker.pickMultiImage();
+      if (pickedFiles.isNotEmpty) {
+        setState(() {
+          _imageFiles.addAll(pickedFiles.map((f) => File(f.path)));
+          _resultText = '';
+          _parsedItems = [];
+          _hasPriority = false;
+        });
+      }
+    } catch (e) {
+      _showError('Error picking image: $e');
+    }
+  }
+
   void _clearImages() {
     setState(() {
       _imageFiles.clear();
@@ -75,36 +94,34 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
 
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
-      List<Map<String, dynamic>> allExtractedItems = [];
       final rawDebugBuffer = StringBuffer();
+      List<dynamic> allExtractedItems = [];
+      Map<String, String> extractedHeader = {};
 
-      for (int i = 0; i < _imageFiles.length; i++) {
-        setState(() {
-          _resultText = 'Scanning image ${i + 1} of ${_imageFiles.length}...';
-        });
-
-        final inputImage = InputImage.fromFile(_imageFiles[i]);
+      for (var file in _imageFiles) {
+        final inputImage = InputImage.fromFile(file);
         final recognizedText = await textRecognizer.processImage(inputImage);
-
-        // ── Build raw debug dump ──────────────────────────────────────────────
-        rawDebugBuffer.writeln('═══ IMAGE ${i + 1} ═══');
-        for (int bi = 0; bi < recognizedText.blocks.length; bi++) {
-          final block = recognizedText.blocks[bi];
-          rawDebugBuffer.writeln('  [BLOCK $bi] y=${block.boundingBox.top.toInt()}–${block.boundingBox.bottom.toInt()}');
-          for (int li = 0; li < block.lines.length; li++) {
-            final line = block.lines[li];
-            rawDebugBuffer.writeln('    [LINE $li] y=${line.boundingBox.top.toInt()}  "${line.text}"');
-            for (int ei = 0; ei < line.elements.length; ei++) {
-              final el = line.elements[ei];
-              rawDebugBuffer.writeln('      [EL $ei] x=${el.boundingBox.left.toInt()} w=${el.boundingBox.width.toInt()}  "${el.text}"');
-            }
+        
+        // Build raw debug string for prompt to Gemini
+        for (int b = 0; b < recognizedText.blocks.length; b++) {
+          final block = recognizedText.blocks[b];
+          rawDebugBuffer.writeln('  [BLOCK $b] y=${block.boundingBox.top.toInt()}–${block.boundingBox.bottom.toInt()}');
+          for (int l = 0; l < block.lines.length; l++) {
+            final line = block.lines[l];
+            rawDebugBuffer.writeln('    [LINE $l] y=${line.boundingBox.top.toInt()}  "${line.text}"');
           }
         }
         rawDebugBuffer.writeln();
 
         // Feed geometry to LocalOcrParser
-        final items = LocalOcrParser.parseTable(recognizedText);
-        allExtractedItems.addAll(items);
+        final result = LocalOcrParser.parseTable(recognizedText);
+        allExtractedItems.addAll(result['items'] as List<dynamic>);
+        if (result['header'] != null) {
+          final header = result['header'] as Map<String, String>;
+          if (header['customer']?.isNotEmpty ?? false) extractedHeader['customer'] = header['customer']!;
+          if (header['area']?.isNotEmpty ?? false) extractedHeader['area'] = header['area']!;
+          if (header['memo_no']?.isNotEmpty ?? false) extractedHeader['memo_no'] = header['memo_no']!;
+        }
       }
 
       setState(() {
@@ -113,7 +130,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
       });
 
       if (_mode == AIVisionMode.memo) {
-        await _processMemoResult({'items': allExtractedItems, 'priority': _hasPriority});
+        await _processMemoResult({'items': allExtractedItems, 'header': extractedHeader, 'priority': _hasPriority});
       } else {
         await _processRedLabelResult({'items': allExtractedItems});
       }
@@ -137,10 +154,18 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
 
   Future<void> _processMemoResult(dynamic parsedData) async {
     final bool priority = parsedData['priority'] ?? false;
-    final List<dynamic> items = parsedData['items'] ?? [];
+    List<dynamic> items = parsedData['items'] ?? [];
+    Map<String, String> header = parsedData['header'] ?? {};
 
     final repo = ref.read(inventoryRepositoryProvider);
     final dbPartLocations = await repo.getAllPartLocations();
+
+    bool needsFallback = false;
+    
+    // Check if header is missing key components
+    if (header['customer'] == null || header['customer']!.isEmpty || header['memo_no'] == null || header['memo_no']!.isEmpty) {
+      needsFallback = true;
+    }
 
     List<Map<String, dynamic>> validatedItems = [];
 
@@ -170,6 +195,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
         item['location_db'] = dbLoc; // inject true location
         item['part_no'] = bestMatch; // UPDATE part_no to the verified one!
       } else {
+        needsFallback = true; // DB match failed, might be OCR error, trigger fallback
         if (extractedPartNo.isEmpty) {
           validationStatus = 'Failed to extract part no';
           statusColor = Colors.red;
@@ -180,11 +206,64 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
       item['_validation_color'] = statusColor.toARGB32();
       validatedItems.add(item);
     }
+    
+    if (needsFallback && _rawOcrDebug.isNotEmpty) {
+      setState(() {
+        _resultText = 'Local OCR incomplete. Using Gemini Fallback...';
+      });
+      try {
+        final geminiData = await GeminiFallbackService.correctOcrData(_rawOcrDebug, header, items);
+        
+        // Use Gemini's data
+        if (geminiData['header'] != null) {
+          header = Map<String, String>.from(geminiData['header']);
+        }
+        if (geminiData['items'] != null) {
+           final geminiItems = geminiData['items'] as List<dynamic>;
+           
+           // Re-validate Gemini's items against DB
+           validatedItems.clear();
+           for (var item in geminiItems) {
+              String rawPartNo = item['part_no']?.toString() ?? '';
+              final extractedPartNo = BarcodeUtil.cleanExtractedPartNo(rawPartNo);
+              item['part_no'] = extractedPartNo;
+
+              final rawLoc = item['location']?.toString() ?? '';
+              final cleanedLoc = BarcodeUtil.cleanLocation(rawLoc);
+              item['location'] = cleanedLoc;
+
+              final bestMatch = BarcodeUtil.findBestMatchWithLocation(extractedPartNo, cleanedLoc, dbPartLocations);
+              
+              String validationStatus = 'Unknown (Not in DB)';
+              Color statusColor = Colors.orange;
+
+              if (bestMatch != null) {
+                final dbLoc = dbPartLocations[bestMatch];
+                validationStatus = 'Verified ($bestMatch)';
+                statusColor = Colors.green;
+                item['location_db'] = dbLoc;
+                item['part_no'] = bestMatch;
+              } else {
+                if (extractedPartNo.isEmpty) {
+                  validationStatus = 'Failed to extract part no';
+                  statusColor = Colors.red;
+                }
+              }
+
+              item['_validation_status'] = validationStatus;
+              item['_validation_color'] = statusColor.toARGB32();
+              validatedItems.add(item);
+           }
+        }
+      } catch (e) {
+         _showError('Gemini fallback error: $e');
+      }
+    }
 
     setState(() {
       _hasPriority = priority;
       _parsedItems = validatedItems;
-      _resultText = 'Extracted ${validatedItems.length} items. Priority: $priority';
+      _resultText = 'Extracted ${validatedItems.length} items. Priority: $priority\\nCustomer: ${header['customer'] ?? ''} | Area: ${header['area'] ?? ''} | Memo: ${header['memo_no'] ?? ''}';
     });
   }
 
@@ -261,6 +340,12 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
                          icon: Icons.document_scanner_rounded,
                          variant: AppButtonVariant.secondary,
                          onPressed: _isProcessing ? null : _scanDocument,
+                       ),
+                       AppButton(
+                         label: 'Gallery',
+                         icon: Icons.photo_library_rounded,
+                         variant: AppButtonVariant.secondary,
+                         onPressed: _isProcessing ? null : _pickGalleryImage,
                        ),
                        if (_imageFiles.isNotEmpty)
                          AppButton(

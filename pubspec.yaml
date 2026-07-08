@@ -53,6 +53,7 @@ dependencies:
   google_mlkit_barcode_scanning: ^0.13.0
   google_generative_ai: ^0.4.7
   cunning_document_scanner: ^2.5.0
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:

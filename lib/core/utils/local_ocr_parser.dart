@@ -44,8 +44,9 @@ class LocalOcrParser {
 
   // ─── Public API ─────────────────────────────────────────────────────────
 
-  static List<Map<String, dynamic>> parseTable(RecognizedText recognizedText) {
+  static Map<String, dynamic> parseTable(RecognizedText recognizedText) {
     final items = <Map<String, dynamic>>[];
+    final header = <String, String>{};
 
     // 1. Flatten all TextElements from all blocks/lines
     final List<TextElement> allElements = [];
@@ -54,13 +55,46 @@ class LocalOcrParser {
         allElements.addAll(line.elements);
       }
     }
-    if (allElements.isEmpty) return items;
+    if (allElements.isEmpty) return {'header': header, 'items': items};
 
     // 2. Sort all elements top-to-bottom
     allElements.sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
 
+    // 2.5 Extract Header (from top area Y < 1200 typically, but we'll scan all elements to be safe)
+    String customer = '';
+    String area = '';
+    String memoNo = '';
+    
+    // Group everything roughly by row to find patterns
+    final allRows = _groupIntoRows(allElements);
+    
+    for (int i = 0; i < allRows.length; i++) {
+      allRows[i].sort((a, b) => a.boundingBox.left.compareTo(b.boundingBox.left));
+      final rowText = allRows[i].map((e) => e.text).join(' ');
+      
+      if (rowText.toUpperCase().contains('M/S')) {
+        customer = rowText;
+        // Area is usually the row right after customer if it's an address, or a few rows down.
+        // We will just look at the next 2 rows for a city name, or rely on Gemini for perfection.
+        if (i + 1 < allRows.length) {
+          final nextRowText = allRows[i+1].map((e) => e.text).join(' ');
+          if (!nextRowText.toUpperCase().contains('MEMO')) {
+             area = nextRowText;
+          }
+        }
+      }
+      
+      if (rowText.toUpperCase().contains('MEMO NO')) {
+        memoNo = rowText.replaceAll(RegExp(r'[^a-zA-Z0-9\s:.]'), '').trim();
+      }
+    }
+    
+    header['customer'] = customer;
+    header['area'] = area;
+    header['memo_no'] = memoNo;
+
     // 3. Group elements into visual rows using Y-tolerance
-    final rows = _groupIntoRows(allElements);
+    final rows = allRows;
 
     // 4. For each row, sort left-to-right and extract data
     final foundPartNos = <String>{};
@@ -72,7 +106,7 @@ class LocalOcrParser {
       }
     }
 
-    return items;
+    return {'header': header, 'items': items};
   }
 
   // ─── Row grouping ────────────────────────────────────────────────────────
