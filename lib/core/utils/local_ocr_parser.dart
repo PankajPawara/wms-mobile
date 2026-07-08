@@ -189,17 +189,20 @@ class LocalOcrParser {
     int qty = 1;
     int qtyIdx = -1;
     
-    // MRP token X-coordinate to measure distance
+    // MRP token X-coordinate and width to measure relative distance
     final double mrpRightX = mrpEnd >= 0 ? rest[mrpEnd].boundingBox.right : 0.0;
+    final double mrpWidth = mrpEnd >= 0 ? rest[mrpEnd].boundingBox.width : 0.0;
+    // Max gap allowed between MRP and Qty (scale-independent)
+    final double maxQtyGap = mrpWidth > 0 ? mrpWidth * 3.0 : 800.0;
 
     for (int i = 0; i < afterMrp.length; i++) {
       final el = afterMrp[i];
       final t = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
       
-      // If the distance from MRP to this token is excessively large (>800px), 
+      // If the distance from MRP to this token is excessively large, 
       // it means the QTY column was completely empty and this token is likely Pack/Stock.
       // So we skip it as a candidate for Qty.
-      if (mrpRightX > 0 && (el.boundingBox.left - mrpRightX) > 800) {
+      if (mrpRightX > 0 && (el.boundingBox.left - mrpRightX) > maxQtyGap) {
          continue; 
       }
 
