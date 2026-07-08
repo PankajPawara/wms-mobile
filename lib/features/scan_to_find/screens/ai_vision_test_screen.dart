@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import '../../settings/repositories/inventory_repository.dart';
 import '../../../core/utils/barcode_util.dart';
 import '../../../core/utils/local_ocr_parser.dart';
@@ -19,7 +19,6 @@ class AIVisionTestScreen extends ConsumerStatefulWidget {
 }
 
 class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
-  final ImagePicker _picker = ImagePicker();
   
   AIVisionMode _mode = AIVisionMode.memo;
   List<File> _imageFiles = [];
@@ -37,31 +36,19 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _scanDocument() async {
     try {
-      if (source == ImageSource.gallery) {
-        final List<XFile> pickedFiles = await _picker.pickMultiImage();
-        if (pickedFiles.isNotEmpty) {
-          setState(() {
-            _imageFiles.addAll(pickedFiles.map((f) => File(f.path)));
-            _resultText = '';
-            _parsedItems = [];
-            _hasPriority = false;
-          });
-        }
-      } else {
-        final XFile? pickedFile = await _picker.pickImage(source: source);
-        if (pickedFile != null) {
-          setState(() {
-            _imageFiles.add(File(pickedFile.path));
-            _resultText = '';
-            _parsedItems = [];
-            _hasPriority = false;
-          });
-        }
+      final List<String>? pictures = await CunningDocumentScanner.getPictures();
+      if (pictures != null && pictures.isNotEmpty) {
+        setState(() {
+          _imageFiles.addAll(pictures.map((path) => File(path)));
+          _resultText = '';
+          _parsedItems = [];
+          _hasPriority = false;
+        });
       }
     } catch (e) {
-      _showError('Error picking image: $e');
+      _showError('Error scanning document: $e');
     }
   }
 
@@ -270,16 +257,10 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
                      runSpacing: 8,
                      children: [
                        AppButton(
-                         label: 'Camera',
-                         icon: Icons.camera_alt_rounded,
+                         label: 'Scan Document',
+                         icon: Icons.document_scanner_rounded,
                          variant: AppButtonVariant.secondary,
-                         onPressed: _isProcessing ? null : () => _pickImage(ImageSource.camera),
-                       ),
-                       AppButton(
-                         label: 'Gallery',
-                         icon: Icons.photo_library_rounded,
-                         variant: AppButtonVariant.secondary,
-                         onPressed: _isProcessing ? null : () => _pickImage(ImageSource.gallery),
+                         onPressed: _isProcessing ? null : _scanDocument,
                        ),
                        if (_imageFiles.isNotEmpty)
                          AppButton(
