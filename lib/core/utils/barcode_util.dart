@@ -26,21 +26,43 @@ class BarcodeUtil {
   }
 
   /// Sanitise an OCR-extracted warehouse location code.
-  /// Valid format: exactly 3 numeric digits followed by 1 uppercase letter, e.g. 003K, 069M.
-  /// Common OCR error: leading `1` is actually a `|` column separator → strip it.
+  ///
+  /// Accepted formats:
+  ///   1. `\d{3}[A-Z]`   — 3 digits + 1 letter, e.g. 003K, 069M
+  ///   2. `BOX-\d{3}`    — shelf-box location, e.g. BOX-001, BOX-042
+  ///
+  /// Common OCR errors handled:
+  ///   • Leading `1` before a `\d{3}[A-Z]` token → was a `|` column separator, strip it.
+  ///   • `B0X` (zero) → `BOX` when trying to match format 2.
   static String cleanLocation(String raw) {
     final s = raw.replaceAll(RegExp(r'[|\s]'), '').toUpperCase();
-    final validPattern = RegExp(r'^\d{3}[A-Z]$');
-    if (validPattern.hasMatch(s)) return s;
-    // Spurious leading `1` from OCR reading `|` as `1`
+
+    // ── Format 1: 3 digits + 1 letter ───────────────────────────────────────
+    final slotPattern = RegExp(r'^\d{3}[A-Z]$');
+    if (slotPattern.hasMatch(s)) return s;
+
+    // Spurious leading `1` (OCR read `|` as `1`) before a valid slot code
     if (s.length == 5 && s.startsWith('1')) {
       final candidate = s.substring(1);
-      if (validPattern.hasMatch(candidate)) return candidate;
+      if (slotPattern.hasMatch(candidate)) return candidate;
     }
-    // Extract the first valid 4-char location from a mixed string
-    final m = RegExp(r'(\d{3}[A-Z])').firstMatch(s);
-    if (m != null) return m.group(1)!;
-    // Return empty if nothing valid found
+
+    // ── Format 2: BOX-NNN ────────────────────────────────────────────────────
+    // Normalise common OCR confusion: `B0X` (zero) → `BOX`
+    final boxNorm = s.replaceAll(RegExp(r'B0X'), 'BOX');
+    final boxPattern = RegExp(r'^BOX-\d{3}$');
+    if (boxPattern.hasMatch(boxNorm)) return boxNorm;
+
+    // ── Scan inside a longer mixed token ────────────────────────────────────
+    // Check BOX-NNN first (longer pattern, more specific)
+    final boxMatch = RegExp(r'(BOX-\d{3})', caseSensitive: false).firstMatch(s);
+    if (boxMatch != null) return boxMatch.group(1)!.toUpperCase();
+
+    // Then try slot pattern
+    final slotMatch = RegExp(r'(\d{3}[A-Z])').firstMatch(s);
+    if (slotMatch != null) return slotMatch.group(1)!;
+
+    // Return empty string if nothing valid found
     return '';
   }
 

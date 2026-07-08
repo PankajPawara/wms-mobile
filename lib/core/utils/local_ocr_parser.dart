@@ -23,8 +23,11 @@ import 'barcode_util.dart';
 class LocalOcrParser {
   static const double _rowTolerance = 14.0;
 
-  /// Valid location pattern: exactly 3 digits then 1 uppercase letter, e.g. 003K, 023X, 069M
-  static final RegExp _locPattern = RegExp(r'^\d{3}[A-Z]$', caseSensitive: false);
+  /// Valid location patterns:
+  ///   1. `\d{3}[A-Z]`  — 3 digits + 1 letter, e.g. 003K, 069M
+  ///   2. `BOX-\d{3}`  — shelf-box, e.g. BOX-001, BOX-042
+  static final RegExp _slotPattern = RegExp(r'^\d{3}[A-Z]$', caseSensitive: false);
+  static final RegExp _boxPattern  = RegExp(r'^BOX-\d{3}$',  caseSensitive: false);
 
   /// MRP ends in .00 and is > 0
   static final RegExp _mrpPattern = RegExp(r'^(\d+)\.00$');
@@ -168,25 +171,39 @@ class LocalOcrParser {
         .replaceAll(',', '.');
   }
 
-  /// Attempt to extract a valid 4-char location code (3 digits + 1 letter)
-  /// from a raw OCR token.  The token may have a spurious leading `1` (which
-  /// was a `|`) or a trailing `|`.
+  /// Attempt to extract a valid location code from a raw OCR token.
+  ///
+  /// Accepted formats:
+  ///   1. `\d{3}[A-Z]`  e.g. 003K, 069M  (4 chars)
+  ///   2. `BOX-\d{3}`  e.g. BOX-001      (7 chars)
+  ///
+  /// The token may carry a spurious leading `1` (OCR read `|` as `1`).
   static String? _extractLocation(String raw) {
-    // Strip common noise characters
-    String s = raw.replaceAll(RegExp(r'[\|\s]'), '').toUpperCase();
+    // Strip pipe and space noise, uppercase
+    String s = raw.replaceAll(RegExp(r'[|\s]'), '').toUpperCase();
 
-    // Direct hit
-    if (_locPattern.hasMatch(s)) return s;
+    // Normalise B0X → BOX (OCR reads `O` as `0` in BOX)
+    final sNorm = s.replaceAll('B0X', 'BOX');
 
-    // If 5 chars and starts with '1' → the `1` was a `|`, strip it
+    // ── Format 2 first (longer, more specific) ─────────────────────────────
+    if (_boxPattern.hasMatch(sNorm)) return sNorm;
+
+    // Scan inside a longer token for BOX-NNN
+    final boxMatch = RegExp(r'(BOX-\d{3})', caseSensitive: false).firstMatch(sNorm);
+    if (boxMatch != null) return boxMatch.group(1)!.toUpperCase();
+
+    // ── Format 1: 3 digits + 1 letter ──────────────────────────────────────
+    if (_slotPattern.hasMatch(s)) return s;
+
+    // Spurious leading `1` (OCR read `|` as `1`) before a valid slot code
     if (s.length == 5 && s.startsWith('1')) {
       final candidate = s.substring(1);
-      if (_locPattern.hasMatch(candidate)) return candidate;
+      if (_slotPattern.hasMatch(candidate)) return candidate;
     }
 
-    // Regex scan inside a longer token
-    final m = RegExp(r'(\d{3}[A-Z])', caseSensitive: false).firstMatch(s);
-    if (m != null) return m.group(1)!.toUpperCase();
+    // Scan inside a longer token for the 4-char slot pattern
+    final slotMatch = RegExp(r'(\d{3}[A-Z])', caseSensitive: false).firstMatch(s);
+    if (slotMatch != null) return slotMatch.group(1)!.toUpperCase();
 
     return null;
   }
