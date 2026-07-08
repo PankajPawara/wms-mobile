@@ -181,6 +181,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
         validationStatus = 'Verified ($bestMatch)';
         statusColor = Colors.green;
         item['location_db'] = dbLoc; // inject true location
+        item['part_no'] = bestMatch; // UPDATE part_no to the verified one!
       } else {
         if (extractedPartNo.isEmpty) {
           validationStatus = 'Failed to extract part no';

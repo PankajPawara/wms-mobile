@@ -66,8 +66,7 @@ class LocalOcrParser {
     final foundPartNos = <String>{};
     for (final row in rows) {
       row.sort((a, b) => a.boundingBox.left.compareTo(b.boundingBox.left));
-      final rawTokens = row.map((e) => e.text).toList();
-      final item = _extractFromTokens(rawTokens);
+      final item = _extractFromTokens(row);
       if (item != null && foundPartNos.add(item['part_no'] as String)) {
         items.add(item);
       }
@@ -100,11 +99,14 @@ class LocalOcrParser {
   // ─── Core token extraction ───────────────────────────────────────────────
 
   /// Extract part no, description, MRP, qty, location from a left-sorted token list.
-  static Map<String, dynamic>? _extractFromTokens(List<String> rawTokens) {
+  static Map<String, dynamic>? _extractFromTokens(List<TextElement> row) {
     // Sanitise: strip leading/trailing `|` from every token, drop blank ones
-    final tokens = rawTokens
-        .map((t) => t.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim())
-        .toList();
+    final tokens = row.where((e) {
+      final text = e.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+      return text.isNotEmpty;
+    }).toList();
+
+    if (tokens.isEmpty) return null;
 
     // ── Step 1: Find Honda part number ───────────────────────────────────
     int partIdx = -1;
@@ -112,19 +114,20 @@ class LocalOcrParser {
     String partNo = '';
 
     for (int i = 0; i < tokens.length; i++) {
-      // Try single token
-      if (_tryPartNo(tokens[i]) case final p?) {
+      final t0 = tokens[i].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+      if (_tryPartNo(t0) case final p?) {
         partIdx = i; partLen = 1; partNo = p; break;
       }
-      // Try direct concat of 2 tokens (handles "150350-K24" + "-GO0")
       if (i + 1 < tokens.length) {
-        if (_tryPartNo(tokens[i] + tokens[i + 1]) case final p?) {
+        final t1 = tokens[i+1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        if (_tryPartNo(t0 + t1) case final p?) {
           partIdx = i; partLen = 2; partNo = p; break;
         }
       }
-      // Try direct concat of 3 tokens (handles further splits)
       if (i + 2 < tokens.length) {
-        if (_tryPartNo(tokens[i] + tokens[i + 1] + tokens[i + 2]) case final p?) {
+        final t1 = tokens[i+1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        final t2 = tokens[i+2].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        if (_tryPartNo(t0 + t1 + t2) case final p?) {
           partIdx = i; partLen = 3; partNo = p; break;
         }
       }
@@ -142,19 +145,16 @@ class LocalOcrParser {
     double mrpCandidate = 0.0; // tentative integer MRP
 
     for (int i = 0; i < rest.length; i++) {
-      final t = rest[i];
-      if (t.isEmpty) continue;
+      final t = rest[i].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
 
-      // Case A: full decimal "62.00" or after pipe-strip "62.00" from "62.00|"
       final dm = _mrpFull.firstMatch(t);
       if (dm != null) {
         final val = double.tryParse('${dm.group(1)}.${dm.group(2)}') ?? 0.0;
         if (val > 5) { mrp = val; mrpIdx = i; mrpEnd = i; break; }
       }
 
-      // Case B: split decimal — "243." followed by "00" (next token)
       if (_mrpLeft.hasMatch(t) && i + 1 < rest.length) {
-        final nextT = rest[i + 1];
+        final nextT = rest[i + 1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
         if (_mrpRight.hasMatch(nextT)) {
           final combined = t.replaceAll(',', '.') + nextT;
           final val = double.tryParse(combined) ?? 0.0;
@@ -162,45 +162,50 @@ class LocalOcrParser {
         }
       }
 
-      // Case C: large standalone integer (price without decimals)
-      // Accept only if > 10 and not at position 0 (not Sr.No)
       final intVal = int.tryParse(t);
       if (intVal != null && intVal > 10 && intVal < 100000 && i > 0 && mrpCandidate == 0.0) {
         mrpCandidate = intVal.toDouble();
         mrpIdx = i; mrpEnd = i;
-        // Don't break — prefer a decimal match later
       }
     }
 
-    // If no decimal MRP found but we have an integer candidate, use it
     if (mrp == 0.0 && mrpCandidate > 0) mrp = mrpCandidate;
 
     // ── Step 4: Description = tokens between part no and MRP ─────────────
     String description = '';
     if (mrpIdx > 0) {
-      final descTokens = rest.sublist(0, mrpIdx).where((t) => t.isNotEmpty).toList();
+      final descTokens = rest.sublist(0, mrpIdx).map((e) => e.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim());
       description = descTokens.join(' ').trim();
     } else if (mrpIdx == -1 && rest.isNotEmpty) {
-      // No MRP: take up to 5 tokens as description, skip location-looking tokens
       final descTokens = rest
-          .where((t) => t.isNotEmpty && _extractLocation(t) == null)
-          .take(5)
-          .toList();
+          .map((e) => e.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim())
+          .where((t) => _extractLocation(t) == null)
+          .take(5);
       description = descTokens.join(' ').trim();
     }
 
     // ── Step 5: QTY — small integer immediately after MRP ────────────────
-    final afterMrp = mrpEnd >= 0 ? rest.sublist(mrpEnd + 1) : <String>[];
+    final afterMrp = mrpEnd >= 0 ? rest.sublist(mrpEnd + 1) : <TextElement>[];
     int qty = 1;
     int qtyIdx = -1;
+    
+    // MRP token X-coordinate to measure distance
+    final double mrpRightX = mrpEnd >= 0 ? rest[mrpEnd].boundingBox.right : 0.0;
 
     for (int i = 0; i < afterMrp.length; i++) {
-      final t = afterMrp[i];
-      if (t.isEmpty) continue;
+      final el = afterMrp[i];
+      final t = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+      
+      // If the distance from MRP to this token is excessively large (>800px), 
+      // it means the QTY column was completely empty and this token is likely Pack/Stock.
+      // So we skip it as a candidate for Qty.
+      if (mrpRightX > 0 && (el.boundingBox.left - mrpRightX) > 800) {
+         continue; 
+      }
+
       final normalized = _normNum(t);
       final parsed = int.tryParse(normalized);
       if (parsed != null && parsed >= 1 && parsed <= 99) {
-        // Make sure this is not a location token
         if (_extractLocation(t) == null) {
           qty = parsed;
           qtyIdx = i;
@@ -213,18 +218,17 @@ class LocalOcrParser {
     final afterQty = qtyIdx >= 0 ? afterMrp.sublist(qtyIdx + 1) : afterMrp;
     String location = '';
 
-    // First, try single tokens
-    for (final tok in afterQty) {
-      if (tok.isEmpty) continue;
+    for (final el in afterQty) {
+      final tok = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
       final loc = _extractLocation(tok);
       if (loc != null) { location = loc; break; }
     }
 
-    // If no single-token match, try adjacent concatenation (e.g. "2104" + "6H")
     if (location.isEmpty) {
       for (int i = 0; i < afterQty.length - 1; i++) {
-        final combined = afterQty[i] + afterQty[i + 1];
-        final loc = _extractLocation(combined);
+        final t1 = afterQty[i].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        final t2 = afterQty[i+1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        final loc = _extractLocation(t1 + t2);
         if (loc != null) { location = loc; break; }
       }
     }
