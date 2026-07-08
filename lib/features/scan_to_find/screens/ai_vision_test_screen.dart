@@ -1,13 +1,13 @@
-import 'dart:convert';
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../settings/repositories/inventory_repository.dart';
 import '../../../core/utils/barcode_util.dart';
+import '../../../core/utils/local_ocr_parser.dart';
 import '../../../shared/widgets/app_button.dart';
-import '../../../shared/widgets/app_text_field.dart';
 
 enum AIVisionMode { memo, redLabel }
 
@@ -19,7 +19,6 @@ class AIVisionTestScreen extends ConsumerStatefulWidget {
 }
 
 class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
-  final TextEditingController _apiKeyController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   
   AIVisionMode _mode = AIVisionMode.memo;
@@ -31,7 +30,6 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
 
   @override
   void dispose() {
-    _apiKeyController.dispose();
     super.dispose();
   }
 
@@ -73,11 +71,6 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
   }
 
   Future<void> _processImage() async {
-    final apiKey = _apiKeyController.text.trim();
-    if (apiKey.isEmpty) {
-      _showError('Please enter your Gemini API Key first.');
-      return;
-    }
     if (_imageFiles.isEmpty) {
       _showError('Please select an image first.');
       return;
@@ -85,98 +78,35 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
 
     setState(() {
       _isProcessing = true;
-      _resultText = 'Initializing Gemini Model...';
+      _resultText = 'Initializing ML Kit...';
       _parsedItems = [];
-      _hasPriority = false;
     });
 
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
-      final prompt = _getPromptForMode();
-      final List<Part> parts = [TextPart(prompt)];
-      for (final file in _imageFiles) {
-        final bytes = await file.readAsBytes();
-        parts.add(DataPart('image/jpeg', bytes));
+      List<Map<String, dynamic>> allExtractedItems = [];
+
+      for (int i = 0; i < _imageFiles.length; i++) {
+        setState(() {
+          _resultText = 'Scanning image ${i + 1} of ${_imageFiles.length}...';
+        });
+
+        final inputImage = InputImage.fromFile(_imageFiles[i]);
+        final recognizedText = await textRecognizer.processImage(inputImage);
+
+        // Feed geometry to LocalOcrParser
+        final items = LocalOcrParser.parseTable(recognizedText);
+        allExtractedItems.addAll(items);
       }
 
-      final List<String> fallbackModels = [
-        'gemini-2.5-flash',
-        'gemini-2.5-pro',
-        'gemini-2.0-flash',
-        'gemini-2.0-pro',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-      ];
-      
-      GenerateContentResponse? response;
-      String? lastError;
-
-      for (final modelName in fallbackModels) {
-        try {
-          final model = GenerativeModel(
-            model: modelName,
-            apiKey: apiKey,
-            generationConfig: GenerationConfig(
-              temperature: 0.1,
-              responseMimeType: 'application/json',
-            ),
-          );
-
-          response = await model.generateContent([
-            Content.multi(parts)
-          ]);
-          break; // Success!
-        } catch (e) {
-          lastError = e.toString();
-          if (!lastError.contains('is not found') && !lastError.contains('404')) {
-            rethrow; // Re-throw if it's an auth error or other issue
-          }
-        }
-      }
-
-      if (response == null) {
-        String availableModels = '';
-        try {
-          final request = await HttpClient().getUrl(Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey'));
-          final res = await request.close();
-          final body = await res.transform(utf8.decoder).join();
-          final data = jsonDecode(body);
-          if (data['models'] != null) {
-            final modelsList = (data['models'] as List).map((m) => m['name'].toString().replaceAll('models/', '')).join(', ');
-            availableModels = '\n\nAvailable Models for your key: $modelsList';
-          } else {
-            availableModels = '\n\nAPI Response: $body';
-          }
-        } catch (e) {
-          availableModels = '\n\nCould not fetch models list: $e';
-        }
-        throw Exception('All Gemini models failed. Last error: $lastError$availableModels');
-      }
-
-      setState(() {
-        _resultText = 'Analyzing image... this usually takes 3-5 seconds.';
-      });
-
-      final responseText = response.text;
-
-      if (responseText == null || responseText.isEmpty) {
-        throw Exception('Empty response from Gemini');
-      }
-
-      setState(() {
-        _resultText = 'Parsing JSON...';
-      });
-
-      // Parse JSON
-      final parsedData = jsonDecode(responseText);
-      
       setState(() {
         _resultText = 'Validating against database...';
       });
 
       if (_mode == AIVisionMode.memo) {
-        await _processMemoResult(parsedData);
+        await _processMemoResult({'items': allExtractedItems, 'priority': _hasPriority});
       } else {
-        await _processRedLabelResult(parsedData);
+        await _processRedLabelResult({'items': allExtractedItems});
       }
 
     } catch (e) {
@@ -185,6 +115,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
       });
       _showError(e.toString());
     } finally {
+      await textRecognizer.close();
       if (mounted) {
         setState(() {
           _isProcessing = false;
@@ -193,47 +124,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     }
   }
 
-  String _getPromptForMode() {
-    if (_mode == AIVisionMode.memo) {
-      return '''
-Analyze this order memo and extract all line items into a JSON array. 
-CRITICAL INSTRUCTION: You must read the data strictly ROW by ROW. Trace your eyes horizontally across each row from left to right. Do NOT mix columns from different rows! 
-The table columns are: SR, PART No, DESCRIPTION, M.R.P., QTY, LOCATION, PACK, STOCK.
-For each item, extract: 
-- `part_no`
-- `description` (the name of the part)
-- `location`
-- `mrp`
-- `qty`
-- `in_stock` (from the STOCK column)
-- `pack_of` (from the PACK column)
 
-Correct any obvious character ambiguities in part numbers based on standard LLLLL-LLL-LLL Honda formats (e.g. O vs 0, S vs 5, Z vs 2). Ignore stray vertical lines like `|` or `1` at the edges of columns.
-
-Additionally, check the ENTIRE memo for handwritten priority keywords such as 'porter', 'leva aavshe', 'urgent', 'asap'.
-If any of these priority keywords are found, set a `priority` flag to true in a top-level wrapper object.
-
-Strictly return a JSON object with this structure:
-{
-  "priority": true/false,
-  "items": [
-    { "part_no": "...", "description": "...", "location": "...", "mrp": 12.3, "qty": 1, "in_stock": 1, "pack_of": 1 }
-  ]
-}
-''';
-    } else {
-      return '''
-Extract only the `part_no`, `qty`, and `price` from this red label. 
-Ignore all other text, instructions, or background noise. 
-Return the result strictly as a JSON object with this structure:
-{
-  "part_no": "...",
-  "qty": "...",
-  "price": "..."
-}
-''';
-    }
-  }
 
   Future<void> _processMemoResult(dynamic parsedData) async {
     final bool priority = parsedData['priority'] ?? false;
@@ -315,12 +206,17 @@ Return the result strictly as a JSON object with this structure:
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                AppTextField(
-                  controller: _apiKeyController,
-                  label: 'Gemini API Key',
-                  hint: 'AIza...',
-                  obscureText: true,
-                  prefixIcon: Icons.key_rounded,
+                CheckboxListTile(
+                  title: const Text('Mark as Priority (Porter/Urgent)'),
+                  value: _hasPriority,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      _hasPriority = value ?? false;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
                 ),
                 const SizedBox(height: 16),
                 
