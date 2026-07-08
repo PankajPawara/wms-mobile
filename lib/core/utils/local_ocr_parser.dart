@@ -14,6 +14,14 @@ import 'barcode_util.dart';
 ///   4. Part no split — "150350-K24" + "-GO0" → direct concat → "150350-K24-GO0" ✓
 ///   5. Part no consumes multiple tokens → track how many tokens used, skip them in rest
 ///   6. Standalone `|` tokens from column separators → treated as empty, filtered out
+class ParsedToken {
+  final String text;
+  final double left;
+  final double right;
+  final double width;
+  ParsedToken({required this.text, required this.left, required this.right, required this.width});
+}
+
 class LocalOcrParser {
 
   // Y-tolerance for grouping elements into the same visual row.
@@ -134,11 +142,39 @@ class LocalOcrParser {
 
   /// Extract part no, description, MRP, qty, location from a left-sorted token list.
   static Map<String, dynamic>? _extractFromTokens(List<TextElement> row) {
-    // Sanitise: strip leading/trailing `|` from every token, drop blank ones
-    final tokens = row.where((e) {
-      final text = e.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-      return text.isNotEmpty;
-    }).toList();
+    // 1. Convert to ParsedToken and split tokens containing `|` in the middle (e.g., "413.00| 2")
+    final tokens = <ParsedToken>[];
+    for (var el in row) {
+      final rawText = el.text.trim();
+      if (rawText.isEmpty || rawText == '|') continue;
+
+      if (rawText.contains('|')) {
+        final parts = rawText.split('|');
+        final double charWidth = el.boundingBox.width / (rawText.length > 0 ? rawText.length : 1);
+        double currLeft = el.boundingBox.left;
+        
+        for (var part in parts) {
+          final pText = part.trim();
+          if (pText.isNotEmpty) {
+            final w = pText.length * charWidth;
+            tokens.add(ParsedToken(
+              text: pText,
+              left: currLeft,
+              right: currLeft + w,
+              width: w,
+            ));
+          }
+          currLeft += (part.length + 1) * charWidth;
+        }
+      } else {
+        tokens.add(ParsedToken(
+          text: rawText,
+          left: el.boundingBox.left,
+          right: el.boundingBox.right,
+          width: el.boundingBox.width,
+        ));
+      }
+    }
 
     if (tokens.isEmpty) return null;
 
@@ -219,13 +255,13 @@ class LocalOcrParser {
     }
 
     // ── Step 5: QTY — small integer immediately after MRP ────────────────
-    final afterMrp = mrpEnd >= 0 ? rest.sublist(mrpEnd + 1) : <TextElement>[];
+    final afterMrp = mrpEnd >= 0 ? rest.sublist(mrpEnd + 1) : <ParsedToken>[];
     int qty = 1;
     int qtyIdx = -1;
     
     // MRP token X-coordinate and width to measure relative distance
-    final double mrpRightX = mrpEnd >= 0 ? rest[mrpEnd].boundingBox.right : 0.0;
-    final double mrpWidth = mrpEnd >= 0 ? rest[mrpEnd].boundingBox.width : 0.0;
+    final double mrpRightX = mrpEnd >= 0 ? rest[mrpEnd].right : 0.0;
+    final double mrpWidth = mrpEnd >= 0 ? rest[mrpEnd].width : 0.0;
     // Max gap allowed between MRP and Qty (scale-independent)
     final double maxQtyGap = mrpWidth > 0 ? mrpWidth * 3.0 : 800.0;
 
@@ -236,7 +272,7 @@ class LocalOcrParser {
       // If the distance from MRP to this token is excessively large, 
       // it means the QTY column was completely empty and this token is likely Pack/Stock.
       // So we skip it as a candidate for Qty.
-      if (mrpRightX > 0 && (el.boundingBox.left - mrpRightX) > maxQtyGap) {
+      if (mrpRightX > 0 && (el.left - mrpRightX) > maxQtyGap) {
          continue; 
       }
 
