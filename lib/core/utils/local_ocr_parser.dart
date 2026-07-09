@@ -269,8 +269,11 @@ class LocalOcrParser {
       
       if (i + 1 < afterMrp.length) {
         final t2 = afterMrp[i+1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-        final loc2 = _extractLocation(tok + t2);
-        if (loc2 != null) { location = loc2; locIdx = i; locLen = 2; break; }
+        // Prevent concatenating Qty and Location (e.g. "60" + "001C") if t2 is already a valid Location
+        if (_extractLocation(t2) == null) {
+          final loc2 = _extractLocation(tok + t2);
+          if (loc2 != null) { location = loc2; locIdx = i; locLen = 2; break; }
+        }
       }
     }
 
