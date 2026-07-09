@@ -254,56 +254,70 @@ class LocalOcrParser {
       description = descTokens.join(' ').trim();
     }
 
-    // ── Step 5: QTY — small integer immediately after MRP ────────────────
+    // ── Step 5, 6, 7: QTY, LOCATION, PACK, STOCK ────────────────────────────
     final afterMrp = mrpEnd >= 0 ? rest.sublist(mrpEnd + 1) : <ParsedToken>[];
-    int qty = 1;
-    int qtyIdx = -1;
     
-    // MRP token X-coordinate and width to measure relative distance
-    final double mrpRightX = mrpEnd >= 0 ? rest[mrpEnd].right : 0.0;
-    final double mrpWidth = mrpEnd >= 0 ? rest[mrpEnd].width : 0.0;
-    // Max gap allowed between MRP and Qty (scale-independent)
-    final double maxQtyGap = mrpWidth > 0 ? mrpWidth * 3.0 : 800.0;
-
+    // First, find Location as it has a very strict pattern
+    int locIdx = -1;
+    int locLen = 1;
+    String location = '';
+    
     for (int i = 0; i < afterMrp.length; i++) {
-      final el = afterMrp[i];
-      final t = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+      final tok = afterMrp[i].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+      final loc = _extractLocation(tok);
+      if (loc != null) { location = loc; locIdx = i; locLen = 1; break; }
       
-      // If the distance from MRP to this token is excessively large, 
-      // it means the QTY column was completely empty and this token is likely Pack/Stock.
-      // So we skip it as a candidate for Qty.
-      if (mrpRightX > 0 && (el.left - mrpRightX) > maxQtyGap) {
-         continue; 
+      if (i + 1 < afterMrp.length) {
+        final t2 = afterMrp[i+1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        final loc2 = _extractLocation(tok + t2);
+        if (loc2 != null) { location = loc2; locIdx = i; locLen = 2; break; }
       }
+    }
 
-      final normalized = _normNum(t);
-      final parsed = int.tryParse(normalized);
-      if (parsed != null && parsed >= 1 && parsed <= 99) {
-        if (_extractLocation(t) == null) {
+    int qty = 1;
+    if (locIdx > 0) {
+      // Any number before Location is QTY
+      for (int i = 0; i < locIdx; i++) {
+        final t = afterMrp[i].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        final parsed = int.tryParse(_normNum(t));
+        if (parsed != null && parsed >= 1) {
           qty = parsed;
-          qtyIdx = i;
+          break; // First number before location
+        }
+      }
+    } else if (locIdx == -1) {
+      // Location missing. Use gap to find QTY so we don't accidentally grab PACK/STOCK
+      final double mrpRightX = mrpEnd >= 0 ? rest[mrpEnd].right : 0.0;
+      final double mrpWidth = mrpEnd >= 0 ? rest[mrpEnd].width : 0.0;
+      final double maxQtyGap = mrpWidth > 0 ? mrpWidth * 3.0 : 800.0;
+
+      for (int i = 0; i < afterMrp.length; i++) {
+        final el = afterMrp[i];
+        if (mrpRightX > 0 && (el.left - mrpRightX) > maxQtyGap) {
+          continue;
+        }
+        final t = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        final parsed = int.tryParse(_normNum(t));
+        if (parsed != null && parsed >= 1) {
+          qty = parsed;
           break;
         }
       }
     }
 
-    // ── Step 6: Location — scan after QTY (or after MRP if no QTY) ───────
-    final afterQty = qtyIdx >= 0 ? afterMrp.sublist(qtyIdx + 1) : afterMrp;
-    String location = '';
-
-    for (final el in afterQty) {
-      final tok = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-      final loc = _extractLocation(tok);
-      if (loc != null) { location = loc; break; }
-    }
-
-    if (location.isEmpty) {
-      for (int i = 0; i < afterQty.length - 1; i++) {
-        final t1 = afterQty[i].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-        final t2 = afterQty[i+1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-        final loc = _extractLocation(t1 + t2);
-        if (loc != null) { location = loc; break; }
+    int pack = 0;
+    int stock = 0;
+    if (locIdx >= 0 && locIdx + locLen < afterMrp.length) {
+      // Anything after Location is PACK and STOCK
+      final afterLoc = afterMrp.sublist(locIdx + locLen);
+      final nums = <int>[];
+      for (var el in afterLoc) {
+        final t = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        final parsed = int.tryParse(_normNum(t));
+        if (parsed != null) nums.add(parsed);
       }
+      if (nums.isNotEmpty) pack = nums[0];
+      if (nums.length > 1) stock = nums[1];
     }
 
     return {
@@ -312,6 +326,8 @@ class LocalOcrParser {
       'mrp': mrp,
       'qty': qty,
       'location': location,
+      'pack': pack,
+      'stock': stock,
     };
   }
 

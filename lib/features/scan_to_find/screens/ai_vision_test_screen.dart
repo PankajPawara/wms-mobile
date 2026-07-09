@@ -585,6 +585,10 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
                                               _buildDataPoint('OCR Loc', item['location'].toString()),
                                             if (item['location_db'] != null)
                                               _buildDataPoint('DB Loc', item['location_db'].toString(), color: Colors.green),
+                                            if (item['pack'] != null && item['pack'] != 0)
+                                              _buildDataPoint('Pack', item['pack'].toString()),
+                                            if (item['stock'] != null && item['stock'] != 0)
+                                              _buildDataPoint('Stock', item['stock'].toString()),
                                           ],
                                         )
                                       ],

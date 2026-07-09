@@ -49,7 +49,9 @@ FORMAT:
       "description": "...",
       "mrp": "...",
       "qty": 1,
-      "location": "103T"
+      "location": "103T",
+      "pack": 1,
+      "stock": 100
     }
   ]
 }
