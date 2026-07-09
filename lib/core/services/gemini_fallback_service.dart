@@ -1,16 +1,23 @@
 import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class GeminiFallbackService {
+  static const _storage = FlutterSecureStorage();
+
   static Future<Map<String, dynamic>> correctOcrData(
     String rawOcrDump, 
     Map<String, String> extractedHeader, 
     List<dynamic> extractedItems
   ) async {
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
+    String? apiKey = await _storage.read(key: 'gemini_api_key');
     if (apiKey == null || apiKey.isEmpty) {
-      throw Exception('GEMINI_API_KEY not found in .env');
+      apiKey = dotenv.env['GEMINI_API_KEY'];
+    }
+    
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('GEMINI_API_KEY not found in Secure Storage or .env');
     }
 
     final model = GenerativeModel(

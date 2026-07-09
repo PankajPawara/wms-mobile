@@ -10,6 +10,7 @@ import '../../../core/utils/barcode_util.dart';
 import '../../../core/utils/local_ocr_parser.dart';
 import '../../../core/services/gemini_fallback_service.dart';
 import '../../../shared/widgets/app_button.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 enum AIVisionMode { memo, redLabel }
 
@@ -22,6 +23,7 @@ class AIVisionTestScreen extends ConsumerStatefulWidget {
 
 class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
   final ImagePicker _picker = ImagePicker();
+  static const _storage = FlutterSecureStorage();
   
   AIVisionMode _mode = AIVisionMode.memo;
   List<File> _imageFiles = [];
@@ -37,6 +39,49 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
   @override
   void dispose() {
     super.dispose();
+  }
+
+  Future<void> _showApiKeyDialog(BuildContext context) async {
+    final TextEditingController controller = TextEditingController();
+    final String? currentKey = await _storage.read(key: 'gemini_api_key');
+    if (currentKey != null) {
+      controller.text = currentKey;
+    }
+
+    if (!context.mounted) return;
+
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Set Gemini API Key'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Enter API Key',
+            border: OutlineInputBorder(),
+          ),
+          obscureText: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await _storage.write(key: 'gemini_api_key', value: controller.text.trim());
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('API Key saved securely.')),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _scanDocument() async {
@@ -288,6 +333,13 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI Vision Sandbox'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.key),
+            tooltip: 'Set Gemini API Key',
+            onPressed: () => _showApiKeyDialog(context),
+          ),
+        ],
       ),
       body: Column(
         children: [
