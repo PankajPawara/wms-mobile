@@ -73,12 +73,21 @@ class LocalOcrParser {
     String area = '';
     String memoNo = '';
     
+    double packX = -1;
+    double stockX = -1;
+    
     // Group everything roughly by row to find patterns
     final allRows = _groupIntoRows(allElements);
     
     for (int i = 0; i < allRows.length; i++) {
       allRows[i].sort((a, b) => a.boundingBox.left.compareTo(b.boundingBox.left));
       final rowText = allRows[i].map((e) => e.text).join(' ');
+      
+      for (final el in allRows[i]) {
+        final t = el.text.toUpperCase();
+        if (t.contains('PACK')) packX = el.boundingBox.center.dx;
+        if (t.contains('STOCK')) stockX = el.boundingBox.center.dx;
+      }
       
       if (rowText.toUpperCase().contains('M/S')) {
         customer = rowText;
@@ -108,7 +117,7 @@ class LocalOcrParser {
     final foundPartNos = <String>{};
     for (final row in rows) {
       row.sort((a, b) => a.boundingBox.left.compareTo(b.boundingBox.left));
-      final item = _extractFromTokens(row);
+      final item = _extractFromTokens(row, packX, stockX);
       if (item != null && foundPartNos.add(item['part_no'] as String)) {
         items.add(item);
       }
@@ -138,10 +147,10 @@ class LocalOcrParser {
     return rows;
   }
 
-  // ─── Core token extraction ───────────────────────────────────────────────
+  // ─── Core token extraction ──────────────────────────────────────────────────
 
   /// Extract part no, description, MRP, qty, location from a left-sorted token list.
-  static Map<String, dynamic>? _extractFromTokens(List<TextElement> row) {
+  static Map<String, dynamic>? _extractFromTokens(List<TextElement> row, double packX, double stockX) {
     // 1. Convert to ParsedToken and split tokens containing `|` in the middle (e.g., "413.00| 2")
     final tokens = <ParsedToken>[];
     for (var el in row) {
@@ -313,14 +322,50 @@ class LocalOcrParser {
     if (locIdx >= 0 && locIdx + locLen < afterMrp.length) {
       // Anything after Location is PACK and STOCK
       final afterLoc = afterMrp.sublist(locIdx + locLen);
-      final nums = <int>[];
+      final candidates = <Map<String, dynamic>>[];
+      
       for (var el in afterLoc) {
-        final t = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-        final parsed = int.tryParse(_normNum(t));
-        if (parsed != null) nums.add(parsed);
+        // Strip out trailing or leading misread pipes (I, l, |) before parsing
+        String text = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+        text = text.replaceAll(RegExp(r'^[Il|]+|[Il|]+$'), '');
+        
+        final parsed = int.tryParse(_normNum(text));
+        if (parsed != null) {
+          candidates.add({'val': parsed, 'x': el.left + el.width / 2});
+        }
       }
-      if (nums.isNotEmpty) pack = nums[0];
-      if (nums.length > 1) stock = nums[1];
+
+      if (packX > 0 && stockX > 0 && candidates.isNotEmpty) {
+        Map<String, dynamic>? bestPack;
+        double minPackDist = double.infinity;
+        
+        Map<String, dynamic>? bestStock;
+        double minStockDist = double.infinity;
+        
+        for (final c in candidates) {
+          final x = c['x'] as double;
+          final distPack = (x - packX).abs();
+          final distStock = (x - stockX).abs();
+          
+          if (distPack < distStock) {
+            if (distPack < minPackDist) {
+              minPackDist = distPack;
+              bestPack = c;
+            }
+          } else {
+            if (distStock < minStockDist) {
+              minStockDist = distStock;
+              bestStock = c;
+            }
+          }
+        }
+        
+        if (bestPack != null) pack = bestPack['val'] as int;
+        if (bestStock != null) stock = bestStock['val'] as int;
+      } else {
+        if (candidates.isNotEmpty) pack = candidates[0]['val'] as int;
+        if (candidates.length > 1) stock = candidates[1]['val'] as int;
+      }
     }
 
     return {
