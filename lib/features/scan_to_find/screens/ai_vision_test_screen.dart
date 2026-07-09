@@ -175,7 +175,12 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
       });
 
       if (_mode == AIVisionMode.memo) {
-        await _processMemoResult({'items': allExtractedItems, 'header': extractedHeader, 'priority': _hasPriority});
+        await _processMemoResult({
+          'items': allExtractedItems, 
+          'header': extractedHeader, 
+          'priority': _hasPriority,
+          'image': _imageFiles.isNotEmpty ? _imageFiles.first : null,
+        });
       } else {
         await _processRedLabelResult({'items': allExtractedItems});
       }
@@ -201,6 +206,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     final bool priority = parsedData['priority'] ?? false;
     List<dynamic> items = parsedData['items'] ?? [];
     Map<String, String> header = parsedData['header'] ?? {};
+    final imageFile = parsedData['image'];
 
     final repo = ref.read(inventoryRepositoryProvider);
     final dbPartLocations = await repo.getAllPartLocations();
@@ -257,7 +263,12 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
         _resultText = 'Local OCR incomplete. Using Gemini Fallback...';
       });
       try {
-        final geminiData = await GeminiFallbackService.correctOcrData(_rawOcrDebug, header, items);
+        final geminiData = await GeminiFallbackService.correctOcrData(
+          _rawOcrDebug, 
+          header, 
+          items,
+          imageFile: imageFile,
+        );
         
         // Use Gemini's data
         if (geminiData['header'] != null) {
