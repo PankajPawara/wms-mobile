@@ -44,8 +44,7 @@ GoRouter appRouter(AppRouterRef ref) {
         if (!isLoginPage) return '/login';
       }
       if (status == AuthStatus.authenticated) {
-        if (authState.isFirstLogin && !isChangePassword) return '/change-password';
-        if (isLoginPage || isSplashPage) return '/home';
+        if (isLoginPage || isSplashPage || isChangePassword) return '/home';
       }
       return null;
     },
