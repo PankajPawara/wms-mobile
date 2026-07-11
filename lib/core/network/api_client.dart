@@ -59,18 +59,23 @@ class ApiClient {
       onError: (error, handler) {
         if (error.response != null) {
           final data = error.response!.data;
-          throw ApiException(
-            message: data['message'] ?? AppStrings.error,
-            errorCode: data['error_code'] ?? 'INTERNAL_ERROR',
-            statusCode: error.response!.statusCode ?? 500,
-            errors: List<String>.from(data['errors'] ?? []),
-          );
+          handler.reject(error.copyWith(
+            error: ApiException(
+              message: data['message'] ?? AppStrings.error,
+              errorCode: data['error_code'] ?? 'INTERNAL_ERROR',
+              statusCode: error.response!.statusCode ?? 500,
+              errors: List<String>.from(data['errors'] ?? []),
+            ),
+          ));
+          return;
         }
-        throw ApiException(
-          message: 'No internet connection. Working offline.',
-          errorCode: 'NETWORK_ERROR',
-          statusCode: 0,
-        );
+        handler.reject(error.copyWith(
+          error: ApiException(
+            message: 'No internet connection. Working offline.',
+            errorCode: 'NETWORK_ERROR',
+            statusCode: 0,
+          ),
+        ));
       },
     );
   }

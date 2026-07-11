@@ -104,7 +104,18 @@ class AuthNotifier extends _$AuthNotifier {
       );
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      String errorMessage = e.toString();
+      if (e is ApiException) {
+        errorMessage = e.message;
+      } else if (e.runtimeType.toString() == 'DioException') {
+        dynamic dioError = e;
+        if (dioError.error is ApiException) {
+          errorMessage = (dioError.error as ApiException).message;
+        } else if (dioError.response?.data != null && dioError.response?.data['message'] != null) {
+          errorMessage = dioError.response!.data['message'];
+        }
+      }
+      state = state.copyWith(isLoading: false, error: errorMessage);
       return false;
     }
   }
@@ -119,7 +130,18 @@ class AuthNotifier extends _$AuthNotifier {
       state = state.copyWith(isLoading: false, isFirstLogin: false);
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      String errorMessage = e.toString();
+      if (e is ApiException) {
+        errorMessage = e.message;
+      } else if (e.runtimeType.toString() == 'DioException') {
+        dynamic dioError = e;
+        if (dioError.error is ApiException) {
+          errorMessage = (dioError.error as ApiException).message;
+        } else if (dioError.response?.data != null && dioError.response?.data['message'] != null) {
+          errorMessage = dioError.response!.data['message'];
+        }
+      }
+      state = state.copyWith(isLoading: false, error: errorMessage);
       return false;
     }
   }
