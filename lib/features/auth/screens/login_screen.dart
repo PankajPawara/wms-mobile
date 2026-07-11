@@ -30,7 +30,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     final success = await ref.read(authNotifierProvider.notifier).login(
-          _employeeIdController.text.trim().toUpperCase(),
+          _employeeIdController.text.trim(),
           _passwordController.text,
         );
     if (success && mounted) {
@@ -254,11 +254,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             // Employee ID field
                             _LoginField(
                               controller: _employeeIdController,
-                              hint: 'Employee ID',
+                              hint: 'Employee ID, Email or Mobile',
                               icon: Icons.person_outline_rounded,
-                              textCapitalization: TextCapitalization.characters,
+                              textCapitalization: TextCapitalization.none,
                               validator: (v) =>
-                                  v == null || v.isEmpty ? 'Employee ID is required' : null,
+                                  v == null || v.isEmpty ? 'This field is required' : null,
                             ),
                             const SizedBox(height: 14),
 
