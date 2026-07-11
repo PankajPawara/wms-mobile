@@ -8,37 +8,76 @@ import '../../../core/network/api_endpoints.dart';
 
 part 'inventory_repository.g.dart';
 
+enum InventoryUpdateStatus {
+  needsInitialSync,
+  updateAvailable,
+  upToDate,
+  error,
+}
+
 class InventoryRepository {
   final AppDatabase _db;
   final ApiClient _api;
 
   InventoryRepository(this._db, this._api);
 
-  /// Run check and sync inventory version
-  Future<bool> syncInventory({bool force = false}) async {
+  Future<InventoryUpdateStatus> checkUpdateStatus() async {
     try {
-      // 1. Fetch current server version
       final res = await _api.get(ApiEndpoints.inventoryVersion);
       final data = res['data'] as Map<String, dynamic>?;
-      if (data == null) return false;
+      if (data == null) return InventoryUpdateStatus.error;
 
       final serverVersion = data['version'] as String? ?? 'v0';
-      final totalProducts = int.parse((data['total_products'] ?? 0).toString());
-
-      // 2. Fetch local meta
       final localMeta = await _db.select(_db.inventoryMetas).getSingleOrNull();
 
-      if (!force && localMeta != null && localMeta.currentVersion == serverVersion) {
-        // Already up to date
-        return false;
+      if (localMeta == null) {
+        return InventoryUpdateStatus.needsInitialSync;
+      } else if (localMeta.currentVersion != serverVersion) {
+        return InventoryUpdateStatus.updateAvailable;
+      } else {
+        return InventoryUpdateStatus.upToDate;
+      }
+    } catch (_) {
+      return InventoryUpdateStatus.error;
+    }
+  }
+
+  /// Run check and sync inventory version
+  Future<bool> syncInventory({bool force = false, bool skipCheck = false}) async {
+    try {
+      String serverVersion = 'v0';
+      int totalProducts = 0;
+
+      if (!skipCheck) {
+        // 1. Fetch current server version
+        final res = await _api.get(ApiEndpoints.inventoryVersion);
+        final data = res['data'] as Map<String, dynamic>?;
+        if (data == null) return false;
+
+        serverVersion = data['version'] as String? ?? 'v0';
+        totalProducts = int.parse((data['total_products'] ?? 0).toString());
+
+        // 2. Fetch local meta
+        final localMeta = await _db.select(_db.inventoryMetas).getSingleOrNull();
+
+        if (!force && localMeta != null && localMeta.currentVersion == serverVersion) {
+          // Already up to date
+          return false;
+        }
       }
 
-      // 3. Mismatch → Download full inventory
+      // 3. Download full inventory
       final downloadRes = await _api.get(ApiEndpoints.inventoryDownload);
       final downloadData = downloadRes['data'] as Map<String, dynamic>?;
       final items = downloadData?['items'] as List<dynamic>?;
 
       if (items != null) {
+        // If skipCheck is true, we didn't fetch the version above, so we extract it from the payload if possible
+        if (skipCheck) {
+          serverVersion = downloadData?['version'] ?? 'v0';
+          totalProducts = items.length;
+        }
+
         // Drop local inventory
         await _db.delete(_db.inventory).go();
 

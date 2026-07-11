@@ -99,6 +99,7 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
       final ocrDescription = item['description'] as String?;
       final ocrLocation = item['location'] as String?;
       final ocrStock = item['stock'] as int?;
+      final ocrPack = item['pack'] as int?;
 
       final resolvedResult = await _resolvePartNo(partNo);
       if (resolvedResult != null) {
@@ -114,6 +115,7 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
               ? dbItem.location
               : (ocrLocation != null && ocrLocation.isNotEmpty ? ocrLocation : 'LOCATION NOT DEFINED'),
           'stock': dbItem.stock > 0 ? dbItem.stock : (ocrStock ?? 0),
+          'pack': ocrPack ?? 0,
           'match_status': 'verified',
         });
       } else {
@@ -128,6 +130,7 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
               ? ocrLocation
               : 'LOCATION NOT DEFINED',
           'stock': ocrStock ?? 0,
+          'pack': ocrPack ?? 0,
           'match_status': 'unmatched',
         });
       }
@@ -147,6 +150,19 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
 
   void _removeItem(int index) {
     setState(() => _items.removeAt(index));
+  }
+
+  Future<void> _editItem(int index) async {
+    final updatedItem = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _EditItemDialog(item: _items[index]),
+    );
+
+    if (updatedItem != null) {
+      setState(() {
+        _items[index] = updatedItem;
+      });
+    }
   }
 
   Future<void> _generatePickupList() async {
@@ -290,6 +306,7 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
                             item: _items[index],
                             onQtyChanged: (qty) => _updateQty(index, qty),
                             onRemove: () => _removeItem(index),
+                            onEdit: () => _editItem(index),
                           ),
                         ),
                 ),
@@ -315,11 +332,13 @@ class _OcrItemCard extends StatelessWidget {
   final Map<String, dynamic> item;
   final ValueChanged<int> onQtyChanged;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
 
   const _OcrItemCard({
     required this.item,
     required this.onQtyChanged,
     required this.onRemove,
+    required this.onEdit,
   });
 
   @override
@@ -331,6 +350,7 @@ class _OcrItemCard extends StatelessWidget {
     final matchStatus = item['match_status'] as String? ?? 'unknown';
     final price = item['price'] as double? ?? 0.0;
     final stock = item['stock'] as int? ?? 0;
+    final pack = item['pack'] as int? ?? 0;
 
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -356,6 +376,14 @@ class _OcrItemCard extends StatelessWidget {
                 ),
               ),
               StatusBadge(status: matchStatus),
+              const SizedBox(width: AppDimensions.sm),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined,
+                    color: AppColors.primary, size: 20),
+                onPressed: onEdit,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
               const SizedBox(width: AppDimensions.sm),
               IconButton(
                 icon: const Icon(Icons.delete_outline,
@@ -384,7 +412,7 @@ class _OcrItemCard extends StatelessWidget {
                   ],
                 ),
               Text(
-                'Stock: $stock NOS',
+                'Stock: $stock NOS ${pack > 0 ? '| Pack: $pack' : ''}',
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -447,6 +475,120 @@ class _OcrItemCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EditItemDialog extends StatefulWidget {
+  final Map<String, dynamic> item;
+  const _EditItemDialog({required this.item});
+
+  @override
+  State<_EditItemDialog> createState() => _EditItemDialogState();
+}
+
+class _EditItemDialogState extends State<_EditItemDialog> {
+  late TextEditingController _partNoCtrl;
+  late TextEditingController _descCtrl;
+  late TextEditingController _locCtrl;
+  late TextEditingController _packCtrl;
+  late TextEditingController _stockCtrl;
+  late TextEditingController _priceCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _partNoCtrl = TextEditingController(text: widget.item['part_no']?.toString());
+    _descCtrl = TextEditingController(text: widget.item['description']?.toString());
+    _locCtrl = TextEditingController(text: widget.item['location']?.toString());
+    _packCtrl = TextEditingController(text: widget.item['pack']?.toString());
+    _stockCtrl = TextEditingController(text: widget.item['stock']?.toString());
+    _priceCtrl = TextEditingController(text: widget.item['price']?.toString());
+  }
+
+  @override
+  void dispose() {
+    _partNoCtrl.dispose();
+    _descCtrl.dispose();
+    _locCtrl.dispose();
+    _packCtrl.dispose();
+    _stockCtrl.dispose();
+    _priceCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+                controller: _partNoCtrl,
+                decoration: const InputDecoration(labelText: 'Part No', isDense: true, border: OutlineInputBorder()),
+                style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _descCtrl,
+                decoration: const InputDecoration(labelText: 'Description', isDense: true, border: OutlineInputBorder()),
+                style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _locCtrl,
+                decoration: const InputDecoration(labelText: 'Location', isDense: true, border: OutlineInputBorder()),
+                style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                      controller: _packCtrl,
+                      decoration: const InputDecoration(labelText: 'Pack', isDense: true, border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(fontSize: 14)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                      controller: _stockCtrl,
+                      decoration: const InputDecoration(labelText: 'Stock', isDense: true, border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(fontSize: 14)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _priceCtrl,
+                decoration: const InputDecoration(labelText: 'Price', isDense: true, border: OutlineInputBorder()),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final updated = Map<String, dynamic>.from(widget.item);
+            updated['part_no'] = _partNoCtrl.text.trim();
+            updated['description'] = _descCtrl.text.trim();
+            updated['location'] = _locCtrl.text.trim();
+            updated['pack'] = int.tryParse(_packCtrl.text.trim()) ?? 0;
+            updated['stock'] = int.tryParse(_stockCtrl.text.trim()) ?? 0;
+            updated['price'] = double.tryParse(_priceCtrl.text.trim()) ?? 0.0;
+            Navigator.pop(context, updated);
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

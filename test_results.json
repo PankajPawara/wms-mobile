@@ -1,0 +1,3020 @@
+{
+  "20260604_154224.jpg": {
+    "header": {
+      "memo_no": "MEMO No."
+    },
+    "items": [
+      {
+        "part_no": "09120-KOL-D01",
+        "description": "OIL SEAL SET",
+        "mrp": 40.0,
+        "qty": 10,
+        "location": "037J",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "06439-MAK-003",
+        "description": "BOOT SEAL SET PISTON HOR/UNI.160 CI",
+        "mrp": 395.0,
+        "qty": 1,
+        "location": "038P",
+        "pack": 1,
+        "stock": 265
+      },
+      {
+        "part_no": "06451-GE2-405",
+        "description": "BRG BALL RADIAL 35X72X15",
+        "mrp": 1056.0,
+        "qty": 5,
+        "location": "039Q",
+        "pack": 1,
+        "stock": 164
+      },
+      {
+        "part_no": "91001-K43-D41",
+        "description": "KEY SET NEW/HET",
+        "mrp": 132.0,
+        "qty": 2,
+        "location": "044R",
+        "pack": 1,
+        "stock": 34
+      },
+      {
+        "part_no": "35010-KSP-861",
+        "description": "OIL SEAL KIT- ACTIVA WHITE",
+        "mrp": 1009.0,
+        "qty": 1,
+        "location": "119C",
+        "pack": 1,
+        "stock": 3
+      },
+      {
+        "part_no": "09120-KWP-D01",
+        "description": "COVER HANDLE FR 3G",
+        "mrp": 598.0,
+        "qty": 2,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53205-KWP-F00ZD",
+        "description": "GEAR PRIMARY DRIVE",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23121-KRE-GO0",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 11.44016273s."
+  },
+  "20260605_115517.jpg": {
+    "header": {
+      "customer": "M/S.,",
+      "area": "SR"
+    },
+    "items": [
+      {
+        "part_no": "40520-KSP-860ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "40510-KSP-860ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "37211-KRP-901",
+        "description": "33610-KSP-860 22011-KWP-G30",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "01471-KWP-900",
+        "description": "22110-KOP-DAO",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "37800-KWP-F01",
+        "description": "135160-KWP-901 35010-KSP-861 44830-KTE-D12 01210-KWP-DO0 37800-KOP-601",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61312-KSP-860",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "17211-K38-23100-KOP-DO",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 54.921456597s."
+  },
+  "20260605_122604.jpg": {
+    "header": {
+      "customer": "24 23 22 SR M/S., C#",
+      "area": "25 26 27 28 29 |"
+    },
+    "items": [
+      {
+        "part_no": "17541-KOL-D00",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "17542-KOL-D00",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "35100-KSP-861",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "31220-K0P-DC1",
+        "description": "83541-KlK-DO0",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "83641-K1K-DO0",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61301-KSP-860ZH",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61310-KTE-650",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61410-KTE-651ZS",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 38.621869096s."
+  },
+  "20260605_125514.jpg": {
+    "header": {
+      "customer": "M/S.",
+      "area": "122110-KOP-DAO J14430-KON-D80 161311-KOV-A00 122105-KWP-DO0 123100-K0P-D01, |14401-KON-DO0 114440-KON-D80"
+    },
+    "items": [
+      {
+        "part_no": "22102-KWP-D00",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "37211-KOP-602",
+        "description": "652400-K67-901",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61311-KOV-A00",
+        "description": "114440-KON-D80 123100-K0P-D01, 122110-KOP-DAO 122105-KWP-DO0 14401-KON-DO0",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "22110-KWP-DO0",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "80120-KZK-900ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "35010-KTE-501",
+        "description": "22110-KWP-900",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 15.099399131s."
+  },
+  "20260606_124416.jpg": {
+    "header": {
+      "customer": "M/S., +C#",
+      "area": "6"
+    },
+    "items": [
+      {
+        "part_no": "-&50280-K67-A00",
+        "description": "3 15022-KRE-GO0 367111-KOV-A00",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "16111-K43-D41",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53250-KWP-G30ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "43456-KSP-900",
+        "description": "23411-KOP-DO0 90666-SDA-A01",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "09108-KON-A00",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61120-KOP-D00ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23430-K24-901",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 55.190473879s."
+  },
+  "20260608_110521.jpg": {
+    "header": {},
+    "items": [
+      {
+        "part_no": "22120-KON-DU2",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "22201-KON-DU2",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "22355-K0N-DU2",
+        "description": "02212-K43-900",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 45.035722836s."
+  },
+  "20260608_110529.jpg": {
+    "header": {
+      "customer": "M/S.,",
+      "area": "|17910-KOV-B81 |17920-KOV-B81"
+    },
+    "items": [
+      {
+        "part_no": "17910-KOV-B81",
+        "description": "17920-KOV-B81",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 35.211669659s."
+  },
+  "20260608_115448.jpg": {
+    "header": {
+      "customer": "SR M/S., +C#",
+      "area": "1 2 3"
+    },
+    "items": [
+      {
+        "part_no": "35200-KSP-920",
+        "description": "61340-KSP-860 137211-KTE- 61330-KSP-860 22355-KVS-J01",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "51410-KSP-871",
+        "description": "81250-KZK-900 46500-KSP-901 02212-KOE-A00 35150-KSP-920",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "83750-KOP-DO0ZD",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77256-K55-64330-K2",
+        "description": "37310-KTE- 37800-KWP-",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "64200-KWP-GO0ZD",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 31.083757997s."
+  },
+  "20260608_115504.jpg": {
+    "header": {
+      "customer": "M/S., SR 22 23 24 25 26 27 28 29 30 31 32"
+    },
+    "items": [
+      {
+        "part_no": "64200-KWP-G30ZE",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77236-K55-600ZF",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "37213-K1J-D01",
+        "description": "17920-K3C-Dll 14751-KSP-910 17910-K3C-D11 81131-KOP-DO",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 27.869818215s."
+  },
+  "20260608_161753.jpg": {
+    "header": {
+      "customer": "AS M/S.",
+      "area": "Ai|37800-KTE-D01"
+    },
+    "items": [
+      {
+        "part_no": "12391-KON-DO1",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "37800-KTE-D01",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "31220-KOP-D61",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61410-KTE-6512S",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "37080-KSP-860",
+        "description": "02380-KBP-900 14401-KON-DO0",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "37200-KWP-H11",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "16100-K24-901",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23205-KOP-33702-KSP-",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "35010-KWP-H01",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "80105-KWP-901",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_header": {
+      "customer": "M/S. HINDUSTAN AUTO PART RUSTAMPURA",
+      "area": "SALABATPUR",
+      "memo_no": "6581"
+    },
+    "gemini_items": [
+      {
+        "part_no": "14401-KON-D00",
+        "description": "CHAIN CAM",
+        "mrp": "185.00",
+        "qty": 5,
+        "location": "009H",
+        "pack": 1,
+        "stock": 51
+      },
+      {
+        "part_no": "02380-KBP-900",
+        "description": "CHAIN SPROCKET KIT UNICORN BS6",
+        "mrp": "1271.00",
+        "qty": 10,
+        "location": "015T",
+        "pack": 1,
+        "stock": 103
+      },
+      {
+        "part_no": "161102-KTE-600",
+        "description": "STAY FR FENDER",
+        "mrp": "109.00",
+        "qty": 1,
+        "location": "020S",
+        "pack": 1,
+        "stock": 152
+      },
+      {
+        "part_no": "16100-K83-D01",
+        "description": "CARBURETOR ASSY",
+        "mrp": "1770.00",
+        "qty": 40,
+        "location": "024E",
+        "pack": 4,
+        "stock": 1526
+      },
+      {
+        "part_no": "12391-KON-D01",
+        "description": "GASKET COMP HEAD COVER",
+        "mrp": "75.00",
+        "qty": 5,
+        "location": "040T",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "35010-KWP-H01",
+        "description": "KEY SET ACTIVA 5G",
+        "mrp": "287.00",
+        "qty": 1,
+        "location": "046D",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "61220-KTE-650ZA",
+        "description": "WINDSCREEN SET (WL) *TYPE 1 *",
+        "mrp": "449.00",
+        "qty": 5,
+        "location": "046A",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "37080-KSP-860",
+        "description": "UNIT SET FUEL",
+        "mrp": "160.00",
+        "qty": 5,
+        "location": "050F",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "33702-KSP-911",
+        "description": "LENS TAILLIGHT white",
+        "mrp": "911.00",
+        "qty": 6,
+        "location": "052I",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "23205-KOP-DA0",
+        "description": "FACE SET DRIVEN BIG",
+        "mrp": "302.00",
+        "qty": 2,
+        "location": "069P",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "37800-KTE-D01",
+        "description": "STATOR COMP BLACK+BLACK (WHITE) 7/8/9",
+        "mrp": "3073.00",
+        "qty": 2,
+        "location": "069L",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "31220-KOP-D61",
+        "description": "UNIT ASSY FUEL",
+        "mrp": "1605.00",
+        "qty": 2,
+        "location": "200A",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "37200-KWP-H11",
+        "description": "SPEEDOMETER ASSY* BLUE",
+        "mrp": "3012.00",
+        "qty": 1,
+        "location": "212A",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "16100-K24-901",
+        "description": "CARBURETOR ASSY (PB5LU)",
+        "mrp": "1322.00",
+        "qty": 1,
+        "location": "313B",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "61410-KTE-6512S",
+        "description": "COWL ASSY. FR. * 2014 BLACK+RED",
+        "mrp": "624.00",
+        "qty": 2,
+        "location": "313W",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "80105-KWP-901",
+        "description": "FENDER RR",
+        "mrp": "",
+        "qty": 2,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ]
+  },
+  "20260608_165152.jpg": {
+    "header": {
+      "customer": "M/S., +C#",
+      "area": "SR 1 2 3 4"
+    },
+    "items": [
+      {
+        "part_no": "40520-KSP-860ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53100-KZK-910",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "88110-KYJ-H01",
+        "description": "151110-KZK-900",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 585.492956ms."
+  },
+  "20260609_144138.jpg": {
+    "header": {},
+    "items": [
+      {
+        "part_no": "45510-KSP-B51",
+        "description": "53168-KPL-900 150350-K24-G00",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "35180-KWP-901",
+        "description": "16707-K0I-D01",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "52200-KSP-860ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77235-KWP-900",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "02380-KBP-900",
+        "description": "22011-K24-900 17683-KWP-D01 22011-KOP-DO0",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "11103-KWP-900",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 45.416687979s."
+  },
+  "20260609_144146.jpg": {
+    "header": {},
+    "items": [
+      {
+        "part_no": "01721-KOL-DO0",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "45510-KSP-B51",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "35180-KWP-35200-KWP-",
+        "description": "16472-K0 16707-KO",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "52200-KSP-860ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "17683-KWP-D01",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77235-KWP-900",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "22011-KOP-D00",
+        "description": "11103-KWP-900",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 30.345288007s."
+  },
+  "20260609_171658.jpg": {
+    "header": {},
+    "items": [
+      {
+        "part_no": "81131-KVT-900ZB",
+        "description": "COVER",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "81131-KVT-900ZH",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53250-KOP-DTOZA",
+        "description": "Ar 53250-KOP-DV0ZA] -1453250-KOP-D00ZA",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53250-KWP-G30ZA",
+        "description": "4T64300-KOP-DA0ZA",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "11100-K0P-D00",
+        "description": "5150610-KlK-D10",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "33100-K0L-DQ1",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "33100-KOL-DL1",
+        "description": "H31110-K1K-DO1",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "64302-KOL-DO0",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 16.824522837s."
+  },
+  "20260609_175825.jpg": {
+    "header": {},
+    "items": [
+      {
+        "part_no": "81131-KWP-G30ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53250-KWP-G30ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "37211-KRP-901",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23225-KSY-900",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23226-KVB-900",
+        "description": "01210-KWP-DO0 152400-KOP-DA2",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 2.926394936s."
+  },
+  "20260610_161446.jpg": {
+    "header": {
+      "customer": "M/S.",
+      "area": "SR 2 3 1"
+    },
+    "items": [
+      {
+        "part_no": "30500-KOP-DO1",
+        "description": "11100-KOP-DO0 35700-KOL-D71",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 49.115059193s."
+  },
+  "20260613_140459.jpg": {
+    "header": {
+      "customer": "M/S., 2852",
+      "area": "Cotinue SR 22 30- 38 22"
+    },
+    "items": [
+      {
+        "part_no": "50330-KWP-DO0ZZ",
+        "description": "TRAY",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "83520-KOP-DO0ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "64304-KOP-DO0ZZ",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "46500-KTE-910",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "50330-KWP-H00",
+        "description": "80330-KWP-F00 151103-KTE-650",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "42301-KTE-A00",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "35100-KSP-B01",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "30400-KIE-DA1",
+        "description": "35753-KWS-900",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "50610-K3C-D10",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53175-K1C-D61",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 33.696065786s."
+  },
+  "20260615_151856.jpg": {
+    "header": {
+      "memo_no": "MEMO No. : 7297 BAl1A"
+    },
+    "items": [
+      {
+        "part_no": "12391-K24-900",
+        "description": "BAR COMP SIDE STAND",
+        "mrp": 142.0,
+        "qty": 1,
+        "location": "010V",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "50530-K43-900",
+        "description": "GAUGE OILLEVEL",
+        "mrp": 22.0,
+        "qty": 5,
+        "location": "011G",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "15651-KSP-910",
+        "description": "FAN",
+        "mrp": 85.0,
+        "qty": 1,
+        "location": "022A",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "19610-KWP-D00",
+        "description": "COVERCOMP",
+        "mrp": 311.0,
+        "qty": 3,
+        "location": "022F",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "67111-KSP-860",
+        "description": "GARNISH SCREEN",
+        "mrp": 2541.0,
+        "qty": 1,
+        "location": "024N",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "30400-KSP-862",
+        "description": "UNIT ASSY DIGITAL, DO",
+        "mrp": 2541.0,
+        "qty": 1,
+        "location": "027H",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "30400-KSP-D02",
+        "description": "UNIT ASSY DIGITALDC CDI BLACK",
+        "mrp": 337.0,
+        "qty": 2,
+        "location": "033M",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77280-KSP-A70ZA",
+        "description": "SETILLUST RR CENT COWL*UNI 150",
+        "mrp": 345.0,
+        "qty": 1,
+        "location": "049P",
+        "pack": 0,
+        "stock": 1
+      },
+      {
+        "part_no": "33703-KOV-A01",
+        "description": "COMP TAIL LIGHT",
+        "mrp": 160.0,
+        "qty": 2,
+        "location": "050F",
+        "pack": 0,
+        "stock": 1
+      },
+      {
+        "part_no": "33702-KSP-911",
+        "description": "LENS TAILLIGHT white",
+        "mrp": 360.0,
+        "qty": 5,
+        "location": "051H",
+        "pack": 0,
+        "stock": 1
+      },
+      {
+        "part_no": "53100-KSP-D00",
+        "description": "PIPE STRG HANDLE",
+        "mrp": 908.0,
+        "qty": 2,
+        "location": "058P",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "33110-KSP-932",
+        "description": "HEADLIGHT UNIT",
+        "mrp": 88.0,
+        "qty": 1,
+        "location": "061A",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "19610-KWP-900",
+        "description": "FAN COVER COMP.",
+        "mrp": 988.0,
+        "qty": 2,
+        "location": "063E",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77270-KSP-B10ZA",
+        "description": "COWL SET L. RR*TY PE",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "33701-K55-601",
+        "description": "UNIT",
+        "mrp": 988.0,
+        "qty": 2,
+        "location": "070F",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77260-KSP-B10ZA",
+        "description": "COWL SET R.RR*TYPE1*",
+        "mrp": 860.0,
+        "qty": 12,
+        "location": "",
+        "pack": 700,
+        "stock": 22
+      },
+      {
+        "part_no": "02380-KON-D00",
+        "description": "CHAIN SPROCKET KIT SHINE BS6",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "51110-KWP-HO0",
+        "description": "FORK SUB ASSY",
+        "mrp": 973.0,
+        "qty": 1,
+        "location": "078J",
+        "pack": 11,
+        "stock": 17
+      },
+      {
+        "part_no": "64200-KWP-H00ZF",
+        "description": "SET ILLUST FR COVER *5G WHITE",
+        "mrp": 530.0,
+        "qty": 1,
+        "location": "080F",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61100-KOP-P102Z",
+        "description": "FENDER A FR",
+        "mrp": 397.0,
+        "qty": 1,
+        "location": "081C",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "14520-KYJ-711",
+        "description": "LIFTER ASSY TENSI ONER",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 17.70036558s."
+  },
+  "20260622_112705.jpg": {
+    "header": {
+      "customer": "M/S., C#",
+      "area": "|30410-KWP-E01 |64315-K67-900"
+    },
+    "items": [
+      {
+        "part_no": "61310-KLK-DO0",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "30410-KWP-E01",
+        "description": "64315-K67-900",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 3.204875695s."
+  },
+  "20260622_155736.jpg": {
+    "header": {},
+    "items": [
+      {
+        "part_no": "53100-KOV-A00",
+        "description": "2153100-KOp-D00",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53250-KWP-G30ZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "14430-KOP-D00",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "14440-KOP-D00",
+        "description": "23411-KOP-DO0",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77225-KTE-D02",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "50610-K14-KTE-D8",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 47.825320336s."
+  },
+  "20260704_140303.jpg": {
+    "header": {
+      "customer": "19 10 M/S.",
+      "area": "l240510-Kl4-900"
+    },
+    "items": [
+      {
+        "part_no": "35350-KON-E01",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53166-KRP-980",
+        "description": "H 53146-KRB-901",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "43450-K0N-611",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "40510-KL4-900",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "17920-KOV-B81",
+        "description": "53140-K44-V00 53166-KSP-A70 53140-KOV-A00 117211-KlK-DO0",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "40520-K14-900",
+        "description": "02380-KON-DO",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 33.009454194s."
+  },
+  "20260704_142011.jpg": {
+    "header": {
+      "customer": "M/S., MAHAVIR AUTO GARAGE BILIMORA MEMO No. : 9513 AB15",
+      "area": "SANKET APARTMENT,",
+      "memo_no": "MS. MAHAVIR AUTO GARAGE BILIMORA MEMO No. : 9513 AB15"
+    },
+    "items": [
+      {
+        "part_no": "50350-K24-GO0",
+        "description": "LINK ASSY ENG HANGER",
+        "mrp": 413.0,
+        "qty": 2,
+        "location": "002N",
+        "pack": 1,
+        "stock": 81
+      },
+      {
+        "part_no": "12391-GCC-000",
+        "description": "GASKET HEAD COVER",
+        "mrp": 62.0,
+        "qty": 12,
+        "location": "003K",
+        "pack": 4,
+        "stock": 150
+      },
+      {
+        "part_no": "14401-KTE-910",
+        "description": "CHAIN CAM",
+        "mrp": 162.0,
+        "qty": 1,
+        "location": "003T",
+        "pack": 0,
+        "stock": 203
+      },
+      {
+        "part_no": "31120-K83-DO1",
+        "description": "STATOR COMP *ACTIVA HET/3G k",
+        "mrp": 818.0,
+        "qty": 1,
+        "location": "014G",
+        "pack": 0,
+        "stock": 32
+      },
+      {
+        "part_no": "50330-KOP-DO0",
+        "description": "STAY COMP FR COVER 1",
+        "mrp": 243.0,
+        "qty": 1,
+        "location": "018G",
+        "pack": 0,
+        "stock": 87
+      },
+      {
+        "part_no": "30500-KL4-901",
+        "description": "COIL ASSY IGN",
+        "mrp": 335.0,
+        "qty": 2,
+        "location": "018R",
+        "pack": 0,
+        "stock": 413
+      },
+      {
+        "part_no": "52400-K67-901",
+        "description": "CUSHION ASSY RR",
+        "mrp": 829.0,
+        "qty": 1,
+        "location": "023X",
+        "pack": 0,
+        "stock": 94
+      },
+      {
+        "part_no": "02380-KWS-900",
+        "description": "CHAIN SPROCKET KIT TWISTER",
+        "mrp": 1083.0,
+        "qty": 1,
+        "location": "025V",
+        "pack": 0,
+        "stock": 33
+      },
+      {
+        "part_no": "61311-KTE-910",
+        "description": "STAY FR COWL",
+        "mrp": 382.0,
+        "qty": 1,
+        "location": "046H",
+        "pack": 0,
+        "stock": 67
+      },
+      {
+        "part_no": "51110-KWP-GO0",
+        "description": "FORK SUB ASSY. ER.",
+        "mrp": 2876.0,
+        "qty": 1,
+        "location": "069M",
+        "pack": 0,
+        "stock": 45
+      },
+      {
+        "part_no": "51110-KWP-H00",
+        "description": "FORK SUB ASSY FR",
+        "mrp": 2847.0,
+        "qty": 11,
+        "location": "073J",
+        "pack": 0,
+        "stock": 17
+      },
+      {
+        "part_no": "30410-KWP-E01",
+        "description": "UNIT ASSY SPARK",
+        "mrp": 2121.0,
+        "qty": 1,
+        "location": "171F",
+        "pack": 0,
+        "stock": 1
+      },
+      {
+        "part_no": "77201-KVT-900",
+        "description": "HINGE SEAT",
+        "mrp": 47.0,
+        "qty": 11,
+        "location": "220D",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61300-KOL-DO0",
+        "description": "1 STAY COMP ER FENDER 1",
+        "mrp": 184.0,
+        "qty": 51,
+        "location": "311X",
+        "pack": 0,
+        "stock": 61
+      }
+    ],
+    "needs_fallback": false
+  },
+  "20260709_155324.jpg": {
+    "header": {
+      "customer": "M/S. , HINDUSTAN AUTO PART RUSTAMPURA MEMO No. :9852 HS02",
+      "area": "2/562 TO 564 PAKI BASEMENT FLOOR NIRMAL APPARTMEN",
+      "memo_no": "MS.  HINDUSTAN AUTO PART RUSTAMPURA MEMO No. :9852 HS02"
+    },
+    "items": [
+      {
+        "part_no": "06430-KWP-D00",
+        "description": "SHOE SET BRAKE",
+        "mrp": 267.0,
+        "qty": 60,
+        "location": "001C",
+        "pack": 30,
+        "stock": 973
+      },
+      {
+        "part_no": "90202-KPL-900",
+        "description": "NUT SPECIAL 28MM",
+        "mrp": 22.0,
+        "qty": 50,
+        "location": "110I",
+        "pack": 0,
+        "stock": 110
+      },
+      {
+        "part_no": "06410-K67-900",
+        "description": "DAMPER SET WHEEL",
+        "mrp": 72.0,
+        "qty": 20,
+        "location": "015L",
+        "pack": 1,
+        "stock": 131
+      },
+      {
+        "part_no": "22113-KWP-DO0",
+        "description": "FIN DRIVE FACE",
+        "mrp": 49.0,
+        "qty": 5,
+        "location": "020H",
+        "pack": 11,
+        "stock": 3
+      },
+      {
+        "part_no": "02220-KOV-A00",
+        "description": "CLUTCH PLATE KIT",
+        "mrp": 756.0,
+        "qty": 5,
+        "location": "024A",
+        "pack": 1,
+        "stock": 101
+      },
+      {
+        "part_no": "30500-K83-DO1",
+        "description": "COIL ASSY IGN *3G*",
+        "mrp": 194.0,
+        "qty": 50,
+        "location": "028L",
+        "pack": 11,
+        "stock": 160
+      },
+      {
+        "part_no": "28150-KPL-900",
+        "description": "HOLDER COMP START *MANDIR*",
+        "mrp": 114.0,
+        "qty": 17,
+        "location": "033A",
+        "pack": 11,
+        "stock": 0
+      },
+      {
+        "part_no": "40520-K14-900",
+        "description": "CASE DRIVE CHAIN LOWER",
+        "mrp": 254.0,
+        "qty": 5,
+        "location": "057F",
+        "pack": 1,
+        "stock": 35
+      },
+      {
+        "part_no": "40510-K14-900",
+        "description": "CASE DRIVE CHAIN UPPER 247.001 5 060H",
+        "mrp": 11.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 39
+      },
+      {
+        "part_no": "64310-KVT-940ZA",
+        "description": "STEP FLOOR *NH1",
+        "mrp": 541.0,
+        "qty": 2,
+        "location": "062F",
+        "pack": 1,
+        "stock": 3
+      },
+      {
+        "part_no": "28223-KZL-840",
+        "description": "SPG KICK DRIVEN G",
+        "mrp": 9.0,
+        "qty": 3,
+        "location": "181B",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "35700-KOL-D71",
+        "description": "SIDE STAND SW ASSY",
+        "mrp": 598.0,
+        "qty": 1,
+        "location": "230G",
+        "pack": 1,
+        "stock": 8
+      }
+    ],
+    "needs_fallback": false
+  },
+  "20260710_101153.jpg": {
+    "header": {
+      "customer": "M/S., PILOT B-501--02, AUTO 529-30 CENTRE , SAIBABA UDHNA SHOPPING MEMO No. :9786 IU07",
+      "memo_no": "MS. PILOT B50102 AUTO 52930 CENTRE  SAIBABA UDHNA SHOPPING MEMO No. :9786 IU07"
+    },
+    "items": [
+      {
+        "part_no": "22100-KWP-DO1",
+        "description": "122201-K3C-D11 DISK CLUTCHFRICTION",
+        "mrp": 65.0,
+        "qty": 20,
+        "location": "001E",
+        "pack": 1,
+        "stock": 352
+      },
+      {
+        "part_no": "17211-KTE-651",
+        "description": "OUTERCOMP. ELEMENT COMP CLUTCH AIR/C",
+        "mrp": 793.0,
+        "qty": 2,
+        "location": "007B",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "17210-KVT-D00",
+        "description": "ELEMENT AIR/C ACTIVA 3G 4G 5G",
+        "mrp": 239.0,
+        "qty": 10,
+        "location": "010E",
+        "pack": 1,
+        "stock": 149
+      },
+      {
+        "part_no": "22321-K63-D33",
+        "description": "22355-K63-D33 PLATE PLATE CLUTCH CLUTCH PRESSURE",
+        "mrp": 183.0,
+        "qty": 3,
+        "location": "",
+        "pack": 1,
+        "stock": 10
+      },
+      {
+        "part_no": "30500-K14-901",
+        "description": "COIL ASSY IGN",
+        "mrp": 335.0,
+        "qty": 10,
+        "location": "018F",
+        "pack": 1,
+        "stock": 128
+      },
+      {
+        "part_no": "35010-KLE-601",
+        "description": "KEY SET CD 110 BS6 4 PIN",
+        "mrp": 822.0,
+        "qty": 5,
+        "location": "018R",
+        "pack": 1,
+        "stock": 18
+      },
+      {
+        "part_no": "22870-KLK-DO1",
+        "description": "61410-KTE-651zs CABLE COWL ASSY. COMP, CLUTCH FR. * 2014 BLACK+RED",
+        "mrp": 142.0,
+        "qty": 10,
+        "location": "100A",
+        "pack": 1,
+        "stock": 110
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 18.723962619s."
+  },
+  "20260710_103648.jpg": {
+    "header": {
+      "memo_no": "S. DEVANSE AUo SALEs DEDIYAPADA SUMIT MEMO No. : 9907 FR17"
+    },
+    "items": [
+      {
+        "part_no": "21203-GC7-300",
+        "description": "BUSH CUSH. UND. RUB",
+        "mrp": 21.0,
+        "qty": 10,
+        "location": "001H",
+        "pack": 10,
+        "stock": 410
+      },
+      {
+        "part_no": "77239-KWP-901",
+        "description": "KEY SEAT LOCK",
+        "mrp": 160.0,
+        "qty": 2,
+        "location": "001P",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "15412--KON-DO1",
+        "description": "0IL FILTER SHINE BS6 94.00I 10 I 0010",
+        "mrp": 11.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 263
+      },
+      {
+        "part_no": "06430-KWP-900",
+        "description": "1 SHOE SET BRAKE 1",
+        "mrp": 267.0,
+        "qty": 1,
+        "location": "001W",
+        "pack": 30,
+        "stock": 292
+      },
+      {
+        "part_no": "53140-KSP-A70",
+        "description": "GRIP COMP THROTTLE *HOLE TYPE*",
+        "mrp": 57.0,
+        "qty": 140,
+        "location": "",
+        "pack": 1,
+        "stock": 25
+      },
+      {
+        "part_no": "22102-KWP-D00",
+        "description": "FACE DRIVE (69T)",
+        "mrp": 478.0,
+        "qty": 1,
+        "location": "018S",
+        "pack": 0,
+        "stock": 47
+      },
+      {
+        "part_no": "26950-KSP-900",
+        "description": "COCKASSY. FUEL 177.001 2 1",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "44660-KOL-DO0",
+        "description": "RIM SET, WHEEL *6G FR.",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 4.071936317s."
+  },
+  "20260710_103656.jpg": {
+    "header": {
+      "customer": "M/S. DEVANSH AUTO SALES DEDIYAPADA (SUMIT) MEMO No. : 9907 FR17",
+      "area": "OPP. STAT BANK OF INDIA",
+      "memo_no": "MS. DEVANSH AUTO SALES DEDIYAPADA SUMIT MEMO No. : 9907 FR17"
+    },
+    "items": [
+      {
+        "part_no": "11203-GC7-300",
+        "description": "BUSH CUSH. UND. RUB",
+        "mrp": 21.0,
+        "qty": 10,
+        "location": "001H",
+        "pack": 10,
+        "stock": 410
+      },
+      {
+        "part_no": "77239-KWP-901",
+        "description": "KEY SEAT LOCK",
+        "mrp": 160.0,
+        "qty": 2,
+        "location": "001P",
+        "pack": 1,
+        "stock": 7
+      },
+      {
+        "part_no": "15412-KON-D01",
+        "description": "06430-KWP- 900 1OIL FILTER SHINE BS6",
+        "mrp": 94.0,
+        "qty": 10,
+        "location": "",
+        "pack": 1,
+        "stock": 263
+      },
+      {
+        "part_no": "53140-KSP-A70",
+        "description": "GRIP SHOE COMP SET THROTTLE BRAKE *HOLE TYPE*",
+        "mrp": 267.0,
+        "qty": 10,
+        "location": "001W",
+        "pack": 30,
+        "stock": 292
+      },
+      {
+        "part_no": "22102-KWP-D00",
+        "description": "EACE DRIVE (69T)",
+        "mrp": 478.0,
+        "qty": 5,
+        "location": "014U",
+        "pack": 1,
+        "stock": 25
+      },
+      {
+        "part_no": "44660-KOL-DO0",
+        "description": "116950-KSP- 900 COCKASSY. FUEL",
+        "mrp": 177.0,
+        "qty": 2,
+        "location": "082B",
+        "pack": 1,
+        "stock": 2
+      }
+    ],
+    "needs_fallback": false
+  },
+  "20260710_110225.jpg": {
+    "header": {
+      "customer": "M/S. SHIV SHAKTI AUTO PANDESARA",
+      "memo_no": "F1412 LAXMI NARAYAN TEXTILES PARK MEMO No. :9914 IB01D"
+    },
+    "items": [
+      {
+        "part_no": "17211-K1K-DO0",
+        "description": "ELEMENT COMP AIR/C M.R.P. QTY",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "02212-K43-900",
+        "description": "122321 -K23- 902 PLATE CLUTCH",
+        "mrp": 196.0,
+        "qty": 5,
+        "location": "002W",
+        "pack": 1,
+        "stock": 110
+      },
+      {
+        "part_no": "0222B-KTE-910",
+        "description": "KIT KIT DISC CLUTCHASSY-CB CLUTCH UNICORN 160",
+        "mrp": 1544.0,
+        "qty": 5,
+        "location": "004K",
+        "pack": 3,
+        "stock": 129
+      },
+      {
+        "part_no": "17211-KTE-651",
+        "description": "ELEMENT COMP AIR/C FRICTION SHINE",
+        "mrp": 646.0,
+        "qty": 5,
+        "location": "006O",
+        "pack": 1,
+        "stock": 11
+      },
+      {
+        "part_no": "22201-K63-D33",
+        "description": "DISK CLUTCH FRICTION",
+        "mrp": 165.0,
+        "qty": 10,
+        "location": "008H",
+        "pack": 1,
+        "stock": 136
+      },
+      {
+        "part_no": "02212-K38-900",
+        "description": "135010-KOP-D00 KEY SET ACT 6G",
+        "mrp": 169.0,
+        "qty": 20,
+        "location": "008M",
+        "pack": 1,
+        "stock": 258
+      },
+      {
+        "part_no": "30500-KWP-D21",
+        "description": "KIT COIL CLUTCH ASSY ASSY- CB UNICORN 150/160",
+        "mrp": 1201.0,
+        "qty": 2,
+        "location": "008P",
+        "pack": 1,
+        "stock": 45
+      },
+      {
+        "part_no": "35014-KWP-D00",
+        "description": "SET KEY SET IGNITION & SCREW 3G *3G* HET",
+        "mrp": 254.0,
+        "qty": 5,
+        "location": "009N",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "35010-KSP-861",
+        "description": "22321-KTE-652 PLATE CLUTCH 4G ACTIVA 1",
+        "mrp": 513.0,
+        "qty": 5,
+        "location": "013Q",
+        "pack": 1,
+        "stock": 101
+      },
+      {
+        "part_no": "35010-KWP-H01",
+        "description": "KEY KEY SET SET ACTIVA",
+        "mrp": 1056.0,
+        "qty": 9,
+        "location": "016D",
+        "pack": 3,
+        "stock": 15
+      },
+      {
+        "part_no": "53219-K14-900",
+        "description": "STEM SUB ASSY STRG 5G",
+        "mrp": 1208.0,
+        "qty": 5,
+        "location": "038P",
+        "pack": 1,
+        "stock": 103
+      },
+      {
+        "part_no": "24701-KON-DO0",
+        "description": "17650-KOV-A01 HOSE COMP FUEL FEED",
+        "mrp": 1089.0,
+        "qty": 782,
+        "location": "",
+        "pack": 1,
+        "stock": 48
+      },
+      {
+        "part_no": "31210-K3C-D12",
+        "description": "PEDAL GEAR CHANGE",
+        "mrp": 350.0,
+        "qty": 1,
+        "location": "085A",
+        "pack": 1,
+        "stock": 4
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 47.573322301s."
+  },
+  "20260710_113437.jpg": {
+    "header": {
+      "customer": "M/S. , VIRAS AUTOMATIVE VAPI MEMO No. 9916 CV03",
+      "area": "MAJID NO 6 SHOPPING CENTER",
+      "memo_no": "MS.  VIRAS AUTOMATIVE VAPI MEMO No. 9916 CV03"
+    },
+    "items": [
+      {
+        "part_no": "33460-KOP-601",
+        "description": "LENS COMP L",
+        "mrp": 181.0,
+        "qty": 1,
+        "location": "002T",
+        "pack": 1,
+        "stock": 16
+      },
+      {
+        "part_no": "35010-KOP-D00",
+        "description": "130500-KWP-D2 1 KEY COIL SET ASSY ACT IGNITION 6G 1 1201.001 3 008P 1",
+        "mrp": 42.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "33410-KOP-601",
+        "description": "LENS COMP R *3G*",
+        "mrp": 254.0,
+        "qty": 5,
+        "location": "009R",
+        "pack": 1,
+        "stock": 96
+      },
+      {
+        "part_no": "02380-KBP-900",
+        "description": "CHAIN SPROCKET KIT UNICORN BS6 1",
+        "mrp": 1271.0,
+        "qty": 1,
+        "location": "010V",
+        "pack": 1,
+        "stock": 11
+      },
+      {
+        "part_no": "06455-KPP-N02",
+        "description": "124701l-KSP- 900 PAD PEDAL SET GEARCHANGE FR BRAKE *SHINE NEW, UNI.160 BS6",
+        "mrp": 241.0,
+        "qty": 2,
+        "location": "010X",
+        "pack": 1,
+        "stock": 2
+      },
+      {
+        "part_no": "31120-K43-901",
+        "description": "STATOR COMP",
+        "mrp": 1050.0,
+        "qty": 1,
+        "location": "013P",
+        "pack": 1,
+        "stock": 1
+      },
+      {
+        "part_no": "32100-KZK-E00",
+        "description": "131220-KOP-D01 STATOR WIRE HARNESS COMP. BROWN +WHITE (BLACK)",
+        "mrp": 4142.0,
+        "qty": 1,
+        "location": "018G",
+        "pack": 1,
+        "stock": 18
+      },
+      {
+        "part_no": "37211-K0P-602",
+        "description": "LENS",
+        "mrp": 1526.0,
+        "qty": 1,
+        "location": "024J",
+        "pack": 1,
+        "stock": 3
+      },
+      {
+        "part_no": "37211-KOP-DO3",
+        "description": "LENS I",
+        "mrp": 182.0,
+        "qty": 1,
+        "location": "032R",
+        "pack": 1,
+        "stock": 23
+      },
+      {
+        "part_no": "35010-KTE-601",
+        "description": "35010-KWP-H01 KEY KEY SET SET ACTIVA 5G",
+        "mrp": 863.0,
+        "qty": 1,
+        "location": "",
+        "pack": 1,
+        "stock": 245
+      },
+      {
+        "part_no": "64304-KOP-DO0ZZ",
+        "description": "COVER R FR*NH1 *",
+        "mrp": 1208.0,
+        "qty": 2,
+        "location": "040T",
+        "pack": 1,
+        "stock": 46
+      },
+      {
+        "part_no": "37800-K0P-601",
+        "description": "FUEL UNIT 2 PIN",
+        "mrp": 277.0,
+        "qty": 1,
+        "location": "048A",
+        "pack": 0,
+        "stock": 10
+      },
+      {
+        "part_no": "50610-K38-900",
+        "description": "53205-KOP-D00ZD COVER HANDLE FR*6G 2020 BLACK",
+        "mrp": 923.0,
+        "qty": 1,
+        "location": "050Z",
+        "pack": 1,
+        "stock": 27
+      },
+      {
+        "part_no": "50400-KON-DO0",
+        "description": "BAR GRIP COMP REAR STEP",
+        "mrp": 344.0,
+        "qty": 1,
+        "location": "053J",
+        "pack": 1,
+        "stock": 2
+      },
+      {
+        "part_no": "53205-KWP-F00ZF",
+        "description": "COVER HANDLE FR 3G BLUE",
+        "mrp": 1019.0,
+        "qty": 1,
+        "location": "054F",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "64305-KOP-DO0",
+        "description": "ZZ COVER L FR*NH1*",
+        "mrp": 958.0,
+        "qty": 1,
+        "location": "063C",
+        "pack": 1,
+        "stock": 3
+      }
+    ],
+    "needs_fallback": false
+  },
+  "20260710_113451.jpg": {
+    "header": {
+      "customer": "CVO3 9916 : No. MEMO CENTER VAPI SHOPPING AUTOMATIVE MAJID VIKAS 6 NO M/S.,",
+      "area": "LIST PICKING / ORDER"
+    },
+    "items": [
+      {
+        "part_no": "77280-KON-DU0",
+        "description": "40",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "64305-KZK-900ZC",
+        "description": "39",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61320-KON-DJ0ZD",
+        "description": "38",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61310-KON-DJ0ZD",
+        "description": "37",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "83602-KON-DO0",
+        "description": "36",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "83751-KWP-F00",
+        "description": "35",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "28120-KPH-701",
+        "description": "34",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "35010-K0L-D00",
+        "description": "33",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "38770-K0P-DP2",
+        "description": "32",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "30400-KON-D22",
+        "description": "31",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "22870-KLK-D01",
+        "description": "29",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "T0R50-K0P-D60",
+        "description": "164",
+        "mrp": 28.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77270-KON--DUOZD",
+        "description": "27",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "61000-KZK-DO0ZB",
+        "description": "26",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "83751-KWP-F00ZC",
+        "description": "25",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53100-KOP-D00",
+        "description": "22",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 32.429136539s."
+  },
+  "20260710_113501.jpg": {
+    "header": {
+      "customer": "LIST AUTOMATIVE VIKAS M/S.,",
+      "area": "PICKING / ORDER"
+    },
+    "items": [
+      {
+        "part_no": "61410-KTE-6512S",
+        "description": "1-KOP-",
+        "mrp": 15062.0,
+        "qty": 45,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "80110-KSP-B10",
+        "description": "44",
+        "mrp": 43.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 48.293834529s."
+  },
+  "20260710_113506.jpg": {
+    "header": {
+      "customer": "VAPI AUTOMATIVE VIKAS M/S.,",
+      "area": "LIST PICKING / ORDER"
+    },
+    "items": [
+      {
+        "part_no": "50621-KOP-DA0",
+        "description": "44",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "80110-KSP-B10",
+        "description": "43",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 9.954109851s."
+  },
+  "20260710_135535.jpg": {
+    "header": {
+      "customer": "M/S.,",
+      "area": "ATi83602-KON-"
+    },
+    "items": [
+      {
+        "part_no": "61320-KON-DJ0",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77270-KON-DUOZD",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "28300-K43-900",
+        "description": "26I16450-KOP-D60",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "83751-KWP-F00ZC",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "28120--KEH-701",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "83751-KWP-FO0ZD",
+        "description": "COVER",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "77280-KON-DUOZA",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53100-KOP-DO0",
+        "description": "",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "53205-KNP-61310-KON-",
+        "description": "38770-KOP-",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "30400-KON-D22",
+        "description": "64320-KOP-D0",
+        "mrp": 0.0,
+        "qty": 1,
+        "location": "",
+        "pack": 0,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 24.337495203s."
+  },
+  "20260710_140843.jpg": {
+    "header": {
+      "memo_no": "GOKUL COMPLEX SHOP NO 09 SILVASSA MEMO No. : 9928 S15004"
+    },
+    "items": [
+      {
+        "part_no": "02380-KBP-900",
+        "description": "14100-KOL-DO1 CHAIN SHAFT COMP SPRCKET CAM KIT UNICORN BS6",
+        "mrp": 1271.0,
+        "qty": 1,
+        "location": "010V",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "14430-KOP-D00",
+        "description": "ARM COMP N VALVE ROCKER",
+        "mrp": 1138.0,
+        "qty": 1,
+        "location": "092H",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "14440-KOP-D60",
+        "description": "ARM COMP EXH VALVE ROCKER *BEARING TYP",
+        "mrp": 305.0,
+        "qty": 1,
+        "location": "137B",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "14440-KOP-DO0",
+        "description": "14430-KOP-D60 ARM ARM COMP COMP EXH IN VALVE VÀLVE ROCKER ROCKER *BEARING",
+        "mrp": 284.0,
+        "qty": 1,
+        "location": "142D",
+        "pack": 1,
+        "stock": 9
+      },
+      {
+        "part_no": "14430-KSP-910",
+        "description": "ARMCOMP. VALVE ROCKER TYPE",
+        "mrp": 307.0,
+        "qty": 1,
+        "location": "219F",
+        "pack": 1,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 50.791357014s."
+  },
+  "20260710_140846.jpg": {
+    "header": {
+      "customer": "M/S., SUPREME AUTO PARTS",
+      "memo_no": "GOKUL COMPLEX SHOP NO 09 SILVASSA MEMO No. :9928 S15004"
+    },
+    "items": [
+      {
+        "part_no": "02380-KBP-900",
+        "description": "CHAIN SPROCKET KIT UNICORN BS6",
+        "mrp": 1271.0,
+        "qty": 1,
+        "location": "010V",
+        "pack": 0,
+        "stock": 31
+      },
+      {
+        "part_no": "14100-KOL-DO1",
+        "description": "SHAFT COMP CAM",
+        "mrp": 1138.0,
+        "qty": 1,
+        "location": "037I",
+        "pack": 11,
+        "stock": 0
+      },
+      {
+        "part_no": "14430-KOP-DO0",
+        "description": "ARM COMP IN VALVE ROCKER",
+        "mrp": 292.0,
+        "qty": 1,
+        "location": "092H",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "14440-KOP-D60",
+        "description": "ARM COMP EXH VALVE ROCKER *BEARING TYP",
+        "mrp": 305.0,
+        "qty": 1,
+        "location": "137B",
+        "pack": 11,
+        "stock": 24
+      },
+      {
+        "part_no": "14440-KOP-D00",
+        "description": "ARM COMP EXH VALVE ROCKER",
+        "mrp": 284.0,
+        "qty": 1,
+        "location": "142D",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "14430-KOP-D60",
+        "description": "ARM COMP IN VALVE ROCKER *BEARING TYPE",
+        "mrp": 307.0,
+        "qty": 1,
+        "location": "198F",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "14430-KSP-910",
+        "description": "ARMCOMP. VALVE ROCKER",
+        "mrp": 341.0,
+        "qty": 2,
+        "location": "219F",
+        "pack": 0,
+        "stock": 50
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 32.843079421s."
+  },
+  "20260710_154733 - Copy.jpg": {
+    "header": {
+      "customer": "M/S.I NAGAR SHIVAM PALIKA AUTO PARTS KILLA PARDI MEMO No. : 9962 BV23A",
+      "area": "SHOPPING CENTER VALSADI ZAMPA",
+      "memo_no": "MS.I NAGAR SHIVAM PALIKA AUTO PARTS KILLA PARDI MEMO No. : 9962 BV23A"
+    },
+    "items": [
+      {
+        "part_no": "23421-KWP-DO0",
+        "description": "123422-KWP-D00 GEAR SHAFT COUNTER COUNTER (51T)",
+        "mrp": 470.0,
+        "qty": 1,
+        "location": "003V",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23411-KVT-F00",
+        "description": "SHAFT DRIVE",
+        "mrp": 487.0,
+        "qty": 1,
+        "location": "017D",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "16100-K83-DO1",
+        "description": "CARBURETOR ASSY",
+        "mrp": 1770.0,
+        "qty": 1,
+        "location": "019T",
+        "pack": 1,
+        "stock": 26
+      },
+      {
+        "part_no": "22870-KSP-901",
+        "description": "CABLECOMP CLUTCH",
+        "mrp": 188.0,
+        "qty": 1,
+        "location": "020S",
+        "pack": 1,
+        "stock": 25
+      },
+      {
+        "part_no": "51410-KTE-A01",
+        "description": "PIPE COMP FR. FORK",
+        "mrp": 1080.0,
+        "qty": 2,
+        "location": "071P",
+        "pack": 1,
+        "stock": 89
+      },
+      {
+        "part_no": "14430-KOP-DO0",
+        "description": "ARM COMP IN VALVE ROCKER",
+        "mrp": 292.0,
+        "qty": 1,
+        "location": "092H",
+        "pack": 0,
+        "stock": 4
+      },
+      {
+        "part_no": "14440-KOP-DO0",
+        "description": "123430-KWP-F00 ARM GEAR COMP COMP EXH FINAL VALVE ROCKER",
+        "mrp": 921.0,
+        "qty": 1,
+        "location": "099D",
+        "pack": 0,
+        "stock": 7
+      }
+    ],
+    "needs_fallback": false
+  },
+  "20260710_154733.jpg": {
+    "header": {
+      "customer": "M/S.I NAGAR SHIVAM PALIKA AUTO PARTS KILLA PARDI MEMO No. : 9962 BV23A",
+      "area": "SHOPPING CENTER VALSADI ZAMPA",
+      "memo_no": "MS.I NAGAR SHIVAM PALIKA AUTO PARTS KILLA PARDI MEMO No. : 9962 BV23A"
+    },
+    "items": [
+      {
+        "part_no": "23421-KWP-DO0",
+        "description": "123422-KWP-D00 GEAR SHAFT COUNTER COUNTER (51T)",
+        "mrp": 470.0,
+        "qty": 1,
+        "location": "003V",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23411-KVT-F00",
+        "description": "SHAFT DRIVE",
+        "mrp": 487.0,
+        "qty": 1,
+        "location": "017D",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "16100-K83-DO1",
+        "description": "CARBURETOR ASSY",
+        "mrp": 1770.0,
+        "qty": 1,
+        "location": "019T",
+        "pack": 1,
+        "stock": 26
+      },
+      {
+        "part_no": "22870-KSP-901",
+        "description": "CABLECOMP CLUTCH",
+        "mrp": 188.0,
+        "qty": 1,
+        "location": "020S",
+        "pack": 1,
+        "stock": 25
+      },
+      {
+        "part_no": "51410-KTE-A01",
+        "description": "PIPE COMP FR. FORK",
+        "mrp": 1080.0,
+        "qty": 2,
+        "location": "071P",
+        "pack": 1,
+        "stock": 89
+      },
+      {
+        "part_no": "14430-KOP-DO0",
+        "description": "ARM COMP IN VALVE ROCKER",
+        "mrp": 292.0,
+        "qty": 1,
+        "location": "092H",
+        "pack": 0,
+        "stock": 4
+      },
+      {
+        "part_no": "14440-KOP-DO0",
+        "description": "123430-KWP-F00 ARM GEAR COMP COMP EXH FINAL VALVE ROCKER",
+        "mrp": 921.0,
+        "qty": 1,
+        "location": "099D",
+        "pack": 0,
+        "stock": 7
+      }
+    ],
+    "needs_fallback": false
+  },
+  "20260710_154736 - Copy.jpg": {
+    "header": {
+      "customer": "M/S., SHIVAM AUTO PARTs KILLA PARDI",
+      "memo_no": "NAGAR PALIKA SHOPPING CENTER MEMO No. :9962 BV23A"
+    },
+    "items": [
+      {
+        "part_no": "23421-KWP-D00",
+        "description": "123422-KWP-DO0 SHAFT GEAR COUNTER(51T) COUNTER",
+        "mrp": 470.0,
+        "qty": 1,
+        "location": "003V",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23411-KVT-FO0",
+        "description": "SHAFT DRIVE",
+        "mrp": 487.0,
+        "qty": 1,
+        "location": "017D",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "16100-K83-D01",
+        "description": "CARBURE TOR ASSY",
+        "mrp": 1770.0,
+        "qty": 1,
+        "location": "019T",
+        "pack": 0,
+        "stock": 26
+      },
+      {
+        "part_no": "22870-KSP-901",
+        "description": "CABLECOMP . CLUTCH",
+        "mrp": 188.0,
+        "qty": 1,
+        "location": "020S",
+        "pack": 1,
+        "stock": 25
+      },
+      {
+        "part_no": "51410-KTE-A01",
+        "description": "PIPE COMP FR.FORK",
+        "mrp": 1080.0,
+        "qty": 2,
+        "location": "071P",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "14430-KOP-23430-KWP-FO0",
+        "description": "D00 ARM GEAR COMP COMP IN FINAL VALVE ROCKER",
+        "mrp": 292.0,
+        "qty": 1,
+        "location": "092H",
+        "pack": 1,
+        "stock": 4
+      },
+      {
+        "part_no": "14440-KOP-D00",
+        "description": "ARM COMP EXH VALVE ROCKER",
+        "mrp": 921.0,
+        "qty": 1,
+        "location": "142D",
+        "pack": 1,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 19.831549891s."
+  },
+  "20260710_154736.jpg": {
+    "header": {
+      "customer": "M/S., SHIVAM AUTO PARTs KILLA PARDI",
+      "memo_no": "NAGAR PALIKA SHOPPING CENTER MEMO No. :9962 BV23A"
+    },
+    "items": [
+      {
+        "part_no": "23421-KWP-D00",
+        "description": "123422-KWP-DO0 SHAFT GEAR COUNTER(51T) COUNTER",
+        "mrp": 470.0,
+        "qty": 1,
+        "location": "003V",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "23411-KVT-FO0",
+        "description": "SHAFT DRIVE",
+        "mrp": 487.0,
+        "qty": 1,
+        "location": "017D",
+        "pack": 0,
+        "stock": 0
+      },
+      {
+        "part_no": "16100-K83-D01",
+        "description": "CARBURE TOR ASSY",
+        "mrp": 1770.0,
+        "qty": 1,
+        "location": "019T",
+        "pack": 0,
+        "stock": 26
+      },
+      {
+        "part_no": "22870-KSP-901",
+        "description": "CABLECOMP . CLUTCH",
+        "mrp": 188.0,
+        "qty": 1,
+        "location": "020S",
+        "pack": 1,
+        "stock": 25
+      },
+      {
+        "part_no": "51410-KTE-A01",
+        "description": "PIPE COMP FR.FORK",
+        "mrp": 1080.0,
+        "qty": 2,
+        "location": "071P",
+        "pack": 1,
+        "stock": 0
+      },
+      {
+        "part_no": "14430-KOP-23430-KWP-FO0",
+        "description": "D00 ARM GEAR COMP COMP IN FINAL VALVE ROCKER",
+        "mrp": 292.0,
+        "qty": 1,
+        "location": "092H",
+        "pack": 1,
+        "stock": 4
+      },
+      {
+        "part_no": "14440-KOP-D00",
+        "description": "ARM COMP EXH VALVE ROCKER",
+        "mrp": 921.0,
+        "qty": 1,
+        "location": "142D",
+        "pack": 1,
+        "stock": 0
+      }
+    ],
+    "needs_fallback": true,
+    "gemini_error": "Exception: Gemini fallback failed: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 8.33949654s."
+  }
+}

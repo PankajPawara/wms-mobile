@@ -37,7 +37,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
   final _searchController = TextEditingController();
   String _searchTerm = '';
   String _searchBy = 'all';
-  String _sortBy = 'part_no';
+  String _sortBy = 'location';
   String _sortOrder = 'asc';
 
   @override

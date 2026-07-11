@@ -87,30 +87,32 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 20),
 
             // ── DATA MANAGEMENT ─────────────────────────────────────────────
-            _SectionLabel('DATA MANAGEMENT'),
-            const SizedBox(height: 8),
-            _SettingsGroup(items: [
-              _SettingsItem(
-                  icon: Icons.file_upload_outlined,
-                  iconColor: const Color(0xFF16A34A),
-                  title: 'Import Excel File',
-                  subtitle: 'Import or update inventory data',
-                  onTap: () => _showImportExcelDialog(context)),
-              _SettingsItem(
-                  icon: Icons.storage_rounded,
-                  iconColor: const Color(0xFF16A34A),
-                  title: 'Database & Sync Diagnostics',
-                  subtitle: 'Sync logs and SQLite catalog viewer',
-                  onTap: () => context.push('/diagnostics')),
-              _SettingsItem(
-                  icon: Icons.refresh_rounded,
-                  iconColor: const Color(0xFF16A34A),
-                  title: 'Re-import Database',
-                  subtitle: 'Replace existing data',
-                  onTap: () => _runManualSync(context, ref),
-                  showDivider: false),
-            ]),
-            const SizedBox(height: 16),
+            if (role == 'Admin') ...[
+              _SectionLabel('DATA MANAGEMENT'),
+              const SizedBox(height: 8),
+              _SettingsGroup(items: [
+                _SettingsItem(
+                    icon: Icons.file_upload_outlined,
+                    iconColor: const Color(0xFF16A34A),
+                    title: 'Import Excel File',
+                    subtitle: 'Import or update inventory data',
+                    onTap: () => _showImportExcelDialog(context)),
+                _SettingsItem(
+                    icon: Icons.storage_rounded,
+                    iconColor: const Color(0xFF16A34A),
+                    title: 'Database & Sync Diagnostics',
+                    subtitle: 'Sync logs and SQLite catalog viewer',
+                    onTap: () => context.push('/diagnostics')),
+                _SettingsItem(
+                    icon: Icons.refresh_rounded,
+                    iconColor: const Color(0xFF16A34A),
+                    title: 'Re-import Database',
+                    subtitle: 'Replace existing data',
+                    onTap: () => _runManualSync(context, ref),
+                    showDivider: false),
+              ]),
+              const SizedBox(height: 16),
+            ],
 
             // ── TOOLS ───────────────────────────────────────────────────────
             _SectionLabel('TOOLS'),
@@ -128,13 +130,14 @@ class SettingsScreen extends ConsumerWidget {
                   title: 'History',
                   subtitle: 'View all orders and status',
                   onTap: () => context.push('/history')),
-              _SettingsItem(
-                  icon: Icons.auto_awesome_rounded,
-                  iconColor: const Color(0xFF8B5CF6),
-                  title: 'AI Vision Sandbox',
-                  subtitle: 'Test Gemini image extraction',
-                  onTap: () => context.push('/ai-vision-test'),
-                  showDivider: false),
+              if (role == 'Admin')
+                _SettingsItem(
+                    icon: Icons.auto_awesome_rounded,
+                    iconColor: const Color(0xFF8B5CF6),
+                    title: 'AI Vision Sandbox',
+                    subtitle: 'Test Gemini image extraction',
+                    onTap: () => context.push('/ai-vision-test'),
+                    showDivider: false),
             ]),
             const SizedBox(height: 16),
 

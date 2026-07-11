@@ -23,7 +23,7 @@ class GeminiFallbackService {
     }
 
     final model = GenerativeModel(
-      model: 'gemini-1.5-flash', // Using flash for maximum speed
+      model: 'gemini-2.5-flash', // Using flash for maximum speed
       apiKey: apiKey,
     );
 

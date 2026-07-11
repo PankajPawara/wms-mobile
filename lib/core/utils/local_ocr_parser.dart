@@ -73,6 +73,7 @@ class LocalOcrParser {
     String area = '';
     String memoNo = '';
     
+    double qtyX = -1;
     double packX = -1;
     double stockX = -1;
     
@@ -87,6 +88,7 @@ class LocalOcrParser {
         final t = el.text.toUpperCase();
         if (t.contains('PACK')) packX = el.boundingBox.center.dx;
         if (t.contains('STOCK')) stockX = el.boundingBox.center.dx;
+        if (t == 'QTY' || t == 'QTY.') qtyX = el.boundingBox.center.dx;
       }
       
       if (rowText.toUpperCase().contains('M/S')) {
@@ -117,7 +119,7 @@ class LocalOcrParser {
     final foundPartNos = <String>{};
     for (final row in rows) {
       row.sort((a, b) => a.boundingBox.left.compareTo(b.boundingBox.left));
-      final item = _extractFromTokens(row, packX, stockX);
+      final item = _extractFromTokens(row, qtyX, packX, stockX);
       if (item != null && foundPartNos.add(item['part_no'] as String)) {
         items.add(item);
       }
@@ -150,7 +152,7 @@ class LocalOcrParser {
   // ─── Core token extraction ──────────────────────────────────────────────────
 
   /// Extract part no, description, MRP, qty, location from a left-sorted token list.
-  static Map<String, dynamic>? _extractFromTokens(List<TextElement> row, double packX, double stockX) {
+  static Map<String, dynamic>? _extractFromTokens(List<TextElement> row, double qtyX, double packX, double stockX) {
     // 1. Convert to ParsedToken and split tokens containing `|` in the middle (e.g., "413.00| 2")
     final tokens = <ParsedToken>[];
     for (var el in row) {
@@ -266,105 +268,80 @@ class LocalOcrParser {
     // ── Step 5, 6, 7: QTY, LOCATION, PACK, STOCK ────────────────────────────
     final afterMrp = mrpEnd >= 0 ? rest.sublist(mrpEnd + 1) : <ParsedToken>[];
     
-    // First, find Location as it has a very strict pattern
-    int locIdx = -1;
-    int locLen = 1;
+    int qty = 1;
+    int pack = 0;
+    int stock = 0;
     String location = '';
+    
+    final candidates = <Map<String, dynamic>>[];
     
     for (int i = 0; i < afterMrp.length; i++) {
       final tok = afterMrp[i].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
       final loc = _extractLocation(tok);
-      if (loc != null) { location = loc; locIdx = i; locLen = 1; break; }
       
-      if (i + 1 < afterMrp.length) {
-        final t2 = afterMrp[i+1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-        // Prevent concatenating Qty and Location (e.g. "60" + "001C") if t2 is already a valid Location
-        if (_extractLocation(t2) == null) {
-          final loc2 = _extractLocation(tok + t2);
-          if (loc2 != null) { location = loc2; locIdx = i; locLen = 2; break; }
+      if (loc != null) { 
+        location = loc;
+        // Check if there is a number prefix glued to the location
+        if (tok.length > loc.length) {
+           final prefix = tok.substring(0, tok.length - loc.length);
+           final parsed = int.tryParse(_normNum(prefix));
+           if (parsed != null) {
+              candidates.add({'val': parsed, 'x': afterMrp[i].left}); // Approximate X
+           }
         }
-      }
-    }
-
-    int qty = 1;
-    if (locIdx > 0) {
-      // Any number before Location is QTY
-      for (int i = 0; i < locIdx; i++) {
-        final t = afterMrp[i].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-        final parsed = int.tryParse(_normNum(t));
-        if (parsed != null && parsed >= 1) {
-          qty = parsed;
-          break; // First number before location
-        }
-      }
-    } else if (locIdx == -1) {
-      // Location missing. Use gap to find QTY so we don't accidentally grab PACK/STOCK
-      final double mrpRightX = mrpEnd >= 0 ? rest[mrpEnd].right : 0.0;
-      final double mrpWidth = mrpEnd >= 0 ? rest[mrpEnd].width : 0.0;
-      final double maxQtyGap = mrpWidth > 0 ? mrpWidth * 3.0 : 800.0;
-
-      for (int i = 0; i < afterMrp.length; i++) {
-        final el = afterMrp[i];
-        if (mrpRightX > 0 && (el.left - mrpRightX) > maxQtyGap) {
-          continue;
-        }
-        final t = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-        final parsed = int.tryParse(_normNum(t));
-        if (parsed != null && parsed >= 1) {
-          qty = parsed;
-          break;
-        }
-      }
-    }
-
-    int pack = 0;
-    int stock = 0;
-    if (locIdx >= 0 && locIdx + locLen < afterMrp.length) {
-      // Anything after Location is PACK and STOCK
-      final afterLoc = afterMrp.sublist(locIdx + locLen);
-      final candidates = <Map<String, dynamic>>[];
-      
-      for (var el in afterLoc) {
-        // Strip out trailing or leading misread pipes (I, l, |) before parsing
-        String text = el.text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
-        text = text.replaceAll(RegExp(r'^[Il|]+|[Il|]+$'), '');
-        
-        final parsed = int.tryParse(_normNum(text));
-        if (parsed != null) {
-          candidates.add({'val': parsed, 'x': el.left + el.width / 2});
-        }
-      }
-
-      if (packX > 0 && stockX > 0 && candidates.isNotEmpty) {
-        Map<String, dynamic>? bestPack;
-        double minPackDist = double.infinity;
-        
-        Map<String, dynamic>? bestStock;
-        double minStockDist = double.infinity;
-        
-        for (final c in candidates) {
-          final x = c['x'] as double;
-          final distPack = (x - packX).abs();
-          final distStock = (x - stockX).abs();
-          
-          if (distPack < distStock) {
-            if (distPack < minPackDist) {
-              minPackDist = distPack;
-              bestPack = c;
-            }
-          } else {
-            if (distStock < minStockDist) {
-              minStockDist = distStock;
-              bestStock = c;
+      } else {
+        // Look ahead for glued prefix + location (e.g. tok + nextTok = location)
+        if (i + 1 < afterMrp.length) {
+          final t2 = afterMrp[i+1].text.replaceAll(RegExp(r'^[|\s]+|[|\s]+$'), '').trim();
+          if (_extractLocation(t2) == null) {
+            final loc2 = _extractLocation(tok + t2);
+            if (loc2 != null) {
+              location = loc2;
+              i++; // Skip the next token as it was consumed by location
+              continue;
             }
           }
         }
         
-        if (bestPack != null) pack = bestPack['val'] as int;
-        if (bestStock != null) stock = bestStock['val'] as int;
-      } else {
-        if (candidates.isNotEmpty) pack = candidates[0]['val'] as int;
-        if (candidates.length > 1) stock = candidates[1]['val'] as int;
+        // Normal number candidate
+        String numText = tok.replaceAll(RegExp(r'^[Il|]+|[Il|]+$'), '');
+        final parsed = int.tryParse(_normNum(numText));
+        if (parsed != null) {
+          candidates.add({'val': parsed, 'x': afterMrp[i].left + afterMrp[i].width / 2});
+        }
+      }
+    }
+
+    // Map candidates to Qty, Pack, Stock
+    if (qtyX > 0 && packX > 0 && stockX > 0) {
+      for (final c in candidates) {
+        final val = c['val'] as int;
+        final x = c['x'] as double;
+        
+        final dQty = (x - qtyX).abs();
+        final dPack = (x - packX).abs();
+        final dStock = (x - stockX).abs();
+        
+        if (dQty <= dPack && dQty <= dStock) {
+          qty = val;
+        } else if (dPack <= dQty && dPack <= dStock) {
+          pack = val;
+        } else {
+          stock = val;
+        }
+      }
+    } else {
+      // Fallback if headers are missing
+      if (candidates.length >= 3) {
+        qty = candidates[0]['val'] as int;
+        pack = candidates[1]['val'] as int;
+        stock = candidates[2]['val'] as int;
+      } else if (candidates.length == 2) {
+        // Usually Qty and Stock
+        qty = candidates[0]['val'] as int;
+        stock = candidates[1]['val'] as int;
+      } else if (candidates.isNotEmpty) {
+        qty = candidates[0]['val'] as int;
       }
     }
 
