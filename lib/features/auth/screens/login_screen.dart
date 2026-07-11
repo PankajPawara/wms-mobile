@@ -34,12 +34,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           _passwordController.text,
         );
     if (success && mounted) {
-      final authState = ref.read(authNotifierProvider);
-      if (authState.isFirstLogin) {
-        context.go('/change-password');
-      } else {
-        context.go('/home');
-      }
+      context.go('/home');
+    } else if (mounted) {
+      _passwordController.clear();
     }
   }
 

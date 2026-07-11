@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
