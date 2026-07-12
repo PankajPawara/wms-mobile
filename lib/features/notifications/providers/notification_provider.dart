@@ -54,10 +54,18 @@ class NotificationNotifier extends _$NotificationNotifier {
   }
 
   Future<void> markAllAsRead() async {
+    if (state.hasValue && state.value != null) {
+      final updated = state.value!.map((e) => e.copyWith(isRead: true)).toList();
+      state = AsyncValue.data(updated);
+    }
+
     final client = ref.read(apiClientProvider);
     try {
       await client.post('/notifications/read-all');
-      await refresh();
+      // Quiet refresh
+      final res = await client.get('/notifications');
+      final items = res['data']['items'] as List<dynamic>;
+      state = AsyncValue.data(items.map((e) => NotificationModel.fromJson(e as Map<String, dynamic>)).toList());
     } catch (_) {}
   }
 }
