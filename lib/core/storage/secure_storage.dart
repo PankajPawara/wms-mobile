@@ -34,6 +34,7 @@ class SecureStorage {
       _storage.write(key: _employeeIdKey, value: employeeId),
       _storage.write(key: _userNameKey, value: name),
       _storage.write(key: _roleKey, value: role),
+      _storage.write(key: 'wms_login_time', value: DateTime.now().toIso8601String()),
     ]);
   }
 
@@ -43,12 +44,14 @@ class SecureStorage {
       _storage.read(key: _employeeIdKey),
       _storage.read(key: _userNameKey),
       _storage.read(key: _roleKey),
+      _storage.read(key: 'wms_login_time'),
     ]);
     return {
       'id': results[0],
       'employeeId': results[1],
       'name': results[2],
       'role': results[3],
+      'loginTime': results[4],
     };
   }
 

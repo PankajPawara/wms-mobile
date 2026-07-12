@@ -30,13 +30,9 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
   List<CameraDescription> _cameras = [];
 
   final BarcodeScanner _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);
-  final TextRecognizer _textRecognizer = TextRecognizer();
   
   bool _isProcessing = false;
   bool _isDisposed = false;
-  
-  // Throttle OCR to run less frequently than barcode (e.g. max 2 times per second)
-  DateTime? _lastOcrTime;
 
   @override
   void initState() {
@@ -108,7 +104,6 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     WidgetsBinding.instance.removeObserver(this);
     _stopLiveFeed();
     _barcodeScanner.close();
-    _textRecognizer.close();
     super.dispose();
   }
 
@@ -134,32 +129,12 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     }
 
     try {
-      // 1. Try Barcode First (it is very fast)
       final barcodes = await _barcodeScanner.processImage(inputImage);
       if (barcodes.isNotEmpty) {
         for (final barcode in barcodes) {
           final rawVal = barcode.rawValue;
           if (rawVal != null && rawVal.isNotEmpty) {
             final success = await widget.onResult(rawVal, false);
-            if (success) {
-              _stopLiveFeed(); // Stop on success
-              return; // We are done!
-            }
-            // If false, continue streaming to allow OCR or another barcode
-          }
-        }
-      }
-
-      // 2. Try OCR if enough time has passed (throttle OCR to avoid lag)
-      final now = DateTime.now();
-      if (_lastOcrTime == null || now.difference(_lastOcrTime!).inMilliseconds > 500) {
-        _lastOcrTime = now;
-        final recognizedText = await _textRecognizer.processImage(inputImage);
-        
-        final partNumbers = BarcodeUtil.extractPartNumbers(recognizedText.text);
-        if (partNumbers.isNotEmpty) {
-          for (final partNo in partNumbers) {
-            final success = await widget.onResult(partNo, true);
             if (success) {
               _stopLiveFeed(); // Stop on success
               return; // We are done!
