@@ -7,6 +7,7 @@ import '../../../features/auth/providers/auth_provider.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../../core/database/app_database.dart';
 import '../../settings/repositories/inventory_repository.dart';
+import '../../settings/providers/app_config_provider.dart';
 
 // ── Top-level provider (MUST be outside the class) ──────────────────────────
 final _watchOrdersProvider = StreamProvider<List<Order>>((ref) {
@@ -27,68 +28,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationNotifierProvider.notifier).refresh();
-      _checkInventoryUpdates();
+      _checkUpdates();
     });
   }
 
-  Future<void> _checkInventoryUpdates() async {
+  Future<void> _checkUpdates() async {
+    // 1. Check App Version Update
+    try {
+      final appConfig = await ref.read(appConfigNotifierProvider.future);
+      if (appConfig != null && mounted) {
+        // Simple string comparison for versions (e.g. '1.0.1' > '1.0.0')
+        // In a real app, use the package_info_plus package to get current version.
+        // For now, we assume current app version is 1.0.0.
+        const currentVersion = '1.0.0';
+        if (appConfig.latestApkVersion.compareTo(currentVersion) > 0) {
+          showDialog(
+            context: context,
+            barrierDismissible: !appConfig.forceApkUpdate,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Update Available'),
+              content: Text('A new version of the app (${appConfig.latestApkVersion}) is available. Please update to continue.'),
+              actions: [
+                if (!appConfig.forceApkUpdate)
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Later'),
+                  ),
+                FilledButton(
+                  onPressed: () {
+                    // Normally launch appConfig.apkDownloadUrl using url_launcher
+                    if (!appConfig.forceApkUpdate) Navigator.pop(ctx);
+                  },
+                  child: const Text('Update'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    // 2. Check Inventory Updates
     final repo = ref.read(inventoryRepositoryProvider);
     final status = await repo.checkUpdateStatus();
 
     if (!mounted) return;
 
-    if (status == InventoryUpdateStatus.needsInitialSync) {
+    if (status == InventoryUpdateStatus.needsInitialSync || status == InventoryUpdateStatus.updateAvailable) {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Expanded(child: Text("Downloading inventory database for the first time...")),
-            ],
-          ),
-        ),
-      );
-      await repo.syncInventory(force: true, skipCheck: true);
-      if (mounted) {
-        Navigator.pop(context); // close dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inventory downloaded successfully!')),
-        );
-      }
-    } else if (status == InventoryUpdateStatus.updateAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('New locations are updated.'),
-          duration: const Duration(days: 1),
-          action: SnackBarAction(
-            label: 'Download Latest',
-            onPressed: () async {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (ctx) => const AlertDialog(
-                  content: Row(
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(width: 16),
-                      Text("Downloading..."),
-                    ],
+        builder: (ctx) => AlertDialog(
+          title: Text(status == InventoryUpdateStatus.needsInitialSync ? 'Initial Sync Required' : 'Inventory Update Available'),
+          content: Text(status == InventoryUpdateStatus.needsInitialSync
+              ? 'You must download the inventory database to use the app.'
+              : 'New inventory locations have been published. You must sync the database to continue.'),
+          actions: [
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(ctx); // Close prompt dialog
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx2) => const AlertDialog(
+                    content: Row(
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(width: 16),
+                        Expanded(child: Text("Syncing database...")),
+                      ],
+                    ),
                   ),
-                ),
-              );
-              await repo.syncInventory(force: true, skipCheck: true);
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Locations updated!')),
                 );
-              }
-            },
-          ),
+                await repo.syncInventory(force: true, skipCheck: true);
+                if (mounted) {
+                  Navigator.pop(context); // Close loading dialog
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Inventory synced successfully!')),
+                  );
+                }
+              },
+              child: const Text('Sync Now'),
+            ),
+          ],
         ),
       );
     }

@@ -55,6 +55,14 @@ class SecureStorage {
     };
   }
 
+  Future<void> saveLocalInventoryVersion(String version) async {
+    await _storage.write(key: 'wms_local_inventory_version', value: version);
+  }
+
+  Future<String> getLocalInventoryVersion() async {
+    return await _storage.read(key: 'wms_local_inventory_version') ?? 'v0';
+  }
+
   Future<void> clearAll() => _storage.deleteAll();
 
   Future<bool> isLoggedIn() async {
