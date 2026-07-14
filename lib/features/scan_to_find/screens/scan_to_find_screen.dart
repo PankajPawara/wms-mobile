@@ -185,9 +185,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       // Filter exact matches to prioritize them and fix the multiple locations issue
       if (matches.length > 1) {
          final exactMatches = matches.where((m) {
-            final partNo = m.partNo.toUpperCase().replaceAll('O', '0');
-            final bc = m.barcode?.toUpperCase().replaceAll('O', '0') ?? '';
-            return partNo == queryBarcode || bc == queryBarcode;
+            final partNo = m.partNo.toUpperCase().replaceAll('O', '0').replaceAll(RegExp(r'[-.\s]'), '');
+            final bc = m.barcode.toUpperCase().replaceAll('O', '0').replaceAll(RegExp(r'[-.\s]'), '');
+            final q = queryBarcode.replaceAll(RegExp(r'[-.\s]'), '');
+            return partNo == q || bc == q;
          }).toList();
          
          if (exactMatches.isNotEmpty) {

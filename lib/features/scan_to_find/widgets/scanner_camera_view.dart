@@ -176,7 +176,9 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
     if (format == null ||
         (Platform.isAndroid && format != InputImageFormat.nv21) ||
-        (Platform.isIOS && format != InputImageFormat.bgra8888)) return null;
+        (Platform.isIOS && format != InputImageFormat.bgra8888)) {
+      return null;
+    }
 
     if (image.planes.isEmpty) return null;
 

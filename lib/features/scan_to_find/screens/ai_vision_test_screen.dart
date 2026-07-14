@@ -344,17 +344,29 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
        String validationStatus = 'Unknown (Not in DB)';
        Color statusColor = Colors.orange;
 
-       if (extractedPartNo.isNotEmpty) {
-         // Attempt exact match first, since part_no was cleaned
-         if (dbPartLocations.containsKey(extractedPartNo)) {
-           validationStatus = 'Verified ($extractedPartNo)';
-           statusColor = Colors.green;
-           item['location_db'] = dbPartLocations[extractedPartNo];
-         }
-       } else {
-         validationStatus = 'Failed to extract part no';
-         statusColor = Colors.red;
-       }
+        if (extractedPartNo.isNotEmpty) {
+          // Attempt exact match first
+          String? matchedKey;
+          if (dbPartLocations.containsKey(extractedPartNo)) {
+             matchedKey = extractedPartNo;
+          } else {
+             // Fallback for unhyphenated or slightly misread scans
+             matchedKey = BarcodeUtil.findBestMatch(extractedPartNo, dbPartLocations.keys.toList());
+          }
+
+          if (matchedKey != null) {
+            validationStatus = 'Verified ($matchedKey)';
+            statusColor = Colors.green;
+            item['location_db'] = dbPartLocations[matchedKey];
+            item['part_no'] = matchedKey; // update it so UI shows the matched key
+          } else {
+            validationStatus = 'Unknown (Not in DB)';
+            statusColor = Colors.orange;
+          }
+        } else {
+          validationStatus = 'Failed to extract part no';
+          statusColor = Colors.red;
+        }
 
        item['_validation_status'] = validationStatus;
        item['_validation_color'] = statusColor.toARGB32();
