@@ -28,6 +28,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
   AIVisionMode _mode = AIVisionMode.memo;
   List<File> _imageFiles = [];
   bool _isProcessing = false;
+  bool _isGeminiProcessing = false;
   String _resultText = '';
   List<dynamic> _parsedItems = [];
   bool _hasPriority = false;
@@ -263,70 +264,96 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
       item['_validation_color'] = statusColor.toARGB32();
       validatedItems.add(item);
     }
-    
-    if (needsFallback && _rawOcrDebug.isNotEmpty) {
-      setState(() {
-        _resultText = 'Local OCR incomplete. Using Gemini Fallback...';
-      });
-      try {
-        final geminiData = await GeminiFallbackService.correctOcrData(
-          _rawOcrDebug, 
-          header, 
-          items,
-          imageFile: imageFile,
-        );
-        
-        // Use Gemini's data
-        if (geminiData['header'] != null) {
-          header = Map<String, String>.from(geminiData['header']);
-        }
-        if (geminiData['items'] != null) {
-           final geminiItems = geminiData['items'] as List<dynamic>;
-           
-           // Re-validate Gemini's items against DB
-           validatedItems.clear();
-           for (var item in geminiItems) {
-              String rawPartNo = item['part_no']?.toString() ?? '';
-              final extractedPartNo = BarcodeUtil.cleanExtractedPartNo(rawPartNo);
-              item['part_no'] = extractedPartNo;
-
-              final rawLoc = item['location']?.toString() ?? '';
-              final cleanedLoc = BarcodeUtil.cleanLocation(rawLoc);
-              item['location'] = cleanedLoc;
-
-              final bestMatch = BarcodeUtil.findBestMatchWithLocation(extractedPartNo, cleanedLoc, dbPartLocations);
-              
-              String validationStatus = 'Unknown (Not in DB)';
-              Color statusColor = Colors.orange;
-
-              if (bestMatch != null) {
-                final dbLoc = dbPartLocations[bestMatch];
-                validationStatus = 'Verified ($bestMatch)';
-                statusColor = Colors.green;
-                item['location_db'] = dbLoc;
-                item['part_no'] = bestMatch;
-              } else {
-                if (extractedPartNo.isEmpty) {
-                  validationStatus = 'Failed to extract part no';
-                  statusColor = Colors.red;
-                }
-              }
-
-              item['_validation_status'] = validationStatus;
-              item['_validation_color'] = statusColor.toARGB32();
-              validatedItems.add(item);
-           }
-        }
-      } catch (e) {
-         _showError('Gemini fallback error: $e');
-      }
-    }
-
-    setState(() {
+       setState(() {
       _hasPriority = priority;
       _parsedItems = validatedItems;
-      _resultText = 'Extracted ${validatedItems.length} items. Priority: $priority\\nCustomer: ${header['customer'] ?? ''} | Area: ${header['area'] ?? ''} | Memo: ${header['memo_no'] ?? ''}';
+      _resultText = 'Extracted ${validatedItems.length} items. Priority: $priority\nCustomer: ${header['customer'] ?? ''} | Area: ${header['area'] ?? ''} | Memo: ${header['memo_no'] ?? ''}';
     });
+
+    if (needsFallback && _rawOcrDebug.isNotEmpty) {
+      _runGeminiFallbackMemo(header, items, imageFile, dbPartLocations);
+    }
+  }
+
+  Future<void> _runGeminiFallbackMemo(
+    Map<String, String> header, 
+    List<dynamic> items, 
+    File? imageFile,
+    Map<String, String> dbPartLocations
+  ) async {
+    setState(() {
+      _isGeminiProcessing = true;
+      _resultText += '\n[Local OCR incomplete. Running Gemini Fallback in background...]';
+    });
+    
+    try {
+      final geminiData = await GeminiFallbackService.correctOcrData(
+        _rawOcrDebug, 
+        header, 
+        items,
+        imageFile: imageFile,
+      );
+      
+      if (!mounted) return;
+
+      // Use Gemini's data
+      if (geminiData['header'] != null) {
+        header = Map<String, String>.from(geminiData['header']);
+      }
+      
+      List<Map<String, dynamic>> validatedItems = [];
+      if (geminiData['items'] != null) {
+         final geminiItems = geminiData['items'] as List<dynamic>;
+         
+         // Re-validate Gemini's items against DB
+         for (var item in geminiItems) {
+            String rawPartNo = item['part_no']?.toString() ?? '';
+            final extractedPartNo = BarcodeUtil.cleanExtractedPartNo(rawPartNo);
+            item['part_no'] = extractedPartNo;
+
+            final rawLoc = item['location']?.toString() ?? '';
+            final cleanedLoc = BarcodeUtil.cleanLocation(rawLoc);
+            item['location'] = cleanedLoc;
+
+            final bestMatch = BarcodeUtil.findBestMatchWithLocation(extractedPartNo, cleanedLoc, dbPartLocations);
+            
+            String validationStatus = 'Unknown (Not in DB)';
+            Color statusColor = Colors.orange;
+
+            if (bestMatch != null) {
+              final dbLoc = dbPartLocations[bestMatch];
+              validationStatus = 'Verified ($bestMatch)';
+              statusColor = Colors.green;
+              item['location_db'] = dbLoc;
+              item['part_no'] = bestMatch;
+            } else {
+              if (extractedPartNo.isEmpty) {
+                validationStatus = 'Failed to extract part no';
+                statusColor = Colors.red;
+              }
+            }
+
+            item['_validation_status'] = validationStatus;
+            item['_validation_color'] = statusColor.toARGB32();
+            validatedItems.add(item);
+         }
+      }
+      
+      setState(() {
+        if (validatedItems.isNotEmpty) {
+           _parsedItems = validatedItems;
+        }
+        _resultText = 'Gemini Fallback Complete.\nCustomer: ${header['customer'] ?? ''} | Area: ${header['area'] ?? ''} | Memo: ${header['memo_no'] ?? ''}';
+      });
+    } catch (e) {
+       _showError('Gemini fallback error: $e');
+    } finally {
+       if (mounted) {
+         setState(() {
+           _isGeminiProcessing = false;
+         });
+       }
+    }
   }
 
   Future<void> _processRedLabelResult(dynamic parsedData) async {
@@ -547,6 +574,8 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          if (_isGeminiProcessing)
+                            const LinearProgressIndicator(),
                           // Status bar + debug toggle
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
