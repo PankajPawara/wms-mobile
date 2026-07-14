@@ -83,7 +83,14 @@ class BarcodeUtil {
     final upper = value.toUpperCase().trim();
     // Normalize spaces/dots to hyphens before checking
     final normalized = upper.replaceAll(RegExp(r'[-.\s]+'), '-');
-    return _hondaPartPattern.hasMatch(normalized);
+    if (_hondaPartPattern.hasMatch(normalized)) return true;
+
+    // Also accept 10-15 length alphanumeric strings with NO hyphens/spaces (e.g. 12200K1LD00)
+    // Honda parts almost always start with 5 digits.
+    final unhyphenatedPattern = RegExp(r'^\d{5}[A-Z0-9]{5,10}$');
+    if (unhyphenatedPattern.hasMatch(upper.replaceAll(RegExp(r'[^A-Z0-9]'), ''))) return true;
+
+    return false;
   }
 
   /// Extract all Honda part numbers from OCR text and normalize them
@@ -91,11 +98,18 @@ class BarcodeUtil {
     final upper = text.toUpperCase();
     // Search for flexible part numbers containing spaces, dots, or hyphens
     final flexiblePattern = RegExp(r'\b[A-Z0-9]{4,6}[-.\s]+[A-Z0-9]{3}[-.\s]+[A-Z0-9]{3,5}\b');
-    return flexiblePattern
+    final matches = flexiblePattern
         .allMatches(upper)
         .map((m) => m.group(0)!.replaceAll(RegExp(r'[-.\s]+'), '-'))
-        .toSet()
         .toList();
+        
+    // Also extract unhyphenated parts
+    final unhyphenatedPattern = RegExp(r'\b\d{5}[A-Z0-9]{5,10}\b');
+    matches.addAll(
+      unhyphenatedPattern.allMatches(upper).map((m) => m.group(0)!)
+    );
+        
+    return matches.toSet().toList();
   }
 
   static String formatPartNo(String raw) {

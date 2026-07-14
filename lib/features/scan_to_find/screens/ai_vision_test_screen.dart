@@ -158,14 +158,20 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
         }
         rawDebugBuffer.writeln();
 
-        // Feed geometry to LocalOcrParser
-        final result = LocalOcrParser.parseTable(recognizedText);
-        allExtractedItems.addAll(result['items'] as List<dynamic>);
-        if (result['header'] != null) {
-          final header = result['header'] as Map<String, String>;
-          if (header['customer']?.isNotEmpty ?? false) extractedHeader['customer'] = header['customer']!;
-          if (header['area']?.isNotEmpty ?? false) extractedHeader['area'] = header['area']!;
-          if (header['memo_no']?.isNotEmpty ?? false) extractedHeader['memo_no'] = header['memo_no']!;
+        if (_mode == AIVisionMode.memo) {
+          // Feed geometry to LocalOcrParser for table parsing
+          final result = LocalOcrParser.parseTable(recognizedText);
+          allExtractedItems.addAll(result['items'] as List<dynamic>);
+          if (result['header'] != null) {
+            final header = result['header'] as Map<String, String>;
+            if (header['customer']?.isNotEmpty ?? false) extractedHeader['customer'] = header['customer']!;
+            if (header['area']?.isNotEmpty ?? false) extractedHeader['area'] = header['area']!;
+            if (header['memo_no']?.isNotEmpty ?? false) extractedHeader['memo_no'] = header['memo_no']!;
+          }
+        } else {
+          // Feed to Red Label parser
+          final result = LocalOcrParser.parseRedLabel(recognizedText);
+          allExtractedItems.add(result);
         }
       }
 
@@ -324,16 +330,51 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
   }
 
   Future<void> _processRedLabelResult(dynamic parsedData) async {
+    final items = parsedData['items'] as List<dynamic>? ?? [];
+    
+    // Optional: Re-validate part numbers against local inventory if we want the validation tick
+    final repo = ref.read(inventoryRepositoryProvider);
+    final dbPartLocations = await repo.getAllPartLocations();
+    
+    List<Map<String, dynamic>> validatedItems = [];
+    for (var i in items) {
+       final item = Map<String, dynamic>.from(i);
+       String extractedPartNo = item['part_no']?.toString() ?? '';
+       
+       String validationStatus = 'Unknown (Not in DB)';
+       Color statusColor = Colors.orange;
+
+       if (extractedPartNo.isNotEmpty) {
+         // Attempt exact match first, since part_no was cleaned
+         if (dbPartLocations.containsKey(extractedPartNo)) {
+           validationStatus = 'Verified ($extractedPartNo)';
+           statusColor = Colors.green;
+           item['location_db'] = dbPartLocations[extractedPartNo];
+         }
+       } else {
+         validationStatus = 'Failed to extract part no';
+         statusColor = Colors.red;
+       }
+
+       item['_validation_status'] = validationStatus;
+       item['_validation_color'] = statusColor.toARGB32();
+       validatedItems.add(item);
+    }
+    
     setState(() {
-      _parsedItems = [parsedData];
-      _resultText = 'Red Label Data Extracted Successfully';
+      _parsedItems = validatedItems;
+      _resultText = 'Red Label Data Extracted using Local Rules';
     });
   }
 
   void _showError(String msg) {
     if (!mounted) return;
+    
+    // Truncate long error messages so they don't take up the whole screen
+    final displayMsg = msg.length > 200 ? '${msg.substring(0, 200)}...' : msg;
+    
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red, duration: const Duration(seconds: 4)),
+      SnackBar(content: Text(displayMsg), backgroundColor: Colors.red, duration: const Duration(seconds: 4)),
     );
   }
 

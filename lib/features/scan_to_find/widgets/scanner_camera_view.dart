@@ -230,6 +230,23 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     }
   }
 
+  Future<XFile?> takePicture() async {
+    if (_controller == null || !_controller!.value.isInitialized) return null;
+    if (_controller!.value.isTakingPicture) return null;
+    
+    try {
+      if (_controller!.value.isStreamingImages) {
+        await _controller!.stopImageStream();
+      }
+      final file = await _controller!.takePicture();
+      return file;
+    } catch (e) {
+      if (kDebugMode) print('Error taking picture: $e');
+      restartFeed();
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_controller == null || !_controller!.value.isInitialized) {

@@ -182,6 +182,19 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
             ))
           .get();
 
+      // Filter exact matches to prioritize them and fix the multiple locations issue
+      if (matches.length > 1) {
+         final exactMatches = matches.where((m) {
+            final partNo = m.partNo.toUpperCase().replaceAll('O', '0');
+            final bc = m.barcode?.toUpperCase().replaceAll('O', '0') ?? '';
+            return partNo == queryBarcode || bc == queryBarcode;
+         }).toList();
+         
+         if (exactMatches.isNotEmpty) {
+            matches = exactMatches;
+         }
+      }
+
       if (matches.isEmpty && isOcr) {
         // Run fuzzy match
         final allParts = await db.select(db.inventory).get();
@@ -937,6 +950,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       'code': m.location,
       'area': 'MAIN WAREHOUSE',
       'stock': '--',
+      'partNo': m.partNo,
     }).toList();
     return Column(
       key: const ValueKey('multiple'),
@@ -1033,6 +1047,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                       fontWeight: FontWeight.bold,
                                       fontSize: 28,
                                       color: Theme.of(context).colorScheme.onSurface)),
+                              Text('${loc['partNo']}', 
+                                  style: const TextStyle(
+                                      fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
                               Text(loc['area'] as String,
                                   style: TextStyle(
                                       fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
@@ -1120,19 +1137,64 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     });
   }
 
-  void _triggerCameraScan() {
+  Future<void> _triggerCameraScan() async {
     setState(() {
       _isDetecting = true;
     });
 
-    _detectionTimer?.cancel();
-    _detectionTimer = Timer(const Duration(seconds: 2), () {
+    try {
+      final image = await _scannerKey.currentState?.takePicture();
+      if (image == null) {
+        setState(() {
+          _isDetecting = false;
+        });
+        return;
+      }
+
+      final inputImage = InputImage.fromFilePath(image.path);
+      
+      // Also try barcode scanning on the captured image just in case
+      final barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);
+      final barcodes = await barcodeScanner.processImage(inputImage);
+      await barcodeScanner.close();
+
+      if (barcodes.isNotEmpty) {
+        final rawVal = barcodes.first.rawValue;
+        if (rawVal != null && rawVal.isNotEmpty) {
+          await _searchProduct(rawVal, false);
+          return;
+        }
+      }
+
+      // If no barcode, try OCR
+      final textRecognizer = TextRecognizer();
+      final recognizedText = await textRecognizer.processImage(inputImage);
+      await textRecognizer.close();
+
+      final partNumbers = BarcodeUtil.extractPartNumbers(recognizedText.text);
+
+      if (partNumbers.isNotEmpty) {
+        await _searchProduct(partNumbers.first, true);
+      } else {
+        // Fallback simple regex
+        final reg = RegExp(r'\b\d{8,14}\b');
+        final matches = reg.allMatches(recognizedText.text);
+        if (matches.isNotEmpty) {
+          await _searchProduct(matches.first.group(0)!, true);
+        } else {
+          _showScanFailedDialog();
+        }
+      }
+    } catch (e) {
+      _showScanFailedDialog();
+    } finally {
       if (mounted) {
         setState(() {
           _isDetecting = false;
         });
+        _scannerKey.currentState?.restartFeed();
       }
-    });
+    }
   }
 
   void _showScanFailedDialog() {
