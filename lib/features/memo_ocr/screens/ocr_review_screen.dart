@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' hide Column;
@@ -6,6 +9,7 @@ import 'package:drift/drift.dart' hide Column;
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/services/gemini_fallback_service.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../core/database/app_database.dart';
@@ -16,6 +20,8 @@ class OcrReviewScreen extends ConsumerStatefulWidget {
   final String? customerName;
   final String? customerLocation;
   final String? memoNumber;
+  final String? rawText;
+  final String? imagePath;
 
   const OcrReviewScreen({
     super.key,
@@ -23,6 +29,8 @@ class OcrReviewScreen extends ConsumerStatefulWidget {
     this.customerName,
     this.customerLocation,
     this.memoNumber,
+    this.rawText,
+    this.imagePath,
   });
 
   @override
@@ -32,6 +40,9 @@ class OcrReviewScreen extends ConsumerStatefulWidget {
 class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
   late List<Map<String, dynamic>> _items;
   bool _isLoading = true;
+  bool _isAiEnhancing = false;
+  String? _geminiRawResponse;
+
   late TextEditingController _customerNameController;
   late TextEditingController _customerLocationController;
   late TextEditingController _memoNumberController;
@@ -42,7 +53,11 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
     _customerNameController = TextEditingController(text: widget.customerName);
     _customerLocationController = TextEditingController(text: widget.customerLocation);
     _memoNumberController = TextEditingController(text: widget.memoNumber);
-    _resolveExtractedItems();
+    _resolveExtractedItems().then((_) {
+      if (widget.rawText != null && widget.rawText!.isNotEmpty) {
+        _runGeminiEnhancement();
+      }
+    });
   }
 
   @override
@@ -214,6 +229,207 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
     }
   }
 
+  Future<void> _runGeminiEnhancement() async {
+    if (!mounted) return;
+    setState(() => _isAiEnhancing = true);
+
+    try {
+      final header = {
+        'customerName': widget.customerName ?? '',
+        'customerLocation': widget.customerLocation ?? '',
+        'memoNumber': widget.memoNumber ?? '',
+      };
+
+      File? imageFile;
+      if (widget.imagePath != null) {
+        imageFile = File(widget.imagePath!);
+      }
+
+      final result = await GeminiFallbackService.correctOcrData(
+        widget.rawText!,
+        header,
+        widget.extractedItems,
+        imageFile: imageFile,
+      );
+
+      if (!mounted) return;
+      
+      setState(() {
+        _geminiRawResponse = const JsonEncoder.withIndent('  ').convert(result);
+      });
+
+      // Update Header if Gemini found better ones
+      final newHeader = result['header'] as Map<String, dynamic>?;
+      if (newHeader != null) {
+        if (newHeader['customer'] != null && newHeader['customer'].toString().isNotEmpty) {
+          _customerNameController.text = newHeader['customer'].toString();
+        }
+        if (newHeader['area'] != null && newHeader['area'].toString().isNotEmpty) {
+          _customerLocationController.text = newHeader['area'].toString();
+        }
+        if (newHeader['memo_no'] != null && newHeader['memo_no'].toString().isNotEmpty) {
+          _memoNumberController.text = newHeader['memo_no'].toString();
+        }
+      }
+
+      // Update Items
+      final newItems = result['items'] as List<dynamic>?;
+      if (newItems != null && newItems.isNotEmpty) {
+        final List<Map<String, dynamic>> updatedExtracted = newItems.map((e) => e as Map<String, dynamic>).toList();
+        
+        // Re-resolve the items to get DB stock/location
+        final List<Map<String, dynamic>> resolved = [];
+        for (final item in updatedExtracted) {
+          final partNo = item['part_no']?.toString() ?? '';
+          final requiredQty = int.tryParse(item['qty']?.toString() ?? '1') ?? 1;
+          final price = double.tryParse(item['mrp']?.toString() ?? '0') ?? 0.0;
+          final ocrDescription = item['description']?.toString();
+          final ocrLocation = item['location']?.toString();
+          final ocrStock = int.tryParse(item['stock']?.toString() ?? '0');
+          final ocrPack = int.tryParse(item['pack']?.toString() ?? '0');
+
+          final resolvedResult = await _resolvePartNo(partNo);
+          if (resolvedResult != null) {
+            final dbItem = resolvedResult['item'] as InventoryData;
+            resolved.add({
+              'part_no': resolvedResult['part_no'],
+              'required_qty': requiredQty,
+              'price': price > 0 ? price : dbItem.price,
+              'description': dbItem.description != null && dbItem.description!.isNotEmpty
+                  ? dbItem.description!
+                  : (ocrDescription != null && ocrDescription.isNotEmpty ? ocrDescription : ''),
+              'location': dbItem.location.isNotEmpty
+                  ? dbItem.location
+                  : (ocrLocation != null && ocrLocation.isNotEmpty ? ocrLocation : 'LOCATION NOT DEFINED'),
+              'stock': dbItem.stock > 0 ? dbItem.stock : (ocrStock ?? 0),
+              'pack': ocrPack ?? 0,
+              'match_status': 'verified',
+            });
+          } else {
+            resolved.add({
+              'part_no': partNo,
+              'required_qty': requiredQty,
+              'price': price,
+              'description': ocrDescription != null && ocrDescription.isNotEmpty
+                  ? ocrDescription
+                  : 'Unrecognized Part',
+              'location': ocrLocation != null && ocrLocation.isNotEmpty
+                  ? ocrLocation
+                  : 'LOCATION NOT DEFINED',
+              'stock': ocrStock ?? 0,
+              'pack': ocrPack ?? 0,
+              'match_status': 'unmatched',
+            });
+          }
+        }
+        
+        if (mounted) {
+          setState(() {
+            _items = resolved;
+          });
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ AI Enhancement complete!'), backgroundColor: AppColors.success),
+        );
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('AI Enhancement failed: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAiEnhancing = false);
+      }
+    }
+  }
+
+  void _showDebugDrawer() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.8,
+          maxChildSize: 0.95,
+          minChildSize: 0.4,
+          expand: false,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Developer Debug Panel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => context.pop()),
+                    ],
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        _buildDebugSection('RAW ML Kit Output', widget.rawText ?? 'No local OCR text available.'),
+                        const SizedBox(height: 24),
+                        _buildDebugSection('RAW Gemini JSON', _geminiRawResponse ?? 'No Gemini response yet.'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDebugSection(String title, String content) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+            TextButton.icon(
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Copy'),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: content));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$title copied to clipboard!')));
+              },
+            ),
+          ],
+        ),
+        Container(
+          height: 200,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade900,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SingleChildScrollView(
+            child: Text(
+              content,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.greenAccent),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -225,6 +441,11 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
         backgroundColor: AppColors.primary,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            onPressed: _showDebugDrawer,
+            tooltip: 'Debug Panel',
+          ),
           Padding(
             padding: const EdgeInsets.only(right: AppDimensions.md),
             child: Center(
@@ -241,6 +462,28 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                if (_isAiEnhancing)
+                  Container(
+                    width: double.infinity,
+                    color: Colors.blue.shade50,
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '🤖 AI is enhancing extraction. Please wait...',
+                          style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w500, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_isAiEnhancing)
+                  const LinearProgressIndicator(minHeight: 2),
                 // Memo Details Header Form
                 Container(
                   padding: const EdgeInsets.all(AppDimensions.md),

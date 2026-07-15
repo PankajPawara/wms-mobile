@@ -83,6 +83,8 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
           'customerName': customerName,
           'customerLocation': customerLocation,
           'memoNumber': memoNumber,
+          'rawText': rawText,
+          'imagePath': _imageFile?.path,
         });
       }
     } catch (e) {

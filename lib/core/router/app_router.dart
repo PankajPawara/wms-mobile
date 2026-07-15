@@ -81,6 +81,8 @@ GoRouter appRouter(AppRouterRef ref) {
             customerName: extra?['customerName'] as String?,
             customerLocation: extra?['customerLocation'] as String?,
             memoNumber: extra?['memoNumber'] as String?,
+            rawText: extra?['rawText'] as String?,
+            imagePath: extra?['imagePath'] as String?,
           );
         },
       ),
