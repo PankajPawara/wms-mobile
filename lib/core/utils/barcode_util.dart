@@ -328,6 +328,91 @@ class BarcodeUtil {
     return results;
   }
 
+  /// Extract red label part details from OCR text
+  static Map<String, dynamic> parseRedLabelOcrText(String text) {
+    final lines = text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+
+    String? partNo;
+    int? qty;
+    double? mrp;
+    String? productName;
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final upperLine = line.toUpperCase();
+
+      // 1. Part No
+      final cleaned = cleanExtractedPartNo(line.replaceAll(RegExp(r'[^A-Za-z0-9]'), ''));
+      if (cleaned.length >= 7 && cleaned.length <= 15 && partNo == null) {
+        if (isHondaPartNo(cleaned)) {
+          partNo = line; // Preserve original formatting for display if needed
+        }
+      }
+
+      // 2. Quantity
+      if (qty == null && (upperLine.contains("QTY") || upperLine.contains("QUANTITY") || upperLine.contains("NUMBER(S)"))) {
+        final match = RegExp(r'\d+').firstMatch(line);
+        if (match != null) {
+          qty = int.tryParse(match.group(0)!);
+        }
+      }
+
+      // 3. MRP (Per piece)
+      if (mrp == null && (upperLine.contains("PER NUMBER") || upperLine.contains("PER PIECE") || upperLine.contains("PER UNIT") || upperLine.contains("EACH") || upperLine.contains("MRP"))) {
+        // Remove spaces and commas
+        final cleanLine = line.replaceAll(RegExp(r'[,\s]'), '');
+        final decimalMatch = RegExp(r'\d+\.\d{2}').firstMatch(cleanLine);
+        
+        if (decimalMatch != null) {
+           mrp = double.tryParse(decimalMatch.group(0)!);
+        } else {
+           final match = RegExp(r'\d+').firstMatch(cleanLine);
+           if (match != null) {
+              mrp = double.tryParse(match.group(0)!);
+           }
+        }
+      }
+
+      // 4. Product Name
+      if (productName == null) {
+        if (upperLine.contains("PRODUCT")) {
+          final parts = line.split(RegExp(r':'));
+          if (parts.length > 1 && parts[1].trim().isNotEmpty) {
+            productName = parts[1].trim();
+          } else if (i + 1 < lines.length) {
+            for (int j = i + 1; j < lines.length; j++) {
+              final nextLine = lines[j].trim();
+              if (nextLine.isEmpty) continue;
+              
+              final upperNextLine = nextLine.toUpperCase();
+              
+              if (upperNextLine.contains("PER NUMBER") || 
+                  upperNextLine.contains("PER PIECE") ||
+                  upperNextLine.contains("PER UNIT") ||
+                  upperNextLine.contains("MRP") ||
+                  upperNextLine.contains("MANUFACTURED") ||
+                  isHondaPartNo(cleanExtractedPartNo(nextLine.replaceAll(RegExp(r'[^A-Za-z0-9]'), '')))) {
+                continue;
+              }
+              if (nextLine == upperNextLine && nextLine.contains(RegExp(r'[A-Z]'))) {
+                 productName = nextLine;
+                 break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      'part_no': partNo != null ? cleanExtractedPartNo(partNo) : '',
+      'raw_part_no': partNo ?? '',
+      'qty': qty ?? 0,
+      'mrp': mrp ?? 0.0,
+      'description': productName ?? '',
+    };
+  }
+
   /// Normalize string to wildcard string by replacing common confused characters
   static String _normalizeFuzzy(String s) {
     // Confusions:

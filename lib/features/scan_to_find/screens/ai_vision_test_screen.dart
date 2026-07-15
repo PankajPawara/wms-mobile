@@ -7,7 +7,6 @@ import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../settings/repositories/inventory_repository.dart';
 import '../../../core/utils/barcode_util.dart';
-import '../../../core/utils/local_ocr_parser.dart';
 import '../../../core/services/gemini_fallback_service.dart';
 import '../../../shared/widgets/app_button.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -160,18 +159,21 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
         rawDebugBuffer.writeln();
 
         if (_mode == AIVisionMode.memo) {
-          // Feed geometry to LocalOcrParser for table parsing
-          final result = LocalOcrParser.parseTable(recognizedText);
-          allExtractedItems.addAll(result['items'] as List<dynamic>);
-          if (result['header'] != null) {
-            final header = result['header'] as Map<String, String>;
-            if (header['customer']?.isNotEmpty ?? false) extractedHeader['customer'] = header['customer']!;
-            if (header['area']?.isNotEmpty ?? false) extractedHeader['area'] = header['area']!;
-            if (header['memo_no']?.isNotEmpty ?? false) extractedHeader['memo_no'] = header['memo_no']!;
-          }
+          // Use the highly robust Regex-based BarcodeUtil parser for the pickup list memo
+          final items = BarcodeUtil.parseOcrText(recognizedText.text);
+          allExtractedItems.addAll(items);
+          
+          final customer = BarcodeUtil.extractCustomerName(recognizedText.text);
+          if (customer != null && customer.isNotEmpty) extractedHeader['customer'] = customer;
+          
+          final area = BarcodeUtil.extractArea(recognizedText.text);
+          if (area != null && area.isNotEmpty) extractedHeader['area'] = area;
+          
+          final memoNo = BarcodeUtil.extractMemoNumber(recognizedText.text);
+          if (memoNo != null && memoNo.isNotEmpty) extractedHeader['memo_no'] = memoNo;
         } else {
           // Feed to Red Label parser
-          final result = LocalOcrParser.parseRedLabel(recognizedText);
+          final result = BarcodeUtil.parseRedLabelOcrText(recognizedText.text);
           allExtractedItems.add(result);
         }
       }
