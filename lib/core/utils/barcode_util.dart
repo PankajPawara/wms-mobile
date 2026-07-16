@@ -546,3 +546,156 @@ class BarcodeUtil {
     return null;
   }
 }
+
+// -------------------------------------------------------------------------------
+// PART NUMBER PARSER — Live Barcode Scanner ONLY
+// -------------------------------------------------------------------------------
+// Do NOT use in Pickup List or Red Label parsers.
+//
+// Supported Part Number Patterns:
+//   Type 1: HYPHENATED     — \d{5}-[A-Z0-9]{3}-[A-Z0-9]{3,5}
+//   Type 2: UNHYPHENATED   — \d{5}[A-Z0-9]{5,10}
+//   Type 3: NUMERIC        — \d{8,14}  (EAN/UPC barcodes)
+//   Type 4: ALPHANUMERIC   — [A-Z][A-Z0-9]{3,9}
+//
+// OCR Correction (applied to NUMERIC segments only):
+//   S?5  O/Q?0  B?8  I/L?1  Z?2  G?6  E?3
+// -------------------------------------------------------------------------------
+
+enum PartPattern { hyphenated, unhyphenated, numericBarcode, alphanumeric, unknown }
+
+class ParsedPartNumber {
+  final String original;
+  final String normalized;
+  final String ocrCorrected;
+  final PartPattern pattern;
+  final List<String> candidates;
+
+  const ParsedPartNumber({
+    required this.original,
+    required this.normalized,
+    required this.ocrCorrected,
+    required this.pattern,
+    required this.candidates,
+  });
+}
+
+class ScanSearchResult {
+  final String matchedPartNo;
+  final String matchMethod; // 'exact', 'normalized', 'ocr_corrected', 'fuzzy'
+  final double confidenceScore;
+
+  const ScanSearchResult({
+    required this.matchedPartNo,
+    required this.matchMethod,
+    required this.confidenceScore,
+  });
+}
+
+class PartNumberParser {
+  PartNumberParser._();
+
+  static final RegExp _hyphenated = RegExp(r'\b[A-Z0-9]{4,6}-[A-Z0-9]{3}-[A-Z0-9]{3,5}\b');
+  static final RegExp _unhyphenated = RegExp(r'\b\d{5}[A-Z0-9]{5,10}\b');
+  static final RegExp _numericBarcode = RegExp(r'\b\d{8,14}\b');
+  static final RegExp _flexibleHyphenated = RegExp(
+      r'\b[A-Z0-9]{4,6}[.\s\-]+[A-Z0-9]{3}[.\s\-]+[A-Z0-9]{3,5}\b');
+
+  static PartPattern _identifyPattern(String s) {
+    final upper = s.toUpperCase();
+    if (_hyphenated.hasMatch(upper)) return PartPattern.hyphenated;
+    if (_unhyphenated.hasMatch(upper)) return PartPattern.unhyphenated;
+    if (_numericBarcode.hasMatch(upper)) return PartPattern.numericBarcode;
+    if (RegExp(r'\b[A-Z][A-Z0-9]{3,9}\b').hasMatch(upper)) return PartPattern.alphanumeric;
+    return PartPattern.unknown;
+  }
+
+  /// Normalize: uppercase, collapse odd separators.
+  static String normalize(String raw) {
+    return raw.trim().toUpperCase()
+        .replaceAll(RegExp(r'[^A-Z0-9\-]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  /// Apply pattern-aware OCR corrections.
+  /// Digit corrections are applied ONLY to the numeric prefix before the first '-'.
+  static String applyFuzzyCorrection(String normalized) {
+    if (normalized.contains('-')) {
+      final parts = normalized.split('-');
+      if (parts.isNotEmpty) {
+        final correctedPrefix = _correctNumericSegment(parts[0]);
+        return ([correctedPrefix, ...parts.sublist(1)]).join('-');
+      }
+    }
+    if (normalized.length >= 10 && RegExp(r'^[A-Z0-9]{10,}$').hasMatch(normalized)) {
+      final prefix = normalized.substring(0, 5);
+      final suffix = normalized.substring(5);
+      return _correctNumericSegment(prefix) + suffix;
+    }
+    if (_numericBarcode.hasMatch(normalized)) {
+      return _correctNumericSegment(normalized);
+    }
+    return normalized.replaceAll('O', '0').replaceAll('Q', '0');
+  }
+
+  static String _correctNumericSegment(String segment) {
+    return segment
+        .replaceAll('O', '0').replaceAll('Q', '0')
+        .replaceAll('S', '5')
+        .replaceAll('B', '8')
+        .replaceAll('I', '1').replaceAll('L', '1')
+        .replaceAll('Z', '2')
+        .replaceAll('G', '6')
+        .replaceAll('E', '3');
+  }
+
+  /// Extract all candidate part numbers from a raw OCR text block.
+  static List<String> extractCandidates(String rawOcrText) {
+    final upper = rawOcrText.toUpperCase();
+    final candidates = <String>{};
+
+    for (final match in _flexibleHyphenated.allMatches(upper)) {
+      final raw = match.group(0)!;
+      final normalized = raw.replaceAll(RegExp(r'[.\s]+'), '-');
+      candidates.add(applyFuzzyCorrection(normalize(normalized)));
+    }
+    for (final match in _unhyphenated.allMatches(upper)) {
+      candidates.add(applyFuzzyCorrection(match.group(0)!));
+    }
+    for (final match in _numericBarcode.allMatches(upper)) {
+      candidates.add(match.group(0)!);
+    }
+
+    return candidates.where((c) => c.length >= 8).toList();
+  }
+
+  /// Parse a single raw value (from barcode or OCR) into a ParsedPartNumber.
+  static ParsedPartNumber parse(String raw) {
+    final normalized = normalize(raw);
+    final ocrCorrected = applyFuzzyCorrection(normalized);
+    final pattern = _identifyPattern(ocrCorrected);
+
+    final candidates = <String>{};
+    candidates.add(raw.trim().toUpperCase());
+    candidates.add(normalized);
+    candidates.add(ocrCorrected);
+
+    final stripped = ocrCorrected.replaceAll('-', '');
+    if (stripped.isNotEmpty) candidates.add(stripped);
+
+    if (pattern == PartPattern.unhyphenated && stripped.length >= 11) {
+      final reformatted =
+          '${stripped.substring(0, 5)}-${stripped.substring(5, 8)}-${stripped.substring(8)}';
+      candidates.add(reformatted);
+    }
+
+    return ParsedPartNumber(
+      original: raw,
+      normalized: normalized,
+      ocrCorrected: ocrCorrected,
+      pattern: pattern,
+      candidates: candidates.where((c) => c.length >= 5).toList(),
+    );
+  }
+}

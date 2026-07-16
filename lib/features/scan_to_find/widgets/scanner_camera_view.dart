@@ -30,9 +30,11 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
   List<CameraDescription> _cameras = [];
 
   final BarcodeScanner _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);
+  final TextRecognizer _textRecognizer = TextRecognizer();
   
   bool _isProcessing = false;
   bool _isDisposed = false;
+  DateTime? _lastOcrAttempt; // Throttle OCR to once per second
 
   @override
   void initState() {
@@ -104,6 +106,7 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     WidgetsBinding.instance.removeObserver(this);
     _stopLiveFeed();
     _barcodeScanner.close();
+    _textRecognizer.close();
     super.dispose();
   }
 
@@ -129,6 +132,7 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     }
 
     try {
+      // ── TIER 1: Barcode Detection (fast path) ────────────────────────────
       final barcodes = await _barcodeScanner.processImage(inputImage);
       if (barcodes.isNotEmpty) {
         for (final barcode in barcodes) {
@@ -136,14 +140,53 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
           if (rawVal != null && rawVal.isNotEmpty) {
             final success = await widget.onResult(rawVal, false);
             if (success) {
-              _stopLiveFeed(); // Stop on success
-              return; // We are done!
+              _stopLiveFeed();
+              return;
             }
+          }
+        }
+        // Barcode found but DB returned no match — keep scanning silently
+        return;
+      }
+
+      // ── TIER 2: OCR Fallback (throttled to 1 per second) ────────────────
+      final now = DateTime.now();
+      final lastAttempt = _lastOcrAttempt;
+      if (lastAttempt != null &&
+          now.difference(lastAttempt).inMilliseconds < 1000) {
+        return; // Throttle: skip this frame
+      }
+      _lastOcrAttempt = now;
+
+      final recognizedText = await _textRecognizer.processImage(inputImage);
+      final fullText = recognizedText.text;
+      if (fullText.trim().isEmpty) return;
+
+      // Extract all valid part number candidates using the PartNumberParser
+      final candidates = PartNumberParser.extractCandidates(fullText);
+      if (candidates.isNotEmpty) {
+        for (final candidate in candidates) {
+          if (_isDisposed || !mounted) return;
+          final success = await widget.onResult(candidate, true);
+          if (success) {
+            _stopLiveFeed();
+            return;
+          }
+        }
+      } else {
+        // No structured part found — pass raw text so the screen can try manual search
+        // Only do this if OCR confidence is high (more than 3 words)
+        final words = fullText.trim().split(RegExp(r'\s+'));
+        if (words.length >= 2) {
+          // Pass the first token that looks like it could be a part number
+          final firstCandidate = PartNumberParser.normalize(words.first);
+          if (firstCandidate.length >= 5) {
+            await widget.onResult(firstCandidate, true);
           }
         }
       }
     } catch (e) {
-      if (kDebugMode) print('Error processing frame: $e');
+      if (kDebugMode) print('[Scanner] Error processing frame: $e');
     } finally {
       if (!_isDisposed) {
         _isProcessing = false;

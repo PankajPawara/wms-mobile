@@ -166,49 +166,112 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     super.dispose();
   }
 
-  Future<bool> _searchProduct(String barcode, bool isOcr) async {
+  Future<bool> _searchProduct(String rawInput, bool isOcr) async {
+    // ── Parse the input using the centralized PartNumberParser ───────────────
+    final parsed = PartNumberParser.parse(rawInput);
+
     setState(() {
-      _scannedBarcode = barcode;
+      _scannedBarcode = parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : rawInput;
       _state = _ScanState.searching;
     });
 
     try {
       final db = ref.read(appDatabaseProvider);
-      var queryBarcode = barcode.trim().toUpperCase().replaceAll('O', '0');
-      
-      var matches = await (db.select(db.inventory)
-            ..where((t) => 
-              CustomExpression<bool>("REPLACE(UPPER(barcode), 'O', '0') LIKE '%$queryBarcode%' OR REPLACE(UPPER(part_no), 'O', '0') LIKE '%$queryBarcode%'")
-            ))
-          .get();
+      List<InventoryData> matches = [];
+      String matchedQuery = '';
+      String matchMethod = '';
 
-      // Filter exact matches to prioritize them and fix the multiple locations issue
-      if (matches.length > 1) {
-         final exactMatches = matches.where((m) {
-            final partNo = m.partNo.toUpperCase().replaceAll('O', '0').replaceAll(RegExp(r'[-.\s]'), '');
-            final bc = m.barcode.toUpperCase().replaceAll('O', '0').replaceAll(RegExp(r'[-.\s]'), '');
-            final q = queryBarcode.replaceAll(RegExp(r'[-.\s]'), '');
-            return partNo == q || bc == q;
-         }).toList();
-         
-         if (exactMatches.isNotEmpty) {
-            matches = exactMatches;
-         }
-      }
-
-      if (matches.isEmpty && isOcr) {
-        // Run fuzzy match
-        final allParts = await db.select(db.inventory).get();
-        final partNumbersList = allParts.map((e) => e.partNo).toList();
-        final bestMatch = BarcodeUtil.findBestMatch(queryBarcode, partNumbersList);
-        if (bestMatch != null) {
-           queryBarcode = bestMatch;
-           matches = await (db.select(db.inventory)
-                ..where((t) => t.partNo.equals(bestMatch)))
-              .get();
+      // ── TIER 1: Exact Match ───────────────────────────────────────────────
+      for (final candidate in parsed.candidates) {
+        if (candidate.isEmpty) continue;
+        final results = await (db.select(db.inventory)
+              ..where((t) =>
+                  CustomExpression<bool>(
+                    "UPPER(part_no) = '${candidate.replaceAll("'", "''")}' OR UPPER(barcode) = '${candidate.replaceAll("'", "''")}'"
+                  )))
+            .get();
+        if (results.isNotEmpty) {
+          matches = results;
+          matchedQuery = candidate;
+          matchMethod = 'exact';
+          break;
         }
       }
 
+      // ── TIER 2: Normalized Match (strip all separators, LIKE search) ──────
+      if (matches.isEmpty) {
+        for (final candidate in parsed.candidates) {
+          if (candidate.isEmpty) continue;
+          final stripped = candidate.replaceAll(RegExp(r'[-.\s]'), '');
+          if (stripped.length < 5) continue;
+          final results = await (db.select(db.inventory)
+                ..where((t) => CustomExpression<bool>(
+                    "REPLACE(REPLACE(UPPER(part_no),'-',''),' ','') LIKE '%$stripped%' OR REPLACE(REPLACE(UPPER(barcode),'-',''),' ','') LIKE '%$stripped%'")))
+              .get();
+          if (results.isNotEmpty) {
+            // Prefer exact stripped match over LIKE
+            final exactStripped = results.where((r) {
+              final pn = r.partNo.toUpperCase().replaceAll(RegExp(r'[-.\s]'), '');
+              return pn == stripped;
+            }).toList();
+            matches = exactStripped.isNotEmpty ? exactStripped : results;
+            matchedQuery = candidate;
+            matchMethod = 'normalized';
+            break;
+          }
+        }
+      }
+
+      // ── TIER 3: OCR Corrected Match ───────────────────────────────────────
+      if (matches.isEmpty) {
+        final corrected = parsed.ocrCorrected;
+        if (corrected.isNotEmpty) {
+          // SQL-level O→0 replacement + LIKE
+          final correctedQuery = corrected.replaceAll("'", "''");
+          final results = await (db.select(db.inventory)
+                ..where((t) => CustomExpression<bool>(
+                    "REPLACE(UPPER(part_no),'O','0') LIKE '%${correctedQuery.replaceAll('O', '0')}%' OR REPLACE(UPPER(barcode),'O','0') LIKE '%${correctedQuery.replaceAll('O', '0')}%'")))
+              .get();
+          if (results.isNotEmpty) {
+            matches = results;
+            matchedQuery = corrected;
+            matchMethod = 'ocr_corrected';
+          }
+        }
+      }
+
+      // ── TIER 4: Fuzzy Candidate Match (BarcodeUtil.findBestMatch) ─────────
+      if (matches.isEmpty && isOcr) {
+        final allParts = await db.select(db.inventory).get();
+        final partNumbersList = allParts.map((e) => e.partNo).toList();
+        for (final candidate in parsed.candidates) {
+          final bestMatch = BarcodeUtil.findBestMatch(candidate, partNumbersList);
+          if (bestMatch != null) {
+            final results = await (db.select(db.inventory)
+                  ..where((t) => t.partNo.equals(bestMatch)))
+                .get();
+            if (results.isNotEmpty) {
+              matches = results;
+              matchedQuery = bestMatch;
+              matchMethod = 'fuzzy';
+              break;
+            }
+          }
+        }
+      }
+
+      // ── Filter out sub-matches to prefer the most exact hit ──────────────
+      if (matches.length > 1) {
+        final mq = matchedQuery.replaceAll(RegExp(r'[-.\s]'), '');
+        final exactMatches = matches.where((m) {
+          final pn = m.partNo.toUpperCase().replaceAll(RegExp(r'[-.\s]'), '');
+          final bc = m.barcode.toUpperCase().replaceAll(RegExp(r'[-.\s]'), '');
+          return pn == mq || bc == mq;
+        }).toList();
+        if (exactMatches.isNotEmpty) matches = exactMatches;
+      }
+
+      // ── Handle local DB match ─────────────────────────────────────────────
       if (matches.isNotEmpty) {
         ScanFeedback.triggerSuccess();
         _addRecordToHistory(matches.first.partNo);
@@ -216,7 +279,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         if (matches.length == 1) {
           final match = matches.first;
           setState(() {
-            _scannedBarcode = match.partNo; // update to the matched part no
+            _scannedBarcode = match.partNo;
             _foundProduct = {
               'partNo': match.partNo,
               'description': match.description ?? '',
@@ -224,6 +287,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
               'locationLabel': 'Location: ${match.location}',
               'area': 'MAIN WAREHOUSE',
               'multipleLocations': false,
+              'matchMethod': matchMethod,
             };
             _state = _ScanState.found;
           });
@@ -236,67 +300,75 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         return true;
       }
 
-      final api = ref.read(apiClientProvider);
-      final response = await api.get(ApiEndpoints.inventoryBarcode(queryBarcode));
-      final data = response['data'] as Map<String, dynamic>?;
-      final product = data?['product'] as Map<String, dynamic>?;
+      // ── API Fallback ──────────────────────────────────────────────────────
+      try {
+        final api = ref.read(apiClientProvider);
+        final queryForApi = parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : rawInput;
+        final response = await api.get(ApiEndpoints.inventoryBarcode(queryForApi));
+        final data = response['data'] as Map<String, dynamic>?;
+        final product = data?['product'] as Map<String, dynamic>?;
 
-      if (product != null) {
-        ScanFeedback.triggerSuccess();
-        _addRecordToHistory(product['part_no'] ?? '');
-        if (!mounted) return true;
-        setState(() {
-          _scannedBarcode = product['part_no'] ?? queryBarcode;
-          _foundProduct = {
-            'partNo': product['part_no'] ?? '',
-            'description': product['description'] ?? '',
-            'location': product['location'] ?? '',
-            'locationLabel': 'Location: ${product['location'] ?? ''}',
-            'area': 'MAIN WAREHOUSE',
-            'multipleLocations': false,
-          };
-          _state = _ScanState.found;
-        });
-        return true;
-      } else {
-        if (!mounted) return false;
-        if (!isOcr) {
-           // For barcode, we just return false and keep scanning
-           setState(() {
-             _state = _ScanState.scanning; // Go back to scanning silently
-           });
-           return false;
-        } else {
-           ScanFeedback.triggerError();
-           setState(() {
-             _state = _ScanState.scanning;
-             _isManualMode = true;
-             _manualController.text = _scannedBarcode;
-             _manualSearchQuery = _scannedBarcode;
-             _searchByField = 'Part No';
-           });
-           _performManualSearch();
-           return false;
+        if (product != null) {
+          ScanFeedback.triggerSuccess();
+          _addRecordToHistory(product['part_no'] ?? '');
+          if (!mounted) return true;
+          setState(() {
+            _scannedBarcode = product['part_no'] ?? queryForApi;
+            _foundProduct = {
+              'partNo': product['part_no'] ?? '',
+              'description': product['description'] ?? '',
+              'location': product['location'] ?? '',
+              'locationLabel': 'Location: ${product['location'] ?? ''}',
+              'area': 'MAIN WAREHOUSE',
+              'multipleLocations': false,
+              'matchMethod': 'api',
+            };
+            _state = _ScanState.found;
+          });
+          return true;
         }
+      } catch (_) {
+        // API failed, fall through to not-found handling
+      }
+
+      // ── Not Found ─────────────────────────────────────────────────────────
+      if (!mounted) return false;
+      if (!isOcr) {
+        // For barcode, go back to scanning silently (barcode might just be for another product)
+        setState(() => _state = _ScanState.scanning);
+        return false;
+      } else {
+        // For OCR, auto-populate manual search with the best candidate we have
+        ScanFeedback.triggerError();
+        final bestCandidate = parsed.ocrCorrected.isNotEmpty
+            ? parsed.ocrCorrected
+            : parsed.normalized;
+        setState(() {
+          _state = _ScanState.scanning;
+          _isManualMode = true;
+          _manualController.text = bestCandidate;
+          _manualSearchQuery = bestCandidate;
+          _searchByField = 'Part No';
+        });
+        _performManualSearch();
+        return false;
       }
     } catch (e) {
       if (!mounted) return false;
       if (!isOcr) {
-         setState(() {
-           _state = _ScanState.scanning; // Go back to scanning silently
-         });
-         return false;
+        setState(() => _state = _ScanState.scanning);
+        return false;
       } else {
-         ScanFeedback.triggerError();
-         setState(() {
-           _state = _ScanState.scanning;
-           _isManualMode = true;
-           _manualController.text = _scannedBarcode;
-           _manualSearchQuery = _scannedBarcode;
-           _searchByField = 'Part No';
-         });
-         _performManualSearch();
-         return false;
+        ScanFeedback.triggerError();
+        setState(() {
+          _state = _ScanState.scanning;
+          _isManualMode = true;
+          _manualController.text = _scannedBarcode;
+          _manualSearchQuery = _scannedBarcode;
+          _searchByField = 'Part No';
+        });
+        _performManualSearch();
+        return false;
       }
     }
   }
