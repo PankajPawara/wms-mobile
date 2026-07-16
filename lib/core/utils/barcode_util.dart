@@ -1,4 +1,4 @@
-class BarcodeUtil {
+﻿class BarcodeUtil {
   BarcodeUtil._();
 
   static String cleanExtractedPartNo(String input) {
@@ -16,7 +16,7 @@ class BarcodeUtil {
           .replaceAll('O', '0')
           .replaceAll('S', '5');
       
-      // Prefix must be exactly 5 digits — strip any excess from the front
+      // Prefix must be exactly 5 digits â€” strip any excess from the front
       if (beforeDash.length > 5) {
         beforeDash = beforeDash.substring(beforeDash.length - 5);
       }
@@ -28,16 +28,16 @@ class BarcodeUtil {
   /// Sanitise an OCR-extracted warehouse location code.
   ///
   /// Accepted formats:
-  ///   1. `\d{3}[A-Z]`   — 3 digits + 1 letter, e.g. 003K, 069M
-  ///   2. `BOX-\d{3}`    — shelf-box location, e.g. BOX-001, BOX-042
+  ///   1. `\d{3}[A-Z]`   â€” 3 digits + 1 letter, e.g. 003K, 069M
+  ///   2. `BOX-\d{3}`    â€” shelf-box location, e.g. BOX-001, BOX-042
   ///
   /// Common OCR errors handled:
-  ///   • Leading `1` before a `\d{3}[A-Z]` token → was a `|` column separator, strip it.
-  ///   • `B0X` (zero) → `BOX` when trying to match format 2.
+  ///   â€¢ Leading `1` before a `\d{3}[A-Z]` token â†’ was a `|` column separator, strip it.
+  ///   â€¢ `B0X` (zero) â†’ `BOX` when trying to match format 2.
   static String cleanLocation(String raw) {
     final s = raw.replaceAll(RegExp(r'[|\s]'), '').toUpperCase();
 
-    // ── Format 1: 3 digits + 1 letter ───────────────────────────────────────
+    // â”€â”€ Format 1: 3 digits + 1 letter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     final slotPattern = RegExp(r'^\d{3}[A-Z]$');
     if (slotPattern.hasMatch(s)) return s;
 
@@ -47,13 +47,13 @@ class BarcodeUtil {
       if (slotPattern.hasMatch(candidate)) return candidate;
     }
 
-    // ── Format 2: BOX-NNN ────────────────────────────────────────────────────
-    // Normalise common OCR confusion: `B0X` (zero) → `BOX`
+    // â”€â”€ Format 2: BOX-NNN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Normalise common OCR confusion: `B0X` (zero) â†’ `BOX`
     final boxNorm = s.replaceAll(RegExp(r'B0X'), 'BOX');
     final boxPattern = RegExp(r'^BOX-\d{3}$');
     if (boxPattern.hasMatch(boxNorm)) return boxNorm;
 
-    // ── Scan inside a longer mixed token ────────────────────────────────────
+    // â”€â”€ Scan inside a longer mixed token â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Check BOX-NNN first (longer pattern, more specific)
     final boxMatch = RegExp(r'(BOX-\d{3})', caseSensitive: false).firstMatch(s);
     if (boxMatch != null) return boxMatch.group(1)!.toUpperCase();
@@ -165,7 +165,7 @@ class BarcodeUtil {
       // Helper to clean O->0, l/I->1 for numeric fields
       String _cleanNum(String s) => s.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1');
 
-      // ─── CASE A: FAS Software Pipe Delimited Layout ────────────────────────
+      // â”€â”€â”€ CASE A: FAS Software Pipe Delimited Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (line.contains('|')) {
         final List<String> cols = line.split('|').map((s) => s.trim()).toList();
         if (cols.length >= 3) {
@@ -261,7 +261,7 @@ class BarcodeUtil {
         }
       }
 
-      // ─── CASE B: Standard Fallback (No Pipes) ──────────────────────────────
+      // â”€â”€â”€ CASE B: Standard Fallback (No Pipes) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       final partMatch = flexiblePattern.firstMatch(line.toUpperCase());
       if (partMatch != null) {
         final rawPartNo = partMatch.group(0)!;
@@ -547,23 +547,53 @@ class BarcodeUtil {
   }
 }
 
-// -------------------------------------------------------------------------------
-// PART NUMBER PARSER � Live Barcode Scanner ONLY
-// -------------------------------------------------------------------------------
-// Do NOT use in Pickup List or Red Label parsers.
-//
-// Supported Part Number Patterns:
-//   Type 1: HYPHENATED     � \d{5}-[A-Z0-9]{3}-[A-Z0-9]{3,5}
-//   Type 2: UNHYPHENATED   � \d{5}[A-Z0-9]{5,10}
-//   Type 3: NUMERIC        � \d{8,14}  (EAN/UPC barcodes)
-//   Type 4: ALPHANUMERIC   � [A-Z][A-Z0-9]{3,9}
-//
-// OCR Correction (applied to NUMERIC segments only):
-//   S?5  O/Q?0  B?8  I/L?1  Z?2  G?6  E?3
-// -------------------------------------------------------------------------------
 
-enum PartPattern { hyphenated, unhyphenated, numericBarcode, alphanumeric, unknown }
+// =============================================================================
+// PART NUMBER PARSER — Live Barcode Scanner ONLY
+// Database-driven. Built from analysis of 21,741 real inventory records.
+//
+// PATTERN REGISTRY (database-derived, ordered by frequency):
+//   Type A  5-3-3  \d{5}-[A-Z0-9]{3}-[A-Z0-9]{3}         57.0% (12,396 records)
+//   Type B  5-3-5  \d{5}-[A-Z0-9]{3}-[A-Z0-9]{5}         38.1%  (8,278 records)
+//   Type C  5-3-4  \d{5}-[A-Z0-9]{3}-[A-Z0-9]{4}          1.7%    (374 records)
+//   Type D  alpha  [A-Z0-9]{4,6}-[A-Z0-9]{3}-[A-Z0-9]{2,5} 2.0%  (431 records)
+//   Type E  5-5    \d{5}-\d{5}                              0.9%  (202 records)
+//   Type G  tire   \d{5}-[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z]   0.02%    (4 records)
+//   Type H  6-3-3  \d{6}-[A-Z0-9]{3}-[A-Z0-9]{3}         0.00%    (1 record)
+//   Type F  short  \d{5,8}                                  0.3%
+//
+// OCR CORRECTION RULES (database-justified):
+//   SAFE (apply globally, prefix+suffix):
+//     O -> 0  (only 18 real 'O' in 21,741 records — virtually never legitimate)
+//     I -> 1  (only 57 real 'I' in 21,741 records — virtually never legitimate)
+//     Q -> 0  (0 real 'Q' occurrences in DB)
+//
+//   PREFIX-ONLY (apply ONLY to the 5-digit prefix before first '-'):
+//     S -> 5  (1,564 real S's exist in suffix/model — must NOT touch those)
+//     B -> 8  (2,160 real B's exist in suffix/model — must NOT touch those)
+//     Z -> 2  (8,550 real Z's exist in suffix — extremely dangerous globally)
+//     G -> 6  (1,257 real G's exist in model codes — must NOT touch those)
+//     L -> 1  (1,881 real L's exist in model codes — must NOT touch those)
+//     E -> 3  (3,499 real E's exist in suffix like ZA, ZF — must NOT touch)
+//   NEVER APPLY:
+//     D -> 0  (8,355 real D's — D01, D00ZA are real suffixes, too risky)
+// =============================================================================
 
+/// Identifies which pattern family a part number belongs to.
+/// Ordered by database frequency (most common first).
+enum PartPattern {
+  typeA,    // 5-3-3: most common (57%)
+  typeB,    // 5-3-5: color-code variant (38%)
+  typeC,    // 5-3-4: bolt/screw codes (1.7%)
+  typeD,    // Alphanumeric prefix (2%)
+  typeE,    // Two-segment numeric (0.9%)
+  typeG,    // Tire format with trailing letter (0.02%)
+  typeH,    // Six-digit prefix (rare)
+  typeF,    // Short no-dash numeric
+  unknown,
+}
+
+/// Parsed result from a single raw OCR/barcode input.
 class ParsedPartNumber {
   final String original;
   final String normalized;
@@ -578,122 +608,221 @@ class ParsedPartNumber {
     required this.pattern,
     required this.candidates,
   });
+
+  @override
+  String toString() =>
+      'ParsedPartNumber(pattern=$pattern, corrected=$ocrCorrected, candidates=${candidates.length})';
 }
 
-class ScanSearchResult {
-  final String matchedPartNo;
-  final String matchMethod; // 'exact', 'normalized', 'ocr_corrected', 'fuzzy'
-  final double confidenceScore;
-
-  const ScanSearchResult({
-    required this.matchedPartNo,
-    required this.matchMethod,
-    required this.confidenceScore,
-  });
-}
-
+/// Database-driven part number parser for the Live Barcode Scanner.
+/// DO NOT use in Pickup List or Red Label parsers.
 class PartNumberParser {
   PartNumberParser._();
 
-  static final RegExp _hyphenated = RegExp(r'\b[A-Z0-9]{4,6}-[A-Z0-9]{3}-[A-Z0-9]{3,5}\b');
-  static final RegExp _unhyphenated = RegExp(r'\b\d{5}[A-Z0-9]{5,10}\b');
-  static final RegExp _numericBarcode = RegExp(r'\b\d{8,14}\b');
-  static final RegExp _flexibleHyphenated = RegExp(
-      r'\b[A-Z0-9]{4,6}[.\s\-]+[A-Z0-9]{3}[.\s\-]+[A-Z0-9]{3,5}\b');
+  // ── Database-derived pattern regexes ────────────────────────────────────────
+  // Type A: 5-digit + 3-char + 3-char (57.0% of DB)
+  static final _typeA = RegExp(r'^\d{5}-[A-Z0-9]{3}-[A-Z0-9]{3}$');
+  // Type B: 5-digit + 3-char + 5-char, e.g. D00ZA color suffix (38.1%)
+  static final _typeB = RegExp(r'^\d{5}-[A-Z0-9]{3}-[A-Z0-9]{5}$');
+  // Type C: 5-digit + 3-char + 4-char (1.7%)
+  static final _typeC = RegExp(r'^\d{5}-[A-Z0-9]{3}-[A-Z0-9]{4}$');
+  // Type D: alphanumeric prefix 3-segment (2.0%)
+  static final _typeD = RegExp(r'^[A-Z0-9]{4,6}-[A-Z0-9]{3}-[A-Z0-9]{2,5}$');
+  // Type E: two-segment all-digit (0.9%)
+  static final _typeE = RegExp(r'^\d{5}-\d{3,7}$');
+  // Type G: tire format with trailing single letter (0.02%)
+  static final _typeG = RegExp(r'^\d{5}-[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z]$');
+  // Type H: six-digit prefix (0.005%)
+  static final _typeH = RegExp(r'^\d{6}-[A-Z0-9]{3}-[A-Z0-9]{3}$');
+  // Type F: short numeric codes
+  static final _typeF = RegExp(r'^\d{4,8}$');
 
-  static PartPattern _identifyPattern(String s) {
+  // Flexible extraction: matches OCR-damaged patterns where dashes are replaced
+  // by spaces or dots. Covers Type A, B, C, D, E.
+  static final _flexible = RegExp(
+    r'\b[A-Z0-9]{4,6}[.\s\-]+[A-Z0-9]{3}(?:[.\s\-]+[A-Z0-9]{2,7})?\b',
+  );
+
+  // ── Pattern identification ─────────────────────────────────────────────────
+
+  /// Identifies the pattern type of a fully normalized, uppercase part number.
+  static PartPattern identifyPattern(String s) {
     final upper = s.toUpperCase();
-    if (_hyphenated.hasMatch(upper)) return PartPattern.hyphenated;
-    if (_unhyphenated.hasMatch(upper)) return PartPattern.unhyphenated;
-    if (_numericBarcode.hasMatch(upper)) return PartPattern.numericBarcode;
-    if (RegExp(r'\b[A-Z][A-Z0-9]{3,9}\b').hasMatch(upper)) return PartPattern.alphanumeric;
+    if (_typeG.hasMatch(upper)) return PartPattern.typeG; // Check 4-seg first
+    if (_typeA.hasMatch(upper)) return PartPattern.typeA;
+    if (_typeB.hasMatch(upper)) return PartPattern.typeB;
+    if (_typeC.hasMatch(upper)) return PartPattern.typeC;
+    if (_typeH.hasMatch(upper)) return PartPattern.typeH;
+    if (_typeD.hasMatch(upper)) return PartPattern.typeD;
+    if (_typeE.hasMatch(upper)) return PartPattern.typeE;
+    if (_typeF.hasMatch(upper)) return PartPattern.typeF;
     return PartPattern.unknown;
   }
 
-  /// Normalize: uppercase, collapse odd separators.
+  // ── Normalization ──────────────────────────────────────────────────────────
+
+  /// Step 1: Normalize raw input — uppercase, collapse whitespace/separators.
+  /// Preserves dashes as the primary separator.
   static String normalize(String raw) {
-    return raw.trim().toUpperCase()
-        .replaceAll(RegExp(r'[^A-Z0-9\-]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
+    return raw
+        .trim()
+        .toUpperCase()
+        .replaceAll(RegExp(r'[.\s]+'), ' ')  // collapse dots/spaces
+        .replaceAll(RegExp(r'\s+-\s+|\s+'), '-') // space-dash-space -> single dash
+        .replaceAll(RegExp(r'-+'), '-')  // collapse multiple dashes
+        .replaceAll(RegExp(r'[^A-Z0-9\-]'), '') // strip remaining junk
         .trim();
   }
 
-  /// Apply pattern-aware OCR corrections.
-  /// Digit corrections are applied ONLY to the numeric prefix before the first '-'.
-  static String applyFuzzyCorrection(String normalized) {
-    if (normalized.contains('-')) {
-      final parts = normalized.split('-');
-      if (parts.isNotEmpty) {
-        final correctedPrefix = _correctNumericSegment(parts[0]);
-        return ([correctedPrefix, ...parts.sublist(1)]).join('-');
+  // ── OCR Correction ─────────────────────────────────────────────────────────
+
+  /// Step 2: Apply database-justified OCR corrections.
+  ///
+  /// SAFE corrections (applied to ALL segments):
+  ///   O→0, I→1, Q→0  (virtually never appear legitimately in 21,741 records)
+  ///
+  /// PREFIX-ONLY corrections (applied ONLY to the first segment before first '-'):
+  ///   S→5, B→8, Z→2, G→6, L→1, E→3
+  ///   These chars appear legitimately in model codes and suffixes (e.g. K0V, D00ZA).
+  static String applyOcrCorrection(String normalized) {
+    // ── SAFE: Apply O→0, I→1, Q→0 to entire string (DB-justified) ──────────
+    String result = normalized
+        .replaceAll('O', '0')
+        .replaceAll('Q', '0')
+        .replaceAll('I', '1');
+
+    // ── PREFIX-ONLY corrections ────────────────────────────────────────────
+    final dashIdx = result.indexOf('-');
+    if (dashIdx > 0) {
+      // Only correct prefix if it looks like it SHOULD be all-digit
+      // (i.e. all chars after safe correction are digits or look like digits)
+      final prefix = result.substring(0, dashIdx);
+      final suffix = result.substring(dashIdx); // includes the '-'
+
+      // Check if prefix is close to all-digit (has chars that could be misread digits)
+      final prefixStripped = prefix.replaceAll(RegExp(r'[SBZGLE]'), '');
+      final couldBeNumeric = RegExp(r'^\d*$').hasMatch(prefixStripped);
+
+      if (couldBeNumeric && prefix.length >= 4 && prefix.length <= 6) {
+        final correctedPrefix = prefix
+            .replaceAll('S', '5')
+            .replaceAll('B', '8')
+            .replaceAll('Z', '2')
+            .replaceAll('G', '6')
+            .replaceAll('L', '1')
+            .replaceAll('E', '3');
+        result = correctedPrefix + suffix;
       }
+    } else if (dashIdx == -1 && _typeF.hasMatch(result)) {
+      // Short numeric code — safe to apply numeric corrections fully
+      result = result
+          .replaceAll('S', '5')
+          .replaceAll('B', '8')
+          .replaceAll('Z', '2')
+          .replaceAll('G', '6')
+          .replaceAll('L', '1')
+          .replaceAll('E', '3');
     }
-    if (normalized.length >= 10 && RegExp(r'^[A-Z0-9]{10,}$').hasMatch(normalized)) {
-      final prefix = normalized.substring(0, 5);
-      final suffix = normalized.substring(5);
-      return _correctNumericSegment(prefix) + suffix;
-    }
-    if (_numericBarcode.hasMatch(normalized)) {
-      return _correctNumericSegment(normalized);
-    }
-    return normalized.replaceAll('O', '0').replaceAll('Q', '0');
+
+    return result;
   }
 
-  static String _correctNumericSegment(String segment) {
-    return segment
-        .replaceAll('O', '0').replaceAll('Q', '0')
-        .replaceAll('S', '5')
-        .replaceAll('B', '8')
-        .replaceAll('I', '1').replaceAll('L', '1')
-        .replaceAll('Z', '2')
-        .replaceAll('G', '6')
-        .replaceAll('E', '3');
-  }
+  // ── Candidate Extraction ───────────────────────────────────────────────────
 
-  /// Extract all candidate part numbers from a raw OCR text block.
+  /// Step 3: Extract all valid part number candidates from raw OCR text.
+  ///
+  /// The camera OCR may return a full block of text. This method extracts
+  /// every token that resembles a known database part number pattern.
   static List<String> extractCandidates(String rawOcrText) {
     final upper = rawOcrText.toUpperCase();
     final candidates = <String>{};
 
-    for (final match in _flexibleHyphenated.allMatches(upper)) {
+    // Extract using flexible pattern (handles spaces/dots as separators)
+    for (final match in _flexible.allMatches(upper)) {
       final raw = match.group(0)!;
-      final normalized = raw.replaceAll(RegExp(r'[.\s]+'), '-');
-      candidates.add(applyFuzzyCorrection(normalize(normalized)));
-    }
-    for (final match in _unhyphenated.allMatches(upper)) {
-      candidates.add(applyFuzzyCorrection(match.group(0)!));
-    }
-    for (final match in _numericBarcode.allMatches(upper)) {
-      candidates.add(match.group(0)!);
+      // Normalize separators to dashes
+      final withDashes = raw
+          .replaceAll(RegExp(r'\s+'), '-')
+          .replaceAll('.', '-')
+          .replaceAll(RegExp(r'-+'), '-');
+      final corrected = applyOcrCorrection(withDashes);
+      final pattern = identifyPattern(corrected);
+      if (pattern != PartPattern.unknown) {
+        candidates.add(corrected);
+      }
+      // Also add without correction in case correction was wrong
+      if (pattern == PartPattern.unknown) {
+        final normalized = normalize(withDashes);
+        if (normalized.length >= 8) candidates.add(normalized);
+      }
     }
 
-    return candidates.where((c) => c.length >= 8).toList();
+    // Filter: must be at least 8 chars (shortest valid: 5+1+1 = 7, but practical min is 8)
+    return candidates.where((c) => c.length >= 7).toList();
   }
 
-  /// Parse a single raw value (from barcode or OCR) into a ParsedPartNumber.
+  // ── Full Parse ─────────────────────────────────────────────────────────────
+
+  /// Parse a single raw value (from barcode scan or OCR) into a [ParsedPartNumber].
+  ///
+  /// Generates multiple candidates ordered by confidence:
+  ///   1. Raw uppercase (barcode scanner gives exact values)
+  ///   2. Normalized (separators fixed)
+  ///   3. Safe OCR corrected (O→0, I→1, Q→0)
+  ///   4. Full OCR corrected (prefix digit-correction added)
+  ///   5. Strip-all-separators variant (for normalized DB lookup)
+  ///   6. Hyphenated reconstruction (if unhyphenated 11-15 char string detected)
   static ParsedPartNumber parse(String raw) {
-    final normalized = normalize(raw);
-    final ocrCorrected = applyFuzzyCorrection(normalized);
-    final pattern = _identifyPattern(ocrCorrected);
+    final upper = raw.trim().toUpperCase();
+    final normalized = normalize(upper);
+
+    // Safe correction only (O, I, Q — DB-justified as safe globally)
+    final safeCorrected = normalized
+        .replaceAll('O', '0')
+        .replaceAll('Q', '0')
+        .replaceAll('I', '1');
+
+    // Full OCR correction (prefix-aware)
+    final fullCorrected = applyOcrCorrection(normalized);
+
+    final pattern = identifyPattern(fullCorrected);
 
     final candidates = <String>{};
-    candidates.add(raw.trim().toUpperCase());
-    candidates.add(normalized);
-    candidates.add(ocrCorrected);
 
-    final stripped = ocrCorrected.replaceAll('-', '');
-    if (stripped.isNotEmpty) candidates.add(stripped);
+    // Candidate 1: exact raw (most trusted for barcode scanner)
+    if (upper.length >= 5) candidates.add(upper);
 
-    if (pattern == PartPattern.unhyphenated && stripped.length >= 11) {
-      final reformatted =
-          '${stripped.substring(0, 5)}-${stripped.substring(5, 8)}-${stripped.substring(8)}';
-      candidates.add(reformatted);
+    // Candidate 2: normalized
+    if (normalized.length >= 5) candidates.add(normalized);
+
+    // Candidate 3: safe corrected
+    if (safeCorrected.length >= 5) candidates.add(safeCorrected);
+
+    // Candidate 4: full OCR corrected
+    if (fullCorrected.length >= 5) candidates.add(fullCorrected);
+
+    // Candidate 5: strip separators (for the normalized DB lookup tier)
+    final stripped = fullCorrected.replaceAll('-', '');
+    if (stripped.length >= 5) candidates.add(stripped);
+
+    // Candidate 6: reconstruct hyphenated from 11-char unhyphenated
+    // e.g. "12345K38900" → "12345-K38-900" (Type A)
+    if (!normalized.contains('-') && normalized.length == 11) {
+      final r = '${normalized.substring(0, 5)}-${normalized.substring(5, 8)}-${normalized.substring(8)}';
+      candidates.add(r);
+      candidates.add(applyOcrCorrection(r));
+    }
+    // e.g. "12345K38F10ZA" → "12345-K38-F10ZA" (Type B)
+    if (!normalized.contains('-') && normalized.length == 13) {
+      final r = '${normalized.substring(0, 5)}-${normalized.substring(5, 8)}-${normalized.substring(8)}';
+      candidates.add(r);
+      candidates.add(applyOcrCorrection(r));
     }
 
     return ParsedPartNumber(
       original: raw,
       normalized: normalized,
-      ocrCorrected: ocrCorrected,
+      ocrCorrected: fullCorrected,
       pattern: pattern,
       candidates: candidates.where((c) => c.length >= 5).toList(),
     );
