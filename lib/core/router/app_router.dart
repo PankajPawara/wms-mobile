@@ -23,6 +23,7 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/settings/screens/diagnostics_screen.dart';
 import '../../features/scan_to_find/screens/ai_vision_test_screen.dart';
 import '../../shared/widgets/app_bottom_nav.dart';
+import '../../core/models/extracted_memo.dart';
 
 part 'app_router.g.dart';
 
@@ -77,12 +78,7 @@ GoRouter appRouter(AppRouterRef ref) {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
           return OcrReviewScreen(
-            extractedItems: extra?['items'] ?? [],
-            customerName: extra?['customerName'] as String?,
-            customerLocation: extra?['customerLocation'] as String?,
-            memoNumber: extra?['memoNumber'] as String?,
-            rawText: extra?['rawText'] as String?,
-            imagePath: extra?['imagePath'] as String?,
+            ocrResult: extra?['ocrResult'] as MemoOcrResult,
           );
         },
       ),

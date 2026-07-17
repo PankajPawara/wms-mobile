@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,159 +7,79 @@ import 'package:drift/drift.dart' hide Column;
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
-import '../../../core/constants/app_strings.dart';
-import '../../../core/services/gemini_fallback_service.dart';
+import '../../../core/models/extracted_memo.dart';
+import '../../../core/providers/gemini_verification_provider.dart';
 import '../../../shared/widgets/app_button.dart';
-import '../../../shared/widgets/status_badge.dart';
 import '../../../core/database/app_database.dart';
 import '../../picking/repositories/order_repository.dart';
 
 class OcrReviewScreen extends ConsumerStatefulWidget {
-  final List<Map<String, dynamic>> extractedItems;
-  final String? customerName;
-  final String? customerLocation;
-  final String? memoNumber;
-  final String? rawText;
-  final String? imagePath;
+  final MemoOcrResult ocrResult;
 
-  const OcrReviewScreen({
-    super.key,
-    required this.extractedItems,
-    this.customerName,
-    this.customerLocation,
-    this.memoNumber,
-    this.rawText,
-    this.imagePath,
-  });
+  const OcrReviewScreen({super.key, required this.ocrResult});
 
   @override
   ConsumerState<OcrReviewScreen> createState() => _OcrReviewScreenState();
 }
 
 class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
-  late List<Map<String, dynamic>> _items;
-  bool _isLoading = true;
-  bool _isAiEnhancing = false;
-  String? _geminiRawResponse;
-
-  late TextEditingController _customerNameController;
-  late TextEditingController _customerLocationController;
-  late TextEditingController _memoNumberController;
+  late List<ExtractedMemoItem> _items;
+  late TextEditingController _customerNameCtrl;
+  late TextEditingController _areaCtrl;
+  late TextEditingController _memoNumberCtrl;
+  late TextEditingController _memoDateCtrl;
 
   @override
   void initState() {
     super.initState();
-    _customerNameController = TextEditingController(text: widget.customerName);
-    _customerLocationController = TextEditingController(text: widget.customerLocation);
-    _memoNumberController = TextEditingController(text: widget.memoNumber);
-    _resolveExtractedItems().then((_) {
-      if (widget.rawText != null && widget.rawText!.isNotEmpty) {
-        _runGeminiEnhancement();
+    _items = List.from(widget.ocrResult.items);
+    final h = widget.ocrResult.header;
+    _customerNameCtrl = TextEditingController(text: h.customerName);
+    _areaCtrl = TextEditingController(text: h.area);
+    _memoNumberCtrl = TextEditingController(text: h.memoNumber);
+    _memoDateCtrl = TextEditingController(text: h.memoDate ?? '');
+
+    // Kick off background Gemini verification if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.ocrResult.needsGemini) {
+        ref.read(geminiVerificationProvider.notifier).verify(
+          allItems: _items,
+          header: widget.ocrResult.header,
+          rawOcrDump: widget.ocrResult.rawOcrDump,
+          imageFile: widget.ocrResult.imagePath != null
+              ? File(widget.ocrResult.imagePath!)
+              : null,
+        );
       }
     });
   }
 
   @override
   void dispose() {
-    _customerNameController.dispose();
-    _customerLocationController.dispose();
-    _memoNumberController.dispose();
+    _customerNameCtrl.dispose();
+    _areaCtrl.dispose();
+    _memoNumberCtrl.dispose();
+    _memoDateCtrl.dispose();
     super.dispose();
   }
 
-  Future<Map<String, dynamic>?> _resolvePartNo(String rawPartNo) async {
-    final db = ref.read(appDatabaseProvider);
-    
-    // 1. Direct query
-    var matches = await (db.select(db.inventory)..where((t) => t.partNo.equals(rawPartNo))).get();
-    if (matches.isNotEmpty) {
-      return {
-        'part_no': rawPartNo,
-        'item': matches.first,
-      };
-    }
-    
-    // 2. Try stripping leading garbage characters (like '1', 'l', '|', '!', '/')
-    var cleaned = rawPartNo;
-    while (cleaned.length > 5 && (cleaned.startsWith('1') || cleaned.startsWith('l') || cleaned.startsWith('|') || cleaned.startsWith('!') || cleaned.startsWith('/'))) {
-      cleaned = cleaned.substring(1);
-      matches = await (db.select(db.inventory)..where((t) => t.partNo.equals(cleaned))).get();
-      if (matches.isNotEmpty) {
-        return {
-          'part_no': cleaned,
-          'item': matches.first,
-        };
-      }
-    }
-    
-    // 3. Try partial case-insensitive query matching
-    matches = await (db.select(db.inventory)..where((t) => t.partNo.like('%$rawPartNo%'))).get();
-    if (matches.isNotEmpty) {
-      return {
-        'part_no': matches.first.partNo,
-        'item': matches.first,
-      };
-    }
-    
-    return null;
-  }
-
-  Future<void> _resolveExtractedItems() async {
-    final List<Map<String, dynamic>> resolved = [];
-    for (final item in widget.extractedItems) {
-      final partNo = item['part_no'] as String;
-      final requiredQty = item['required_qty'] as int? ?? 1;
-      final price = item['price'] as double? ?? 0.0;
-      final ocrDescription = item['description'] as String?;
-      final ocrLocation = item['location'] as String?;
-      final ocrStock = item['stock'] as int?;
-      final ocrPack = item['pack'] as int?;
-
-      final resolvedResult = await _resolvePartNo(partNo);
-      if (resolvedResult != null) {
-        final dbItem = resolvedResult['item'] as InventoryData;
-        resolved.add({
-          'part_no': resolvedResult['part_no'],
-          'required_qty': requiredQty,
-          'price': price > 0 ? price : dbItem.price,
-          'description': dbItem.description != null && dbItem.description!.isNotEmpty
-              ? dbItem.description!
-              : (ocrDescription != null && ocrDescription.isNotEmpty ? ocrDescription : ''),
-          'location': dbItem.location.isNotEmpty
-              ? dbItem.location
-              : (ocrLocation != null && ocrLocation.isNotEmpty ? ocrLocation : 'LOCATION NOT DEFINED'),
-          'stock': dbItem.stock > 0 ? dbItem.stock : (ocrStock ?? 0),
-          'pack': ocrPack ?? 0,
-          'match_status': 'verified',
-        });
-      } else {
-        resolved.add({
-          'part_no': partNo,
-          'required_qty': requiredQty,
-          'price': price,
-          'description': ocrDescription != null && ocrDescription.isNotEmpty
-              ? ocrDescription
-              : 'Unrecognized Part',
-          'location': ocrLocation != null && ocrLocation.isNotEmpty
-              ? ocrLocation
-              : 'LOCATION NOT DEFINED',
-          'stock': ocrStock ?? 0,
-          'pack': ocrPack ?? 0,
-          'match_status': 'unmatched',
+  // Listen to Gemini verification updates and merge into local items list
+  void _onGeminiUpdate(GeminiVerificationState state) {
+    if (state.isCompleted && state.updatedItems.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _items = List.from(state.updatedItems);
         });
       }
     }
-
-    if (mounted) {
-      setState(() {
-        _items = resolved;
-        _isLoading = false;
-      });
-    }
   }
 
-  void _updateQty(int index, int qty) {
-    setState(() => _items[index]['required_qty'] = qty.clamp(1, 999));
+  void _updateQty(int index, int delta) {
+    final current = _items[index].qty;
+    final newQty = (current + delta).clamp(1, 999);
+    setState(() {
+      _items[index] = _items[index].copyWith(qty: newQty);
+    });
   }
 
   void _removeItem(int index) {
@@ -168,15 +87,12 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
   }
 
   Future<void> _editItem(int index) async {
-    final updatedItem = await showDialog<Map<String, dynamic>>(
+    final updated = await showDialog<ExtractedMemoItem>(
       context: context,
-      builder: (context) => _EditItemDialog(item: _items[index]),
+      builder: (ctx) => _EditItemDialog(item: _items[index]),
     );
-
-    if (updatedItem != null) {
-      setState(() {
-        _items[index] = updatedItem;
-      });
+    if (updated != null && mounted) {
+      setState(() => _items[index] = updated);
     }
   }
 
@@ -191,160 +107,30 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
 
     try {
       final repo = ref.read(orderRepositoryProvider);
-      final List<Map<String, dynamic>> orderItems = [];
-
-      for (final item in _items) {
-        final partNo = item['part_no'] as String;
-        final requiredQty = item['required_qty'] as int? ?? 1;
-        final price = item['price'] as double? ?? 0.0;
-        final desc = item['description'] as String? ?? '';
-        final loc = item['location'] as String? ?? 'LOCATION NOT DEFINED';
-
-        orderItems.add({
-          'part_no': partNo,
-          'description': desc,
-          'location': loc,
-          'required_qty': requiredQty,
-          'unit_price': price,
-        });
-      }
+      final orderItems = _items.map((i) => i.toOrderItemMap()).toList();
 
       final localId = await repo.createLocalOrder(
-        memoNumber: _memoNumberController.text.trim(),
-        customerName: _customerNameController.text.trim(),
-        customerLocation: _customerLocationController.text.trim(),
+        memoNumber: _memoNumberCtrl.text.trim(),
+        customerName: _customerNameCtrl.text.trim(),
+        customerLocation: _areaCtrl.text.trim(),
+        memoDate: _memoDateCtrl.text.trim().isNotEmpty
+            ? _memoDateCtrl.text.trim()
+            : null,
         items: orderItems,
       );
 
+      // Tell the background Gemini processor which order ID to update when finished
+      ref.read(geminiVerificationProvider.notifier).attachOrderId(localId);
+
       if (!mounted) return;
-      context.pop(); // Dismiss loader
+      context.pop(); // dismiss loader
       context.go('/picking/$localId');
     } catch (e) {
       if (mounted) {
-        context.pop(); // Dismiss loader
+        context.pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to generate pickup list: $e')),
         );
-      }
-    }
-  }
-
-  Future<void> _runGeminiEnhancement() async {
-    if (!mounted) return;
-    setState(() => _isAiEnhancing = true);
-
-    try {
-      final header = {
-        'customerName': widget.customerName ?? '',
-        'customerLocation': widget.customerLocation ?? '',
-        'memoNumber': widget.memoNumber ?? '',
-      };
-
-      File? imageFile;
-      if (widget.imagePath != null) {
-        imageFile = File(widget.imagePath!);
-      }
-
-      final result = await GeminiFallbackService.correctOcrData(
-        widget.rawText!,
-        header,
-        widget.extractedItems,
-        imageFile: imageFile,
-      );
-
-      if (!mounted) return;
-      
-      setState(() {
-        _geminiRawResponse = const JsonEncoder.withIndent('  ').convert(result);
-      });
-
-      // Update Header if Gemini found better ones
-      final newHeader = result['header'] as Map<String, dynamic>?;
-      if (newHeader != null) {
-        if (newHeader['customer'] != null && newHeader['customer'].toString().isNotEmpty) {
-          _customerNameController.text = newHeader['customer'].toString();
-        }
-        if (newHeader['area'] != null && newHeader['area'].toString().isNotEmpty) {
-          _customerLocationController.text = newHeader['area'].toString();
-        }
-        if (newHeader['memo_no'] != null && newHeader['memo_no'].toString().isNotEmpty) {
-          _memoNumberController.text = newHeader['memo_no'].toString();
-        }
-      }
-
-      // Update Items
-      final newItems = result['items'] as List<dynamic>?;
-      if (newItems != null && newItems.isNotEmpty) {
-        final List<Map<String, dynamic>> updatedExtracted = newItems.map((e) => e as Map<String, dynamic>).toList();
-        
-        // Re-resolve the items to get DB stock/location
-        final List<Map<String, dynamic>> resolved = [];
-        for (final item in updatedExtracted) {
-          final partNo = item['part_no']?.toString() ?? '';
-          final requiredQty = int.tryParse(item['qty']?.toString() ?? '1') ?? 1;
-          final price = double.tryParse(item['mrp']?.toString() ?? '0') ?? 0.0;
-          final ocrDescription = item['description']?.toString();
-          final ocrLocation = item['location']?.toString();
-          final ocrStock = int.tryParse(item['stock']?.toString() ?? '0');
-          final ocrPack = int.tryParse(item['pack']?.toString() ?? '0');
-
-          final resolvedResult = await _resolvePartNo(partNo);
-          if (resolvedResult != null) {
-            final dbItem = resolvedResult['item'] as InventoryData;
-            resolved.add({
-              'part_no': resolvedResult['part_no'],
-              'required_qty': requiredQty,
-              'price': price > 0 ? price : dbItem.price,
-              'description': dbItem.description != null && dbItem.description!.isNotEmpty
-                  ? dbItem.description!
-                  : (ocrDescription != null && ocrDescription.isNotEmpty ? ocrDescription : ''),
-              'location': dbItem.location.isNotEmpty
-                  ? dbItem.location
-                  : (ocrLocation != null && ocrLocation.isNotEmpty ? ocrLocation : 'LOCATION NOT DEFINED'),
-              'stock': dbItem.stock > 0 ? dbItem.stock : (ocrStock ?? 0),
-              'pack': ocrPack ?? 0,
-              'match_status': 'verified',
-            });
-          } else {
-            resolved.add({
-              'part_no': partNo,
-              'required_qty': requiredQty,
-              'price': price,
-              'description': ocrDescription != null && ocrDescription.isNotEmpty
-                  ? ocrDescription
-                  : 'Unrecognized Part',
-              'location': ocrLocation != null && ocrLocation.isNotEmpty
-                  ? ocrLocation
-                  : 'LOCATION NOT DEFINED',
-              'stock': ocrStock ?? 0,
-              'pack': ocrPack ?? 0,
-              'match_status': 'unmatched',
-            });
-          }
-        }
-        
-        if (mounted) {
-          setState(() {
-            _items = resolved;
-          });
-        }
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ AI Enhancement complete!'), backgroundColor: AppColors.success),
-        );
-      }
-
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('AI Enhancement failed: $e'), backgroundColor: AppColors.danger),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isAiEnhancing = false);
       }
     }
   }
@@ -354,367 +140,529 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) {
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) {
         return DraggableScrollableSheet(
           initialChildSize: 0.8,
           maxChildSize: 0.95,
           minChildSize: 0.4,
           expand: false,
-          builder: (context, scrollController) {
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          builder: (ctx2, scroll) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Developer Debug Panel',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(ctx2).pop()),
+                  ],
+                ),
+                const Divider(),
+                Expanded(
+                  child: ListView(
+                    controller: scroll,
                     children: [
-                      const Text('Developer Debug Panel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => context.pop()),
+                      _DebugSection(
+                          title: 'RAW ML Kit OCR Output',
+                          content: widget.ocrResult.rawOcrDump),
+                      const SizedBox(height: 24),
+                      _DebugSection(
+                          title: 'Extracted Items (${_items.length})',
+                          content: _items
+                              .map((i) =>
+                                  '[${i.confidence.score}%] ${i.rawOcrPartNo} → ${i.correctedPartNo} (${i.confidence.label})')
+                              .join('\n')),
                     ],
                   ),
-                  const Divider(),
-                  Expanded(
-                    child: ListView(
-                      controller: scrollController,
-                      children: [
-                        _buildDebugSection('RAW ML Kit Output', widget.rawText ?? 'No local OCR text available.'),
-                        const SizedBox(height: 24),
-                        _buildDebugSection('RAW Gemini JSON', _geminiRawResponse ?? 'No Gemini response yet.'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
 
-  Widget _buildDebugSection(String title, String content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  @override
+  Widget build(BuildContext context) {
+    // Listen to Gemini updates
+    ref.listen<GeminiVerificationState>(
+      geminiVerificationProvider,
+      (_, next) => _onGeminiUpdate(next),
+    );
+
+    final geminiState = ref.watch(geminiVerificationProvider);
+    final verifiedCount = _items
+        .where((i) => i.confidence != MatchConfidence.unmatched)
+        .length;
+    final unmatchedCount = _items.length - verifiedCount;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
-            TextButton.icon(
-              icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Copy'),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: content));
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$title copied to clipboard!')));
-              },
+            const Text('Review Pickup List',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(
+              '${_items.length} items · $verifiedCount verified · $unmatchedCount unmatched',
+              style:
+                  const TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
         ),
-        Container(
-          height: 200,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade900,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: SingleChildScrollView(
-            child: Text(
-              content,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.greenAccent),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          AppStrings.reviewItems,
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: AppColors.primary,
-        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.bug_report_outlined),
-            onPressed: _showDebugDrawer,
             tooltip: 'Debug Panel',
+            onPressed: _showDebugDrawer,
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: AppDimensions.md),
-            child: Center(
-              child: Text(
-                '${_items.length} item${_items.length == 1 ? '' : 's'}',
-                style: const TextStyle(
-                    color: Colors.white70, fontSize: 13),
-              ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Gemini verification status banner (inline, not the global one)
+          if (geminiState.isRunning)
+            _GeminiStatusBar(
+                label:
+                    'Correcting with AI... (${geminiState.processedCount}/${geminiState.totalCount})',
+                isRunning: true),
+          if (geminiState.isCompleted && !geminiState.isRunning)
+            _GeminiStatusBar(
+                label:
+                    '✅ AI verification complete',
+                isRunning: false),
+          if (geminiState.hasFailed)
+            _GeminiStatusBar(
+                label: '⚠️ AI verification failed — showing best local results',
+                isRunning: false,
+                isError: true),
+
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(AppDimensions.md),
+              children: [
+                // Header fields
+                _HeaderForm(
+                  customerNameCtrl: _customerNameCtrl,
+                  areaCtrl: _areaCtrl,
+                  memoNumberCtrl: _memoNumberCtrl,
+                  memoDateCtrl: _memoDateCtrl,
+                ),
+                const SizedBox(height: AppDimensions.md),
+
+                // Item list
+                ..._items.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final item = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppDimensions.sm),
+                    child: _OcrItemCard(
+                      item: item,
+                      onQtyIncrease: () => _updateQty(idx, 1),
+                      onQtyDecrease: () => _updateQty(idx, -1),
+                      onEdit: () => _editItem(idx),
+                      onRemove: () => _removeItem(idx),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 100), // space for bottom button
+              ],
             ),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (_isAiEnhancing)
-                  Container(
-                    width: double.infinity,
-                    color: Colors.blue.shade50,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    child: Row(
-                      children: [
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          '🤖 AI is enhancing extraction. Please wait...',
-                          style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w500, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (_isAiEnhancing)
-                  const LinearProgressIndicator(minHeight: 2),
-                // Memo Details Header Form
-                Container(
-                  padding: const EdgeInsets.all(AppDimensions.md),
-                  color: Theme.of(context).colorScheme.surface,
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _memoNumberController,
-                              decoration: const InputDecoration(
-                                labelText: 'Memo Number',
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                border: OutlineInputBorder(),
-                              ),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                          const SizedBox(width: AppDimensions.sm),
-                          Expanded(
-                            child: TextField(
-                              controller: _customerLocationController,
-                              decoration: const InputDecoration(
-                                labelText: 'Area / Location',
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                border: OutlineInputBorder(),
-                              ),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppDimensions.sm),
-                      TextField(
-                        controller: _customerNameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Customer Name',
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          border: OutlineInputBorder(),
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-                Divider(height: 1, color: Theme.of(context).colorScheme.outlineVariant),
-                Expanded(
-                  child: _items.isEmpty
-                      ? Center(
-                          child: Text(AppStrings.noItemsExtracted,
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)))
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(AppDimensions.md),
-                          itemCount: _items.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: AppDimensions.sm),
-                          itemBuilder: (context, index) =>
-                              _OcrItemCard(
-                            item: _items[index],
-                            onQtyChanged: (qty) => _updateQty(index, qty),
-                            onRemove: () => _removeItem(index),
-                            onEdit: () => _editItem(index),
-                          ),
-                        ),
-                ),
-                SafeArea(
-                  top: false,
-                  child: Container(
-                    color: Theme.of(context).colorScheme.surface,
-                    padding: const EdgeInsets.fromLTRB(AppDimensions.md, AppDimensions.md, AppDimensions.md, AppDimensions.md),
-                    child: AppButton(
-                      label: AppStrings.generatePickupList,
-                      icon: Icons.check_rounded,
-                      onPressed: _items.isEmpty ? null : _generatePickupList,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: AppButton(
+          label: 'Generate Pickup List',
+          icon: Icons.shopping_cart_checkout_rounded,
+          onPressed: _items.isEmpty ? null : _generatePickupList,
+        ),
+      ),
     );
   }
 }
 
-class _OcrItemCard extends StatelessWidget {
-  final Map<String, dynamic> item;
-  final ValueChanged<int> onQtyChanged;
-  final VoidCallback onRemove;
-  final VoidCallback onEdit;
+// =============================================================================
+// HEADER FORM
+// =============================================================================
 
-  const _OcrItemCard({
-    required this.item,
-    required this.onQtyChanged,
-    required this.onRemove,
-    required this.onEdit,
+class _HeaderForm extends StatelessWidget {
+  final TextEditingController customerNameCtrl;
+  final TextEditingController areaCtrl;
+  final TextEditingController memoNumberCtrl;
+  final TextEditingController memoDateCtrl;
+
+  const _HeaderForm({
+    required this.customerNameCtrl,
+    required this.areaCtrl,
+    required this.memoNumberCtrl,
+    required this.memoDateCtrl,
   });
 
   @override
   Widget build(BuildContext context) {
-    final partNo = item['part_no'] as String? ?? '--';
-    final location = item['location'] as String? ?? '';
-    final description = item['description'] as String? ?? '';
-    final qty = item['required_qty'] as int? ?? 1;
-    final matchStatus = item['match_status'] as String? ?? 'unknown';
-    final price = item['price'] as double? ?? 0.0;
-    final stock = item['stock'] as int? ?? 0;
-    final pack = item['pack'] as int? ?? 0;
-
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       padding: const EdgeInsets.all(AppDimensions.md),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  partNo,
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: colorScheme.onSurface),
+          const Text('Memo Header',
+              style:
+                  TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+          const SizedBox(height: 12),
+          _field('Customer Name', customerNameCtrl),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _field('Area', areaCtrl)),
+            const SizedBox(width: 8),
+            Expanded(child: _field('Memo No.', memoNumberCtrl)),
+          ]),
+          const SizedBox(height: 8),
+          _field('Memo Date', memoDateCtrl, hint: 'e.g. 2024-06-15'),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController ctrl, {String? hint}) {
+    return TextField(
+      controller: ctrl,
+      style: const TextStyle(fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+            borderSide: const BorderSide(color: AppColors.border)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+            borderSide: const BorderSide(color: AppColors.border)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+            borderSide:
+                const BorderSide(color: AppColors.primary, width: 1.5)),
+        labelStyle:
+            const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// ITEM CARD
+// =============================================================================
+
+class _OcrItemCard extends StatelessWidget {
+  final ExtractedMemoItem item;
+  final VoidCallback onQtyIncrease;
+  final VoidCallback onQtyDecrease;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  const _OcrItemCard({
+    required this.item,
+    required this.onQtyIncrease,
+    required this.onQtyDecrease,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  Color get _confidenceColor => switch (item.confidence) {
+        MatchConfidence.exact => AppColors.success,
+        MatchConfidence.normalized => AppColors.info,
+        MatchConfidence.fuzzy => AppColors.warning,
+        MatchConfidence.gemini => AppColors.primary,
+        MatchConfidence.unmatched => AppColors.danger,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.cardShadow,
+              blurRadius: 6,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Top bar: part number + confidence badge ──────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: _confidenceColor.withValues(alpha: 0.07),
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppDimensions.radiusMd)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Corrected part number (bold, prominent)
+                      Text(
+                        item.correctedPartNo,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            letterSpacing: 0.5),
+                      ),
+                      // If corrected ≠ raw OCR, show the raw OCR below
+                      if (item.wasCorrected) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(Icons.auto_fix_high,
+                                size: 12, color: AppColors.textSecondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'OCR: ${item.rawOcrPartNo}',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                  decoration: TextDecoration.lineThrough),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              StatusBadge(status: matchStatus),
-              const SizedBox(width: AppDimensions.sm),
-              IconButton(
-                icon: const Icon(Icons.edit_outlined,
-                    color: AppColors.primary, size: 20),
-                onPressed: onEdit,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: AppDimensions.sm),
-              IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    color: AppColors.danger, size: 20),
-                onPressed: onRemove,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
+                // Confidence badge
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _confidenceColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                        color: _confidenceColor.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${item.confidence.score}%',
+                        style: TextStyle(
+                            color: _confidenceColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        item.confidence.label,
+                        style: TextStyle(
+                            color: _confidenceColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: AppDimensions.xs),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (location.isNotEmpty)
+
+          // ── Body: description + fields ───────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (item.description.isNotEmpty)
+                  Text(
+                    item.description,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                const SizedBox(height: 8),
+                // Fields row
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 6,
+                  children: [
+                    _chip(Icons.location_on_outlined,
+                        item.location.isEmpty ? 'No location' : item.location,
+                        item.location.isEmpty
+                            ? AppColors.danger
+                            : AppColors.textSecondary),
+                    _chip(Icons.currency_rupee,
+                        item.mrp > 0 ? item.mrp.toStringAsFixed(2) : '—',
+                        AppColors.textSecondary),
+                    _chip(
+                        Icons.inventory_2_outlined,
+                        'Stock: ${item.stock}',
+                        item.stock > 0
+                            ? AppColors.success
+                            : AppColors.danger),
+                    if (item.pack > 0)
+                      _chip(Icons.all_inbox_outlined, 'Pack: ${item.pack}',
+                          AppColors.textSecondary),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Qty stepper + action buttons
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined,
-                        size: 14, color: AppColors.primary),
-                    const SizedBox(width: 4),
-                    Text(
-                      location,
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.bold),
+                    _QtyStepper(
+                        qty: item.qty,
+                        onIncrease: onQtyIncrease,
+                        onDecrease: onQtyDecrease),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined,
+                          size: 20, color: AppColors.textSecondary),
+                      onPressed: onEdit,
+                      tooltip: 'Edit',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline,
+                          size: 20, color: AppColors.danger),
+                      onPressed: onRemove,
+                      tooltip: 'Remove',
                     ),
                   ],
                 ),
-              Text(
-                'Stock: $stock NOS ${pack > 0 ? '| Pack: $pack' : ''}',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: stock > 0 ? AppColors.success : AppColors.danger),
-              ),
-            ],
+              ],
+            ),
           ),
-          if (description.isNotEmpty) ...
-            [
-              const SizedBox(height: AppDimensions.xs),
-              Text(
-                description,
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(IconData icon, String text, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 3),
+        Text(text, style: TextStyle(fontSize: 12, color: color)),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// QTY STEPPER
+// =============================================================================
+
+class _QtyStepper extends StatelessWidget {
+  final int qty;
+  final VoidCallback onIncrease;
+  final VoidCallback onDecrease;
+  const _QtyStepper(
+      {required this.qty,
+      required this.onIncrease,
+      required this.onDecrease});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _btn(Icons.remove, onDecrease),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Text('$qty',
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+          _btn(Icons.add, onIncrease),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(IconData icon, VoidCallback fn) {
+    return InkWell(
+      onTap: fn,
+      borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Icon(icon, size: 18, color: AppColors.primary),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// GEMINI STATUS BAR (inline, inside this screen)
+// =============================================================================
+
+class _GeminiStatusBar extends StatelessWidget {
+  final String label;
+  final bool isRunning;
+  final bool isError;
+  const _GeminiStatusBar(
+      {required this.label,
+      required this.isRunning,
+      this.isError = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isError
+        ? AppColors.warning
+        : isRunning
+            ? AppColors.primary
+            : AppColors.success;
+    return Container(
+      color: color.withValues(alpha: 0.1),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          if (isRunning)
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: color),
+            )
+          else
+            Icon(
+                isError ? Icons.warning_amber_rounded : Icons.check_circle,
+                size: 16,
+                color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(label,
                 style: TextStyle(
-                    fontSize: 12, color: colorScheme.onSurfaceVariant),
-              ),
-            ],
-          const SizedBox(height: AppDimensions.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Price: ₹${price.toStringAsFixed(2)}',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface),
-              ),
-              Row(
-                children: [
-                  Text('Qty:',
-                      style: TextStyle(
-                          fontSize: 13, color: colorScheme.onSurfaceVariant)),
-                  const SizedBox(width: AppDimensions.sm),
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline,
-                        color: AppColors.primary, size: 20),
-                    onPressed: () => onQtyChanged(qty - 1),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimensions.sm),
-                    child: Text(
-                      '$qty',
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline,
-                        color: AppColors.primary, size: 20),
-                    onPressed: () => onQtyChanged(qty + 1),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ],
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -722,8 +670,12 @@ class _OcrItemCard extends StatelessWidget {
   }
 }
 
+// =============================================================================
+// EDIT ITEM DIALOG
+// =============================================================================
+
 class _EditItemDialog extends StatefulWidget {
-  final Map<String, dynamic> item;
+  final ExtractedMemoItem item;
   const _EditItemDialog({required this.item});
 
   @override
@@ -734,102 +686,162 @@ class _EditItemDialogState extends State<_EditItemDialog> {
   late TextEditingController _partNoCtrl;
   late TextEditingController _descCtrl;
   late TextEditingController _locCtrl;
+  late TextEditingController _qtyCtrl;
+  late TextEditingController _mrpCtrl;
   late TextEditingController _packCtrl;
   late TextEditingController _stockCtrl;
-  late TextEditingController _priceCtrl;
 
   @override
   void initState() {
     super.initState();
-    _partNoCtrl = TextEditingController(text: widget.item['part_no']?.toString());
-    _descCtrl = TextEditingController(text: widget.item['description']?.toString());
-    _locCtrl = TextEditingController(text: widget.item['location']?.toString());
-    _packCtrl = TextEditingController(text: widget.item['pack']?.toString());
-    _stockCtrl = TextEditingController(text: widget.item['stock']?.toString());
-    _priceCtrl = TextEditingController(text: widget.item['price']?.toString());
+    final i = widget.item;
+    _partNoCtrl = TextEditingController(text: i.correctedPartNo);
+    _descCtrl = TextEditingController(text: i.description);
+    _locCtrl = TextEditingController(text: i.location);
+    _qtyCtrl = TextEditingController(text: '${i.qty}');
+    _mrpCtrl = TextEditingController(text: i.mrp.toStringAsFixed(2));
+    _packCtrl = TextEditingController(text: '${i.pack}');
+    _stockCtrl = TextEditingController(text: '${i.stock}');
   }
 
   @override
   void dispose() {
-    _partNoCtrl.dispose();
-    _descCtrl.dispose();
-    _locCtrl.dispose();
-    _packCtrl.dispose();
-    _stockCtrl.dispose();
-    _priceCtrl.dispose();
+    for (final c in [
+      _partNoCtrl, _descCtrl, _locCtrl, _qtyCtrl,
+      _mrpCtrl, _packCtrl, _stockCtrl
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Edit Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      title: const Text('Edit Item',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-                controller: _partNoCtrl,
-                decoration: const InputDecoration(labelText: 'Part No', isDense: true, border: OutlineInputBorder()),
-                style: const TextStyle(fontSize: 14)),
-            const SizedBox(height: 12),
-            TextField(
-                controller: _descCtrl,
-                decoration: const InputDecoration(labelText: 'Description', isDense: true, border: OutlineInputBorder()),
-                style: const TextStyle(fontSize: 14)),
-            const SizedBox(height: 12),
-            TextField(
-                controller: _locCtrl,
-                decoration: const InputDecoration(labelText: 'Location', isDense: true, border: OutlineInputBorder()),
-                style: const TextStyle(fontSize: 14)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                      controller: _packCtrl,
-                      decoration: const InputDecoration(labelText: 'Pack', isDense: true, border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(fontSize: 14)),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                      controller: _stockCtrl,
-                      decoration: const InputDecoration(labelText: 'Stock', isDense: true, border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(fontSize: 14)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-                controller: _priceCtrl,
-                decoration: const InputDecoration(labelText: 'Price', isDense: true, border: OutlineInputBorder()),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(fontSize: 14)),
-            const SizedBox(height: 12),
+            _tf('Part Number', _partNoCtrl,
+                caps: TextCapitalization.characters),
+            _tf('Description', _descCtrl),
+            _tf('Location', _locCtrl,
+                caps: TextCapitalization.characters),
+            Row(children: [
+              Expanded(child: _tf('Qty', _qtyCtrl, numeric: true)),
+              const SizedBox(width: 8),
+              Expanded(child: _tf('MRP', _mrpCtrl, decimal: true)),
+            ]),
+            Row(children: [
+              Expanded(child: _tf('Pack', _packCtrl, numeric: true)),
+              const SizedBox(width: 8),
+              Expanded(child: _tf('Stock', _stockCtrl, numeric: true)),
+            ]),
           ],
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel')),
         FilledButton(
           onPressed: () {
-            final updated = Map<String, dynamic>.from(widget.item);
-            updated['part_no'] = _partNoCtrl.text.trim();
-            updated['description'] = _descCtrl.text.trim();
-            updated['location'] = _locCtrl.text.trim();
-            updated['pack'] = int.tryParse(_packCtrl.text.trim()) ?? 0;
-            updated['stock'] = int.tryParse(_stockCtrl.text.trim()) ?? 0;
-            updated['price'] = double.tryParse(_priceCtrl.text.trim()) ?? 0.0;
-            Navigator.pop(context, updated);
+            Navigator.pop(
+              context,
+              widget.item.copyWith(
+                correctedPartNo:
+                    _partNoCtrl.text.trim().toUpperCase(),
+                description: _descCtrl.text.trim(),
+                location:
+                    _locCtrl.text.trim().toUpperCase(),
+                qty: int.tryParse(_qtyCtrl.text) ?? widget.item.qty,
+                mrp: double.tryParse(_mrpCtrl.text) ?? widget.item.mrp,
+                pack: int.tryParse(_packCtrl.text) ?? widget.item.pack,
+                stock:
+                    int.tryParse(_stockCtrl.text) ?? widget.item.stock,
+              ),
+            );
           },
           child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  Widget _tf(
+    String label,
+    TextEditingController ctrl, {
+    bool numeric = false,
+    bool decimal = false,
+    TextCapitalization caps = TextCapitalization.none,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: ctrl,
+        textCapitalization: caps,
+        keyboardType: decimal
+            ? const TextInputType.numberWithOptions(decimal: true)
+            : numeric
+                ? TextInputType.number
+                : TextInputType.text,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          border: const OutlineInputBorder(),
+          labelStyle: const TextStyle(fontSize: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// DEBUG SECTION WIDGET
+// =============================================================================
+
+class _DebugSection extends StatelessWidget {
+  final String title;
+  final String content;
+  const _DebugSection({required this.title, required this.content});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 14)),
+            IconButton(
+              icon: const Icon(Icons.copy, size: 18),
+              tooltip: 'Copy',
+              onPressed: () => Clipboard.setData(ClipboardData(text: content)),
+            ),
+          ],
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SelectableText(
+            content.isEmpty ? '(empty)' : content,
+            style: const TextStyle(
+                fontFamily: 'monospace',
+                color: Color(0xFF9CDCFE),
+                fontSize: 11),
+          ),
         ),
       ],
     );

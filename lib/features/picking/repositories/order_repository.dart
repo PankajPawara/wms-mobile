@@ -191,6 +191,7 @@ class OrderRepository {
     required String memoNumber,
     required String customerName,
     required String customerLocation,
+    String? memoDate,
     required List<Map<String, dynamic>> items,
   }) async {
     final totalAmount = items.fold<double>(0.0, (sum, i) {
@@ -203,6 +204,7 @@ class OrderRepository {
       memoNumber: memoNumber,
       customerName: Value(customerName),
       customerLocation: Value(customerLocation),
+      memoDate: Value(memoDate),
       status: const Value('draft'),
       finalAmount: Value(totalAmount),
       createdAt: DateTime.now().toIso8601String(),

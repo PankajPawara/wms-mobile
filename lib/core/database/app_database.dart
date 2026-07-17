@@ -39,20 +39,27 @@ class InventoryMetas extends Table {
 }
 
 class Orders extends Table {
-  IntColumn get id => integer().autoIncrement()();
+  IntColumn get id =>
+      integer().autoIncrement()();
   TextColumn get mongoId => text().nullable()();
   TextColumn get memoNumber => text()();
   TextColumn get customerName => text().nullable()();
   TextColumn get customerLocation => text().nullable()();
-  TextColumn get status => text().withDefault(const Constant('draft'))();
+  /// ISO-8601 date string parsed from the physical memo (e.g. "2024-06-15").
+  /// Stored separately from createdAt (which is when the order was created in the app).
+  TextColumn get memoDate => text().nullable()();
+  TextColumn get status =>
+      text().withDefault(const Constant('draft'))();
   TextColumn get pickerId => text().nullable()();
   TextColumn get checkerId => text().nullable()();
   TextColumn get pickedAt => text().nullable()();
   TextColumn get checkedAt => text().nullable()();
-  RealColumn get finalAmount => real().withDefault(const Constant(0.0))();
+  RealColumn get finalAmount =>
+      real().withDefault(const Constant(0.0))();
   TextColumn get createdAt => text()();
   TextColumn get updatedAt => text()();
-  IntColumn get isSynced => integer().withDefault(const Constant(0))();
+  IntColumn get isSynced =>
+      integer().withDefault(const Constant(0))();
 }
 
 class OrderItems extends Table {
@@ -104,7 +111,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -113,9 +120,13 @@ class AppDatabase extends _$AppDatabase {
         },
         onUpgrade: (m, from, to) async {
           if (from < 3) {
-            // Drop and recreate inventory table to add price and stock columns
+            // v3: Drop and recreate inventory table to add price and stock columns
             await m.drop(inventory);
             await m.create(inventory);
+          }
+          if (from < 4) {
+            // v4: Add memoDate column to orders table (ADD COLUMN preserves existing rows)
+            await m.addColumn(orders, orders.memoDate);
           }
         },
       );

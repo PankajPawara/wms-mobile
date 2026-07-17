@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_colors.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/theme_provider.dart';
+import 'shared/widgets/gemini_verification_banner.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -33,6 +34,14 @@ class WmsApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'WMS',
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Column(
+          children: [
+            const GeminiVerificationBanner(),
+            Expanded(child: child ?? const SizedBox()),
+          ],
+        );
+      },
       themeMode: themeMode,
       theme: ThemeData(
         useMaterial3: true,
