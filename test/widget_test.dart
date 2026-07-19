@@ -9,6 +9,6 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: WmsApp()));
 
     // Verify that the login screen is displayed by looking for AppFullName or login button text
-    expect(find.text('Warehouse Management System'), findsNothing); // Router has not initialised frame
+    expect(find.text('Warehouse Management System'), findsOneWidget); // Router has not initialised frame
   });
 }

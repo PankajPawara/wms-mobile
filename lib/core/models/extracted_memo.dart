@@ -93,6 +93,18 @@ class ExtractedMemoItem {
     'required_qty': qty,
     'unit_price':   mrp,
   };
+
+  Map<String, dynamic> toJson() => {
+    'rawOcrPartNo': rawOcrPartNo,
+    'correctedPartNo': correctedPartNo,
+    'confidence': confidence.label,
+    'description': description,
+    'mrp': mrp,
+    'qty': qty,
+    'location': location,
+    'pack': pack,
+    'stock': stock,
+  };
 }
 
 /// Extracted header fields from the top of the memo.
@@ -122,6 +134,13 @@ class ExtractedMemoHeader {
       memoDate:     memoDate     ?? this.memoDate,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'customerName': customerName,
+    'area': area,
+    'memoNumber': memoNumber,
+    'memoDate': memoDate,
+  };
 }
 
 /// Full result of the memo OCR pipeline.
@@ -143,4 +162,11 @@ class MemoOcrResult {
   int get unmatchedCount =>
       items.where((i) => i.confidence == MatchConfidence.unmatched).length;
   bool get needsGemini => unmatchedCount > 0;
+
+  Map<String, dynamic> toJson() => {
+    'header': header.toJson(),
+    'items': items.map((i) => i.toJson()).toList(),
+    'rawOcrDump': rawOcrDump,
+    'imagePath': imagePath,
+  };
 }

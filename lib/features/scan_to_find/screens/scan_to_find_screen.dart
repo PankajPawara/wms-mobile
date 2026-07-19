@@ -847,6 +847,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                             fontSize: 30,
                             fontWeight: FontWeight.bold,
                             color: Theme.of(context).colorScheme.onSurface),
+                        maxLines: 2,
+                        softWrap: true,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 12),
                       Text('Description',
@@ -856,6 +859,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                         product['description'] as String,
                         style: TextStyle(
                             fontSize: 15, color: Theme.of(context).colorScheme.onSurface),
+                        maxLines: 3,
+                        softWrap: true,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 12),
                       Text('Available Stock',
@@ -894,25 +900,33 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                           const Icon(Icons.location_on_rounded,
                               color: AppColors.primary, size: 20),
                           const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Location',
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Location',
+                                    style: TextStyle(
+                                        fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                Text(
+                                  product['location'] as String,
                                   style: TextStyle(
-                                      fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                              Text(
-                                product['location'] as String,
-                                style: TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).colorScheme.onSurface),
-                              ),
-                              Text(
-                                product['locationLabel'] as String,
-                                style: TextStyle(
-                                    fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                              ),
-                            ],
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.onSurface),
+                                  maxLines: 2,
+                                  softWrap: true,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  product['locationLabel'] as String,
+                                  style: TextStyle(
+                                      fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  maxLines: 2,
+                                  softWrap: true,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -922,20 +936,25 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                           Icon(Icons.warehouse_rounded,
                               color: Theme.of(context).colorScheme.onSurfaceVariant, size: 18),
                           const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Area',
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Area',
+                                    style: TextStyle(
+                                        fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                Text(
+                                  product['area'] as String,
                                   style: TextStyle(
-                                      fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                              Text(
-                                product['area'] as String,
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(context).colorScheme.onSurface),
-                              ),
-                            ],
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context).colorScheme.onSurface),
+                                  maxLines: 2,
+                                  softWrap: true,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

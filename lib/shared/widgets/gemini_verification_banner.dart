@@ -90,7 +90,7 @@ class _GeminiVerificationBannerState
       GeminiVerificationStatus.completed => (
           AppColors.success,
           Icons.check_circle_rounded,
-          '\u2705 AI verification complete — ${state.updatedItems.where((i) => i.confidence.score >= 80).length} items verified',
+          '\u2705 AI review complete — ${state.updatedItems.where((i) => i.confidence == MatchConfidence.gemini).length} items corrected',
         ),
       GeminiVerificationStatus.failed => (
           AppColors.danger,

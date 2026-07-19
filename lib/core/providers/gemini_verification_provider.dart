@@ -23,6 +23,7 @@ class GeminiVerificationState {
   final GeminiVerificationStatus status;
   final List<ExtractedMemoItem> updatedItems;
   final String? errorMessage;
+  final String? rawJsonOutput;
   final int processedCount;
   final int totalCount;
 
@@ -30,6 +31,7 @@ class GeminiVerificationState {
     this.status = GeminiVerificationStatus.idle,
     this.updatedItems = const [],
     this.errorMessage,
+    this.rawJsonOutput,
     this.processedCount = 0,
     this.totalCount = 0,
   });
@@ -42,6 +44,7 @@ class GeminiVerificationState {
     GeminiVerificationStatus? status,
     List<ExtractedMemoItem>? updatedItems,
     String? errorMessage,
+    String? rawJsonOutput,
     int? processedCount,
     int? totalCount,
   }) {
@@ -49,6 +52,7 @@ class GeminiVerificationState {
       status:         status         ?? this.status,
       updatedItems:   updatedItems   ?? this.updatedItems,
       errorMessage:   errorMessage,
+      rawJsonOutput:  rawJsonOutput  ?? this.rawJsonOutput,
       processedCount: processedCount ?? this.processedCount,
       totalCount:     totalCount     ?? this.totalCount,
     );
@@ -150,6 +154,7 @@ class GeminiVerificationNotifier extends StateNotifier<GeminiVerificationState> 
       state = GeminiVerificationState(
         status: GeminiVerificationStatus.completed,
         updatedItems: allItems,
+        rawJsonOutput: 'No AI verification needed. All items passed local db validation.',
         processedCount: allItems.length,
         totalCount: allItems.length,
       );
@@ -314,8 +319,9 @@ OUTPUT FORMAT:
       state = GeminiVerificationState(
         status: GeminiVerificationStatus.completed,
         updatedItems: updatedItems,
-        processedCount: processed,
-        totalCount: lowConfidenceItems.length,
+        rawJsonOutput: cleanJson,
+        processedCount: updatedItems.length,
+        totalCount: allItems.length,
       );
       
       if (_attachedOrderId != null) {

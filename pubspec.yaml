@@ -1,4 +1,4 @@
-﻿name: wms_mobile
+name: wms_mobile
 description: Warehouse Management System - Mobile App
 
 publish_to: 'none'
@@ -75,6 +75,7 @@ flutter:
   assets:
     - .env
     - test_assets/rawfiles/
+    - assets/test_images/
 #    - assets/images/
 #
 #  fonts:

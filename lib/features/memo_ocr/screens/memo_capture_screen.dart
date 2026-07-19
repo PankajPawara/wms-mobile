@@ -48,7 +48,7 @@ class MemoCaptureScreen extends ConsumerStatefulWidget {
 }
 
 class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
-  File? _imageFile;
+  List<File> _imageFiles = [];
   _PipelineStep _currentStep = _PipelineStep.idle;
   bool get _isProcessing => _currentStep != _PipelineStep.idle && _currentStep != _PipelineStep.done;
   List<ImageQualityIssue> _qualityWarnings = [];
@@ -60,85 +60,143 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-        source: source, imageQuality: 90, maxWidth: 2000);
-    if (picked == null) return;
+    List<XFile> pickedFiles = [];
+    
+    if (source == ImageSource.gallery) {
+      pickedFiles = await picker.pickMultiImage(imageQuality: 90, maxWidth: 2000);
+    } else {
+      final picked = await picker.pickImage(source: source, imageQuality: 90, maxWidth: 2000);
+      if (picked != null) pickedFiles.add(picked);
+    }
+    
+    if (pickedFiles.isEmpty) return;
+    
     setState(() {
-      _imageFile = File(picked.path);
+      _imageFiles.addAll(pickedFiles.map((x) => File(x.path)));
       _error = null;
       _qualityWarnings = [];
       _currentStep = _PipelineStep.idle;
     });
   }
 
+  void _removeImage(int index) {
+    setState(() {
+      _imageFiles.removeAt(index);
+    });
+  }
+
   Future<void> _processOcr() async {
-    if (_imageFile == null) return;
+    if (_imageFiles.isEmpty) return;
     setState(() {
       _error = null;
       _qualityWarnings = [];
     });
 
-    File workingFile = _imageFile!;
+    final db = ref.read(appDatabaseProvider);
+    
+    List<ExtractedMemoItem> allItems = [];
+    ExtractedMemoHeader? finalHeader;
+    String finalDump = '';
+    
+    for (int i = 0; i < _imageFiles.length; i++) {
+      File workingFile = _imageFiles[i];
 
-    // ── STEP 1: Image quality check ────────────────────────────────────
-    _setStep(_PipelineStep.checkingQuality);
-    final quality = await ImageProcessor.checkQuality(workingFile);
+      _setStep(_PipelineStep.checkingQuality);
+      final quality = await ImageProcessor.checkQuality(workingFile);
 
-    if (quality.hasIssues) {
-      if (mounted) setState(() => _qualityWarnings = quality.issues);
+      if (quality.hasIssues) {
+        if (mounted) setState(() => _qualityWarnings = quality.issues);
+        final shouldContinue = await _showQualityWarningDialog(quality);
+        if (!mounted) return;
+        if (!shouldContinue) {
+          setState(() => _currentStep = _PipelineStep.idle);
+          return;
+        }
+      }
 
-      // Show warning dialog — user can retry or continue
-      final shouldContinue = await _showQualityWarningDialog(quality);
-      if (!mounted) return;
-      if (!shouldContinue) {
-        // User chose to cancel — reset to idle
-        setState(() => _currentStep = _PipelineStep.idle);
+      if (quality.canEnhance) {
+        _setStep(_PipelineStep.enhancing);
+        workingFile = await ImageProcessor.enhanceIfNeeded(workingFile, quality);
+      }
+
+      _setStep(_PipelineStep.runningOcr);
+      try {
+        _setStep(_PipelineStep.reconstructingRows);
+        _setStep(_PipelineStep.validatingDb);
+        
+        final result = await MemoOcrEngine.process(workingFile, db);
+        
+        // Merge results
+        allItems.addAll(result.items);
+        finalDump += '\n\n--- Page ${i + 1} ---\n' + result.rawOcrDump;
+        
+        // Use the first valid header we find
+        if (finalHeader == null || finalHeader.memoNumber.contains('OCR Generated')) {
+          finalHeader = result.header;
+        }
+      } catch (e) {
+        if (e.toString().contains('NO_HEADER_DETECTED')) {
+           if (mounted) {
+             setState(() {
+               _error = 'No table header detected on Image ${i+1}. Please retake the photo clearly.';
+               _currentStep = _PipelineStep.idle;
+               _imageFiles.removeAt(i);
+             });
+             if (_imageFiles.isEmpty) {
+               _pickImage(ImageSource.camera);
+             }
+           }
+           return;
+        }
+      
+        if (mounted) {
+          setState(() {
+            _error = 'OCR failed on Image ${i+1}: ${e.toString()}';
+            _currentStep = _PipelineStep.idle;
+          });
+        }
         return;
       }
     }
 
-    // ── STEP 2: Enhance brightness/contrast (only for low-light, non-blurry) ──
-    if (quality.canEnhance) {
-      _setStep(_PipelineStep.enhancing);
-      workingFile = await ImageProcessor.enhanceIfNeeded(workingFile, quality);
-    }
-
-    // ── STEP 3: ML Kit OCR + row reconstruction ──────────────────────────
-    _setStep(_PipelineStep.runningOcr);
-    MemoOcrResult ocrResult;
-    try {
-      _setStep(_PipelineStep.reconstructingRows);
-      _setStep(_PipelineStep.validatingDb);
-      final db = ref.read(appDatabaseProvider);
-      ocrResult = await MemoOcrEngine.process(workingFile, db);
-    } catch (e) {
+    if (allItems.isEmpty) {
       if (mounted) {
         setState(() {
-          _error = 'OCR failed: ${e.toString()}';
+          _error = 'No Honda part numbers found across ${_imageFiles.length} images. Try clearer photos.';
           _currentStep = _PipelineStep.idle;
         });
       }
       return;
     }
 
-    if (ocrResult.items.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _error = 'No Honda part numbers found. Try a clearer photo or better lighting.';
-          _currentStep = _PipelineStep.idle;
-        });
-      }
-      return;
-    }
+    // Deduplicate across all pages
+    final seen = <String>{};
+    final deduped = allItems.where((i) => seen.add(i.correctedPartNo)).toList();
 
     _setStep(_PipelineStep.done);
 
+    final mergedResult = MemoOcrResult(
+      header: finalHeader ?? ExtractedMemoHeader(
+        customerName: 'OCR Generated Order',
+        area: 'Warehouse Floor',
+        memoNumber: 'MEMO-OCR-${DateTime.now().millisecondsSinceEpoch}',
+      ),
+      items: deduped,
+      rawOcrDump: finalDump,
+      imagePath: _imageFiles.first.path, // Pass first image path as primary
+    );
+
     if (mounted) {
       context.push('/ocr-review', extra: {
-        'ocrResult': ocrResult,
-        'imagePath': workingFile.path,
+        'ocrResult': mergedResult,
+        'imagePath': _imageFiles.first.path,
       });
-      setState(() => _currentStep = _PipelineStep.idle);
+      
+      // Clear images after successful parsing so user starts fresh next time
+      setState(() {
+        _imageFiles.clear();
+        _currentStep = _PipelineStep.idle;
+      });
     }
   }
 
@@ -227,7 +285,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
-                  child: _imageFile == null
+                  child: _imageFiles.isEmpty
                       ? _EmptyImageState(
                           onCamera: () => _pickImage(ImageSource.camera),
                           onGallery: () => _pickImage(ImageSource.gallery),
@@ -235,11 +293,38 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
                       : Column(
                           children: [
                             Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                    AppDimensions.radiusLg),
-                                child: Image.file(_imageFile!,
-                                    fit: BoxFit.contain),
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _imageFiles.length,
+                                itemBuilder: (context, index) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8.0),
+                                    child: Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                                          child: Image.file(_imageFiles[index], fit: BoxFit.cover, width: 220),
+                                        ),
+                                        if (!_isProcessing)
+                                          Positioned(
+                                            top: 8,
+                                            right: 8,
+                                            child: InkWell(
+                                              onTap: () => _removeImage(index),
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.black54,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.close, color: Colors.white, size: 20),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                             const SizedBox(height: AppDimensions.md),
@@ -247,12 +332,10 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
                               children: [
                                 Expanded(
                                   child: AppButton(
-                                    label: 'Retake',
+                                    label: 'Add Photo',
                                     variant: AppButtonVariant.outline,
                                     icon: Icons.camera_alt_outlined,
-                                    onPressed: _isProcessing
-                                        ? null
-                                        : () => _pickImage(ImageSource.camera),
+                                    onPressed: _isProcessing ? null : () => _pickImage(ImageSource.camera),
                                   ),
                                 ),
                                 const SizedBox(width: AppDimensions.sm),
@@ -261,9 +344,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
                                     label: 'Gallery',
                                     variant: AppButtonVariant.secondary,
                                     icon: Icons.photo_library_outlined,
-                                    onPressed: _isProcessing
-                                        ? null
-                                        : () => _pickImage(ImageSource.gallery),
+                                    onPressed: _isProcessing ? null : () => _pickImage(ImageSource.gallery),
                                   ),
                                 ),
                               ],
@@ -343,7 +424,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
                         ? _currentStep.label
                         : AppStrings.generatePickupList,
                     icon: Icons.document_scanner_outlined,
-                    onPressed: _imageFile == null || _isProcessing
+                    onPressed: _imageFiles.isEmpty || _isProcessing
                         ? null
                         : _processOcr,
                     isLoading: _isProcessing,

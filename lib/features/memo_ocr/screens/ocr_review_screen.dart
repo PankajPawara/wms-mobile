@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,7 +38,7 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
     _customerNameCtrl = TextEditingController(text: h.customerName);
     _areaCtrl = TextEditingController(text: h.area);
     _memoNumberCtrl = TextEditingController(text: h.memoNumber);
-    _memoDateCtrl = TextEditingController(text: h.memoDate ?? '');
+    _memoDateCtrl = TextEditingController(text: _displayMemoDate(h.memoDate));
 
     // Kick off background Gemini verification if needed
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -80,6 +81,13 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
     setState(() {
       _items[index] = _items[index].copyWith(qty: newQty);
     });
+  }
+
+  String _displayMemoDate(String? value) {
+    if (value == null || value.isEmpty) return '';
+    final date = DateTime.tryParse(value);
+    if (date == null) return value;
+    return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
   void _removeItem(int index) {
@@ -174,6 +182,10 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
                           content: widget.ocrResult.rawOcrDump),
                       const SizedBox(height: 24),
                       _DebugSection(
+                          title: 'Gemini AI JSON Output',
+                          content: ref.read(geminiVerificationProvider).rawJsonOutput ?? 'No AI data available.'),
+                      const SizedBox(height: 24),
+                      _DebugSection(
                           title: 'Extracted Items (${_items.length})',
                           content: _items
                               .map((i) =>
@@ -219,6 +231,35 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.data_object),
+            tooltip: 'Export JSON',
+            onPressed: () {
+              final jsonStr = const JsonEncoder.withIndent('  ').convert(widget.ocrResult.toJson());
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('AI Extracted JSON'),
+                  content: SingleChildScrollView(
+                    child: SelectableText(jsonStr, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: jsonStr));
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
+                      },
+                      child: const Text('Copy'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.bug_report_outlined),
             tooltip: 'Debug Panel',
@@ -324,7 +365,7 @@ class _HeaderForm extends StatelessWidget {
               style:
                   TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
           const SizedBox(height: 12),
-          _field('Customer Name', customerNameCtrl),
+          _field('Customer Name', customerNameCtrl, maxLines: 3),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: _field('Area', areaCtrl)),
@@ -338,9 +379,16 @@ class _HeaderForm extends StatelessWidget {
     );
   }
 
-  Widget _field(String label, TextEditingController ctrl, {String? hint}) {
+  Widget _field(
+    String label,
+    TextEditingController ctrl, {
+    String? hint,
+    int maxLines = 1,
+  }) {
     return TextField(
       controller: ctrl,
+      minLines: 1,
+      maxLines: maxLines,
       style: const TextStyle(fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
@@ -432,6 +480,9 @@ class _OcrItemCard extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
                             letterSpacing: 0.5),
+                        maxLines: 2,
+                        softWrap: true,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       // If corrected ≠ raw OCR, show the raw OCR below
                       if (item.wasCorrected) ...[
@@ -441,12 +492,17 @@ class _OcrItemCard extends StatelessWidget {
                             const Icon(Icons.auto_fix_high,
                                 size: 12, color: AppColors.textSecondary),
                             const SizedBox(width: 4),
-                            Text(
-                              'OCR: ${item.rawOcrPartNo}',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                  decoration: TextDecoration.lineThrough),
+                            Expanded(
+                              child: Text(
+                                'OCR: ${item.rawOcrPartNo}',
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                    decoration: TextDecoration.lineThrough),
+                                maxLines: 2,
+                                softWrap: true,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),

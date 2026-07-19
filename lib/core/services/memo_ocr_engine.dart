@@ -1,21 +1,13 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'dart:math' as math;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:drift/drift.dart' hide Column;
-
 import '../database/app_database.dart';
 import '../models/extracted_memo.dart';
+import 'candidate_generator.dart';
 
 // =============================================================================
-// MEMO OCR ENGINE
+// DOCUMENT LAYOUT PARSER (MEMO OCR ENGINE)
 // Coordinate-aware pipeline for extracting pickup list data from memo images.
-//
-// Pipeline:
-//   1. ML Kit OCR → words with bounding boxes
-//   2. Row reconstruction by Y-proximity
-//   3. Column detection by header word X-positions
-//   4. Per-row field extraction
-//   5. DB-first part number validation with confidence scoring
 // =============================================================================
 
 /// A single OCR word with its position.
@@ -52,24 +44,27 @@ class OcrRow {
   /// True if row appears to be a table header (contains known column headers).
   bool get isHeaderRow {
     final upper = fullText.toUpperCase();
-    return upper.contains('PART') ||
-        upper.contains('MRP') ||
-        upper.contains('QTY') ||
-        upper.contains('LOCATION') ||
-        upper.contains('STOCK');
+    int matchCount = 0;
+    if (upper.contains('PART')) matchCount++;
+    if (upper.contains('DESC')) matchCount++;
+    if (upper.contains('MRP')) matchCount++;
+    if (upper.contains('QTY')) matchCount++;
+    if (upper.contains('LOC')) matchCount++;
+    if (upper.contains('PACK') || upper.contains('PKT')) matchCount++;
+    if (upper.contains('STOCK') || upper.contains('STK')) matchCount++;
+    return matchCount >= 2;
   }
 }
 
 /// X-boundaries for each column derived from the header row.
 class ColumnLayout {
-  final int srEnd;         // x < srEnd → SR No
-  final int partNoEnd;     // x < partNoEnd → Part No
-  final int descEnd;       // x < descEnd → Description
-  final int mrpEnd;        // x < mrpEnd → MRP
-  final int qtyEnd;        // x < qtyEnd → Qty
-  final int locationEnd;   // x < locationEnd → Location
-  final int packEnd;       // x < packEnd → Pack
-  // remainder → Stock
+  final int srEnd;
+  final int partNoEnd;
+  final int descEnd;
+  final int mrpEnd;
+  final int qtyEnd;
+  final int locationEnd;
+  final int packEnd;
 
   const ColumnLayout({
     required this.srEnd,
@@ -80,18 +75,6 @@ class ColumnLayout {
     required this.locationEnd,
     required this.packEnd,
   });
-
-  /// Default layout if no header row is detected.
-  /// Based on typical FAS Software memo proportions.
-  static const defaultLayout = ColumnLayout(
-    srEnd: 60,
-    partNoEnd: 280,
-    descEnd: 560,
-    mrpEnd: 700,
-    qtyEnd: 760,
-    locationEnd: 850,
-    packEnd: 920,
-  );
 
   String columnFor(OcrWord word) {
     final x = word.midX;
@@ -107,10 +90,7 @@ class ColumnLayout {
 }
 
 // =============================================================================
-// OCR CORRECTION (database-justified — same rules as PartNumberParser)
-// Safe global:    O→0, I→1, Q→0
-// Prefix-only:    S→5, B→8, Z→2, G→6, L→1, E→3
-// Never:          D→0 (8,355 real D's in DB)
+// OCR CORRECTION (database-justified)
 // =============================================================================
 
 String _safeCorrect(String s) =>
@@ -149,30 +129,22 @@ String _normalizePartNo(String raw) {
       .trim();
 }
 
-/// Flexible part number pattern — matches OCR-damaged values.
 final _partNoPattern = RegExp(
-  r'\b[A-Z0-9]{4,7}[.\s\-]+[A-Z0-9]{3}(?:[.\s\-]+[A-Z0-9]{2,7})?\b',
+  r'\b[A-Z0-9]{4,7}[.\s\-]*[A-Z0-9]{3}(?:[.\s\-]*[A-Z0-9]{2,7})?\b',
 );
 
-/// Numeric-only price pattern (e.g. 123.45 or 12345)
 final _pricePattern = RegExp(r'\b(\d{2,6}(?:[\.,]\d{2})?)\b');
 
 // =============================================================================
-// MEMO OCR ENGINE
+// DOCUMENT LAYOUT ENGINE
 // =============================================================================
 
 class MemoOcrEngine {
   MemoOcrEngine._();
 
-  // Y-grouping tolerance — words within 15px of each other are on the same row
-  static const int _yThreshold = 15;
+  static const int _yThreshold = 28;
 
-  // ───────────────────────────────────────────────────────────────
-  // STEP 1+2: ML Kit OCR → OcrRows
-  // ───────────────────────────────────────────────────────────────
-
-  /// Run ML Kit OCR and reconstruct rows by Y-coordinate proximity.
-  static Future<({List<OcrRow> rows, String rawDump})> runOcr(File imageFile) async {
+  static Future<({List<OcrWord> headerWords, List<OcrRow> tableRows, String rawDump})> runOcr(File imageFile) async {
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       final inputImage = InputImage.fromFile(imageFile);
@@ -181,141 +153,244 @@ class MemoOcrEngine {
       final allWords = <OcrWord>[];
       final dumpBuffer = StringBuffer();
 
+      int maxImageX = 0;
+      int maxImageY = 0;
+      double sumDx = 0;
+      double sumDy = 0;
+
+      for (final block in recognized.blocks) {
+        for (final line in block.lines) {
+          if (line.elements.length > 1) {
+            final first = line.elements.first.boundingBox;
+            final last = line.elements.last.boundingBox;
+            if (first != null && last != null) {
+              sumDx += (last.center.dx - first.center.dx);
+              sumDy += (last.center.dy - first.center.dy);
+            }
+          }
+          for (final element in line.elements) {
+            final bb = element.boundingBox;
+            if (bb == null) continue;
+            if (bb.right > maxImageX) maxImageX = bb.right.toInt();
+            if (bb.bottom > maxImageY) maxImageY = bb.bottom.toInt();
+          }
+        }
+      }
+
+      int coarseRotation = 0;
+      if (sumDx.abs() > sumDy.abs()) {
+        coarseRotation = sumDx > 0 ? 0 : 180;
+      } else if (sumDy.abs() > sumDx.abs()) {
+        coarseRotation = sumDy > 0 ? 90 : 270;
+      }
+
+      double sumAngle = 0;
+      int angleCount = 0;
+
+      // Second pass to find fine skew angle AFTER assuming coarse rotation
+      for (final block in recognized.blocks) {
+        for (final line in block.lines) {
+          if (line.elements.length > 1) {
+            final first = line.elements.first.boundingBox;
+            final last = line.elements.last.boundingBox;
+            if (first != null && last != null) {
+              double fx = first.center.dx; double fy = first.center.dy;
+              double lx = last.center.dx; double ly = last.center.dy;
+              double temp;
+              // Simulate coarse rotation
+              if (coarseRotation == 180) {
+                fx = maxImageX - fx; fy = maxImageY - fy;
+                lx = maxImageX - lx; ly = maxImageY - ly;
+              } else if (coarseRotation == 90) {
+                temp = fx; fx = fy; fy = maxImageX - temp;
+                temp = lx; lx = ly; ly = maxImageX - temp;
+              } else if (coarseRotation == 270) {
+                temp = fx; fx = maxImageY - fy; fy = temp;
+                temp = lx; lx = maxImageY - ly; ly = temp;
+              }
+              
+              double dx = lx - fx;
+              double dy = ly - fy;
+              
+              // Only consider roughly horizontal lines for skew
+              if (dx.abs() > dy.abs()) {
+                sumAngle += math.atan2(dy, dx);
+                angleCount++;
+              }
+            }
+          }
+        }
+      }
+
+      double skewAngle = angleCount > 0 ? sumAngle / angleCount : 0;
+      
+      // Calculate new center for skew rotation
+      double rotatedImageWidth = (coarseRotation == 90 || coarseRotation == 270) ? maxImageY.toDouble() : maxImageX.toDouble();
+      double rotatedImageHeight = (coarseRotation == 90 || coarseRotation == 270) ? maxImageX.toDouble() : maxImageY.toDouble();
+      double cx = rotatedImageWidth / 2;
+      double cy = rotatedImageHeight / 2;
+
       for (final block in recognized.blocks) {
         for (final line in block.lines) {
           for (final element in line.elements) {
             final bb = element.boundingBox;
             if (bb == null) continue;
+
+            int left = bb.left.toInt();
+            int top = bb.top.toInt();
+            int right = bb.right.toInt();
+            int bottom = bb.bottom.toInt();
+            int newLeft, newTop, newRight, newBottom;
+
+            // 1. Coarse rotation
+            if (coarseRotation == 0) {
+              newLeft = left; newTop = top; newRight = right; newBottom = bottom;
+            } else if (coarseRotation == 180) {
+              newLeft = maxImageX - right;
+              newRight = maxImageX - left;
+              newTop = maxImageY - bottom;
+              newBottom = maxImageY - top;
+            } else if (coarseRotation == 90) {
+              newLeft = top;
+              newRight = bottom;
+              newTop = maxImageX - right;
+              newBottom = maxImageX - left;
+            } else { // 270
+              newLeft = maxImageY - bottom;
+              newRight = maxImageY - top;
+              newTop = left;
+              newBottom = right;
+            }
+
+            // 2. Fine skew rotation
+            double rotateX(double x, double y) =>
+                cx + (x - cx) * math.cos(-skewAngle) - (y - cy) * math.sin(-skewAngle);
+            double rotateY(double x, double y) =>
+                cy + (x - cx) * math.sin(-skewAngle) + (y - cy) * math.cos(-skewAngle);
+
+            int finalLeft = rotateX(newLeft.toDouble(), newTop.toDouble()).toInt();
+            int finalRight = rotateX(newRight.toDouble(), newBottom.toDouble()).toInt();
+            int finalTop = rotateY(newLeft.toDouble(), newTop.toDouble()).toInt();
+            int finalBottom = rotateY(newRight.toDouble(), newBottom.toDouble()).toInt();
+
+            if (finalLeft > finalRight) {
+              final t = finalLeft; finalLeft = finalRight; finalRight = t;
+            }
+            if (finalTop > finalBottom) {
+              final t = finalTop; finalTop = finalBottom; finalBottom = t;
+            }
+
             allWords.add(OcrWord(
               text: element.text,
-              left: bb.left.toInt(),
-              top: bb.top.toInt(),
-              right: bb.right.toInt(),
-              bottom: bb.bottom.toInt(),
+              left: finalLeft,
+              top: finalTop,
+              right: finalRight,
+              bottom: finalBottom,
             ));
-            dumpBuffer.write('[y=${bb.top.toInt()}] ${element.text} ');
+            dumpBuffer.write('[x=$finalLeft, y=$finalTop] ${element.text} ');
           }
           dumpBuffer.writeln();
         }
       }
 
-      // Sort all words top-to-bottom, then left-to-right
-      allWords.sort((a, b) {
-        final yDiff = a.midY - b.midY;
-        return yDiff.abs() <= _yThreshold ? a.midX - b.midX : yDiff;
-      });
+      allWords.sort((a, b) => a.midY.compareTo(b.midY));
 
-      // Group words into rows by Y proximity
       final rows = <OcrRow>[];
       var currentWords = <OcrWord>[];
-      int? currentY;
+      int? anchorY;
 
       for (final word in allWords) {
-        if (currentY == null || (word.midY - currentY).abs() <= _yThreshold) {
+        if (anchorY == null || (word.midY - anchorY).abs() <= _yThreshold) {
           currentWords.add(word);
-          currentY = currentY == null
-              ? word.midY
-              : ((currentY + word.midY) ~/ 2);
+          if (anchorY == null) anchorY = word.midY;
         } else {
           if (currentWords.isNotEmpty) {
             currentWords.sort((a, b) => a.midX - b.midX);
             rows.add(OcrRow(
               words: List.unmodifiable(currentWords),
-              approximateY: currentY!,
+              approximateY: anchorY!,
             ));
           }
           currentWords = [word];
-          currentY = word.midY;
+          anchorY = word.midY;
         }
       }
       if (currentWords.isNotEmpty) {
         currentWords.sort((a, b) => a.midX - b.midX);
         rows.add(OcrRow(
           words: List.unmodifiable(currentWords),
-          approximateY: currentY!,
+          approximateY: anchorY!,
         ));
       }
 
-      return (rows: rows, rawDump: dumpBuffer.toString());
+      // Split into header region (above table) and table region (below)
+      OcrRow? headerRow;
+      for (final row in rows) {
+        if (row.isHeaderRow) {
+          headerRow = row;
+          break;
+        }
+      }
+
+      if (headerRow == null) {
+        throw Exception('NO_HEADER_DETECTED');
+      }
+
+      final headerRegionWords = allWords.where((w) => w.midY < headerRow!.approximateY - 20).toList();
+      final tableRows = rows.where((r) => r.approximateY >= headerRow!.approximateY - 10).toList();
+
+      return (headerWords: headerRegionWords, tableRows: tableRows, rawDump: dumpBuffer.toString());
     } finally {
       await textRecognizer.close();
     }
   }
 
-  // ───────────────────────────────────────────────────────────────
-  // STEP 3: Column layout detection
-  // ───────────────────────────────────────────────────────────────
-
-  static ColumnLayout detectColumns(List<OcrRow> rows) {
-    // Find the header row
-    OcrRow? headerRow;
-    for (final row in rows) {
-      if (row.isHeaderRow) {
-        headerRow = row;
-        break;
-      }
-    }
-    if (headerRow == null) return ColumnLayout.defaultLayout;
-
-    // Map header keyword → midX
-    final xMap = <String, int>{};
+  static ColumnLayout detectColumns(OcrRow headerRow) {
+    int? srX, partNoX, descX, mrpX, qtyX, locX, packX, stockX;
+    
     for (final word in headerRow.words) {
       final upper = word.text.toUpperCase();
-      if (upper.contains('SR') || upper.contains('S.R')) xMap['sr'] = word.midX;
-      if (upper.contains('PART')) xMap['partNo'] = word.midX;
-      if (upper.contains('DESC')) xMap['desc'] = word.midX;
-      if (upper.contains('MRP'))  xMap['mrp'] = word.midX;
-      if (upper.contains('QTY'))  xMap['qty'] = word.midX;
-      if (upper.contains('LOC'))  xMap['location'] = word.midX;
-      if (upper.contains('PACK') || upper.contains('PKT')) xMap['pack'] = word.midX;
-      if (upper.contains('STOCK') || upper.contains('STK')) xMap['stock'] = word.midX;
+      if (upper.contains('SR') || upper.contains('S.R')) srX = word.midX;
+      if (upper.contains('PART')) partNoX = word.midX;
+      if (upper.contains('DESC')) descX = word.midX;
+      if (upper.contains('MRP'))  mrpX = word.midX;
+      if (upper.contains('QTY'))  qtyX = word.midX;
+      if (upper.contains('LOC'))  locX = word.midX;
+      if (upper.contains('PACK') || upper.contains('PKT')) packX = word.midX;
+      if (upper.contains('STOCK') || upper.contains('STK')) stockX = word.midX;
     }
 
-    // Build boundaries using midpoints between adjacent columns
-    int midpoint(String a, String b) {
-      final xA = xMap[a];
-      final xB = xMap[b];
-      if (xA == null || xB == null) return ColumnLayout.defaultLayout.srEnd;
-      return (xA + xB) ~/ 2;
-    }
+    // Dynamic Interpolation for missing headers
+    partNoX ??= (descX != null ? descX ~/ 2 : 280);
+    descX ??= (mrpX != null ? mrpX - 140 : 560);
+    mrpX ??= (qtyX != null ? qtyX - 60 : 700);
+    qtyX ??= (mrpX + 60);
+    locX ??= (qtyX + 90);
+    packX ??= (locX + 70);
+    stockX ??= (packX + 70);
+    srX ??= partNoX ~/ 2;
 
-    return ColumnLayout(
-      srEnd: xMap['sr'] != null && xMap['partNo'] != null
-          ? midpoint('sr', 'partNo')
-          : ColumnLayout.defaultLayout.srEnd,
-      partNoEnd: xMap['partNo'] != null && xMap['desc'] != null
-          ? midpoint('partNo', 'desc')
-          : ColumnLayout.defaultLayout.partNoEnd,
-      descEnd: xMap['desc'] != null && xMap['mrp'] != null
-          ? midpoint('desc', 'mrp')
-          : ColumnLayout.defaultLayout.descEnd,
-      mrpEnd: xMap['mrp'] != null && xMap['qty'] != null
-          ? midpoint('mrp', 'qty')
-          : ColumnLayout.defaultLayout.mrpEnd,
-      qtyEnd: xMap['qty'] != null && xMap['location'] != null
-          ? midpoint('qty', 'location')
-          : ColumnLayout.defaultLayout.qtyEnd,
-      locationEnd: xMap['location'] != null && xMap['pack'] != null
-          ? midpoint('location', 'pack')
-          : ColumnLayout.defaultLayout.locationEnd,
-      packEnd: xMap['pack'] != null && xMap['stock'] != null
-          ? midpoint('pack', 'stock')
-          : ColumnLayout.defaultLayout.packEnd,
+    int midpoint(int a, int b) => (a + b) ~/ 2;
+
+    final layout = ColumnLayout(
+      srEnd: midpoint(srX, partNoX),
+      partNoEnd: midpoint(partNoX, descX),
+      descEnd: midpoint(descX, mrpX),
+      mrpEnd: midpoint(mrpX, qtyX),
+      qtyEnd: midpoint(qtyX, locX),
+      locationEnd: midpoint(locX, packX),
+      packEnd: midpoint(packX, stockX),
     );
+    print('DETECTED COLUMNS: srX=$srX, partNoX=$partNoX, descX=$descX, mrpX=$mrpX, qtyX=$qtyX, locX=$locX');
+    print('LAYOUT BOUNDS: srEnd=${layout.srEnd}, partNoEnd=${layout.partNoEnd}, descEnd=${layout.descEnd}');
+    return layout;
   }
 
-  // ───────────────────────────────────────────────────────────────
-  // STEP 4+5: Row extraction + DB-first validation
-  // ───────────────────────────────────────────────────────────────
-
-  /// Extract a single item from a row using column layout.
-  /// Returns null if the row doesn't contain a part number.
   static Future<ExtractedMemoItem?> extractItemFromRow(
     OcrRow row,
     ColumnLayout cols,
-    AppDatabase db,
+    CandidateGenerator candidateGenerator,
   ) async {
-    // Assign words to columns
     final colTexts = <String, List<String>>{
       'sr': [],
       'partNo': [],
@@ -330,221 +405,154 @@ class MemoOcrEngine {
       colTexts[cols.columnFor(word)]!.add(word.text);
     }
 
-    final rawPartNoText = colTexts['partNo']!.join(' ').trim().toUpperCase();
+    // Join partNo without spaces to fix split segments, and uppercase it to match regex
+    final rawPartNoText = colTexts['partNo']!.join('').trim().toUpperCase();
+    print('ROW COLS: SR=${colTexts['sr']} | PN=${colTexts['partNo']} | DESC=${colTexts['desc']} | MRP=${colTexts['mrp']}');
     if (rawPartNoText.isEmpty) return null;
 
-    // Check if this row could be a part number row
-    // Must contain at least 7 chars resembling a part number
     final partNoMatch = _partNoPattern.firstMatch(rawPartNoText);
-    if (partNoMatch == null && rawPartNoText.length < 7) return null;
+    if (partNoMatch == null) return null;
 
     final rawPartNo = partNoMatch != null
         ? partNoMatch.group(0)!.replaceAll(RegExp(r'[\.\s]+'), '-').toUpperCase()
         : rawPartNoText;
 
-    // Extract other fields
-    final descText = colTexts['desc']!.join(' ').trim();
-    final mrpText = colTexts['mrp']!.join('').trim();
-    final qtyText = colTexts['qty']!.join('').trim();
-    final locationText = colTexts['location']!.join(' ').trim().toUpperCase();
-    final packText = colTexts['pack']!.join('').trim();
-    final stockText = colTexts['stock']!.join('').trim();
+    String descText = colTexts['desc']!.join(' ').trim();
+    String mrpText = colTexts['mrp']!.join('').trim();
+    String locationText = colTexts['location']!.join('').trim().toUpperCase();
 
-    // Parse numeric fields
     double mrp = 0.0;
     final priceMatch = _pricePattern.firstMatch(
         mrpText.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1'));
     if (priceMatch != null) {
-      mrp = double.tryParse(
-              priceMatch.group(1)!.replaceAll(',', '.')) ??
-          0.0;
+      mrp = double.tryParse(priceMatch.group(1)!.replaceAll(',', '.')) ?? 0.0;
     }
 
     final cleanNum = (String s) =>
-        s.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1');
+        s.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[^0-9]'), '');
+
+    String extractFirstNumber(List<String> words) {
+      for (final w in words) {
+        final cleaned = cleanNum(w);
+        if (cleaned.isNotEmpty) return cleaned;
+      }
+      return '';
+    }
+
+    String qtyText = extractFirstNumber(colTexts['qty']!);
+    String packText = extractFirstNumber(colTexts['pack']!);
+    String stockText = extractFirstNumber(colTexts['stock']!);
+
+    // Handle case where ML Kit merges QTY and LOCATION into one word like "2|050F" -> falls in Location column
+    if (qtyText.isEmpty && locationText.isNotEmpty) {
+      final parts = locationText.split(RegExp(r'[|I\\]+'));
+      if (parts.length >= 2) {
+        qtyText = parts[0];
+        locationText = parts[1];
+      } else {
+        final match = RegExp(r'^(\d+)(\d{2,3}[A-Z])$').firstMatch(locationText);
+        if (match != null) {
+          qtyText = match.group(1)!;
+          locationText = match.group(2)!;
+        }
+      }
+    }
+    
+    // Handle case where MRP and QTY merge
+    if (mrpText.isNotEmpty && qtyText.isEmpty) {
+      final parts = mrpText.split(RegExp(r'[|I\\]+'));
+      if (parts.length >= 2 && parts.last.length <= 2) {
+        qtyText = parts.last;
+      }
+    }
 
     final qty = int.tryParse(cleanNum(qtyText)) ?? 1;
     final pack = int.tryParse(cleanNum(packText)) ?? 0;
     final stock = int.tryParse(cleanNum(stockText)) ?? 0;
+    
+    // Location Parser
+    final locMatch = RegExp(r'\d{2,3}[A-Z]').firstMatch(locationText);
+    String loc = locMatch != null ? locMatch.group(0)! : locationText;
+    loc = loc.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (loc.length > 4) loc = loc.substring(0, 4);
 
-    // DB-first validation with confidence scoring
-    return await _validateWithDb(
+    return await candidateGenerator.findBestMatch(
       rawPartNo: rawPartNo,
       description: descText,
       mrp: mrp,
       qty: qty,
-      location: locationText,
-      pack: pack,
-      stock: stock,
-      db: db,
-    );
-  }
-
-  /// Validate and resolve a part number against the local DB.
-  /// Returns an [ExtractedMemoItem] with the highest achievable confidence.
-  static Future<ExtractedMemoItem> _validateWithDb({
-    required String rawPartNo,
-    required String description,
-    required double mrp,
-    required int qty,
-    required String location,
-    required int pack,
-    required int stock,
-    required AppDatabase db,
-  }) async {
-    // ── Tier 1: Exact match (100%) ──────────────────────────────────────────
-    var matches = await (db.select(db.inventory)
-          ..where((t) => t.partNo.equals(rawPartNo)))
-        .get();
-    if (matches.isNotEmpty) {
-      return _buildItem(rawPartNo, rawPartNo, matches.first,
-          MatchConfidence.exact, mrp, qty, pack, description);
-    }
-
-    // ── Tier 2: Normalized match (95%) — strip dashes/spaces ────────────────
-    final normalized = _normalizePartNo(rawPartNo);
-    if (normalized != rawPartNo) {
-      matches = await (db.select(db.inventory)
-            ..where((t) => t.partNo.equals(normalized)))
-          .get();
-      if (matches.isNotEmpty) {
-        return _buildItem(rawPartNo, normalized, matches.first,
-            MatchConfidence.normalized, mrp, qty, pack, description);
-      }
-    }
-
-    // ── Tier 3: OCR correction (85%) ────────────────────────────────────────
-    final corrected = _applyOcrCorrection(normalized);
-    if (corrected != normalized) {
-      matches = await (db.select(db.inventory)
-            ..where((t) => t.partNo.equals(corrected)))
-          .get();
-      if (matches.isNotEmpty) {
-        return _buildItem(rawPartNo, corrected, matches.first,
-            MatchConfidence.fuzzy, mrp, qty, pack, description);
-      }
-    }
-
-    // ── Tier 4: LIKE partial match (sends to Gemini) ─────────────────────────
-    // Try stripping leading garbage (pipe chars, spaces)
-    var cleaned = rawPartNo;
-    while (cleaned.length > 7 &&
-        (cleaned.startsWith('1') ||
-            cleaned.startsWith('|') ||
-            cleaned.startsWith('/') ||
-            cleaned.startsWith('!'))) {
-      cleaned = cleaned.substring(1);
-      matches = await (db.select(db.inventory)
-            ..where((t) => t.partNo.equals(cleaned)))
-          .get();
-      if (matches.isNotEmpty) {
-        return _buildItem(rawPartNo, cleaned, matches.first,
-            MatchConfidence.normalized, mrp, qty, pack, description);
-      }
-    }
-
-    // ── No DB match → unmatched (will be sent to Gemini) ─────────────────────
-    return ExtractedMemoItem(
-      rawOcrPartNo: rawPartNo,
-      correctedPartNo: corrected.isNotEmpty ? corrected : rawPartNo,
-      confidence: MatchConfidence.unmatched,
-      description: description,
-      mrp: mrp,
-      qty: qty,
-      location: location,
+      location: loc,
       pack: pack,
       stock: stock,
     );
   }
 
-  static ExtractedMemoItem _buildItem(
-    String rawOcr,
-    String corrected,
-    InventoryData dbItem,
-    MatchConfidence confidence,
-    double ocrMrp,
-    int qty,
-    int pack,
-    String ocrDesc,
-  ) {
-    return ExtractedMemoItem(
-      rawOcrPartNo: rawOcr,
-      correctedPartNo: corrected,
-      confidence: confidence,
-      description: dbItem.description?.isNotEmpty == true
-          ? dbItem.description!
-          : ocrDesc,
-      mrp: ocrMrp > 0 ? ocrMrp : dbItem.price,
-      qty: qty,
-      location: dbItem.location.isNotEmpty ? dbItem.location : 'LOCATION NOT DEFINED',
-      pack: pack,
-      stock: dbItem.stock,
-    );
-  }
-
   // ───────────────────────────────────────────────────────────────
-  // STEP 6: Header extraction
+  // SPATIAL HEADER PARSING
   // ───────────────────────────────────────────────────────────────
 
-  static ExtractedMemoHeader extractHeader(String rawText) {
-    // Customer name
-    String customerName = 'OCR Generated Order';
-    final custMatch = RegExp(
-      r'M/S\.?,?\s*([^\n\r]+)',
-      caseSensitive: false,
-    ).firstMatch(rawText);
-    if (custMatch != null) {
-      customerName = custMatch.group(1)!.trim();
-      // Remove trailing address suffixes
-      customerName = customerName.replaceAll(
-        RegExp(r'\s+(VANSADA|SURAT|KIM|RUSTAMPURA|KOSAMBA|BILIMORA|NAVSARI|BHARUCH).*$',
-            caseSensitive: false),
-        '',
+  static ExtractedMemoHeader extractHeaderSpatial(List<OcrWord> headerWords) {
+    if (headerWords.isEmpty) {
+      return ExtractedMemoHeader(
+        customerName: 'OCR Generated Order',
+        area: 'Warehouse Floor',
+        memoNumber: 'MEMO-OCR-${DateTime.now().millisecondsSinceEpoch}',
+        memoDate: null,
       );
     }
+    
+    // Find approximate center of the image X
+    int minX = 99999;
+    int maxX = 0;
+    for (final w in headerWords) {
+      if (w.midX < minX) minX = w.midX;
+      if (w.midX > maxX) maxX = w.midX;
+    }
+    final centerX = (minX + maxX) ~/ 2;
 
-    // Area
+    final leftSideWords = headerWords.where((w) => w.midX < centerX).toList();
+    final rightSideWords = headerWords.where((w) => w.midX >= centerX).toList();
+
+    leftSideWords.sort((a, b) => a.midY.compareTo(b.midY));
+    rightSideWords.sort((a, b) => a.midY.compareTo(b.midY));
+
+    String leftText = leftSideWords.map((w) => w.text).join(' ');
+    String rightText = rightSideWords.map((w) => w.text).join(' ');
+
+    String customerName = 'OCR Generated Order';
+    final custMatch = RegExp(r'M/S\.?\s*,?\s*([^\n\r0-9]+)', caseSensitive: false).firstMatch(leftText);
+    if (custMatch != null) {
+      customerName = custMatch.group(1)!.trim();
+      customerName = customerName.replaceAll(RegExp(r'\s+(VANSADA|SURAT|KIM|RUSTAMPURA|KOSAMBA|BILIMORA|NAVSARI|BHARUCH).*$', caseSensitive: false), '');
+    }
+
     String area = 'Warehouse Floor';
-    final areaMatch = RegExp(
-      r'AREA\s*:\s*([^\n\r]+)',
-      caseSensitive: false,
-    ).firstMatch(rawText);
+    final areaMatch = RegExp(r'AREA\s*:\s*([A-Za-z\s]+)', caseSensitive: false).firstMatch(rightText);
     if (areaMatch != null) {
       area = areaMatch.group(1)!.trim();
     } else {
-      final cityMatch = RegExp(
-        r'(VANSADA|RUSTAMPURA|SURAT|KIM|KOSAMBA|BILIMORA|NAVSARI|BHARUCH)',
-        caseSensitive: false,
-      ).firstMatch(rawText);
+      final cityMatch = RegExp(r'(VANSADA|RUSTAMPURA|SURAT|KIM|KOSAMBA|BILIMORA|NAVSARI|BHARUCH)', caseSensitive: false).firstMatch(leftText);
       if (cityMatch != null) area = cityMatch.group(1)!.trim().toUpperCase();
     }
 
-    // Memo number
-    String memoNumber =
-        'MEMO-OCR-${DateTime.now().millisecondsSinceEpoch}';
-    final memoMatch = RegExp(
-      r'MEMO\s*NO\.?\s*:?\s*(\d+)',
-      caseSensitive: false,
-    ).firstMatch(rawText);
+    String memoNumber = 'MEMO-OCR-${DateTime.now().millisecondsSinceEpoch}';
+    final memoMatch = RegExp(r'MEMO\s*NO\.?\s*:?\s*(\d+)', caseSensitive: false).firstMatch(rightText);
     if (memoMatch != null) memoNumber = memoMatch.group(1)!.trim();
 
-    // Memo date (dd/mm/yyyy or dd-mm-yyyy or similar)
     String? memoDate;
-    final dateMatch = RegExp(
-      r'\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b',
-    ).firstMatch(rawText);
+    final dateMatch = RegExp(r'\b(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})\b').firstMatch(rightText);
     if (dateMatch != null) {
       try {
-        final day   = int.parse(dateMatch.group(1)!);
+        final day = int.parse(dateMatch.group(1)!);
         final month = int.parse(dateMatch.group(2)!);
-        var year    = int.parse(dateMatch.group(3)!);
+        var year = int.parse(dateMatch.group(3)!);
         if (year < 100) year += 2000;
         memoDate = DateTime(year, month, day).toIso8601String();
       } catch (_) {}
     }
 
     return ExtractedMemoHeader(
-      customerName: customerName,
+      customerName: customerName.isNotEmpty ? customerName : 'OCR Generated Order',
       area: area,
       memoNumber: memoNumber,
       memoDate: memoDate,
@@ -552,50 +560,36 @@ class MemoOcrEngine {
   }
 
   // ───────────────────────────────────────────────────────────────
-  // STEP 7: Full pipeline runner
+  // FULL PIPELINE RUNNER
   // ───────────────────────────────────────────────────────────────
 
-  /// Run the complete pipeline on a memo image file.
-  /// Returns a [MemoOcrResult] with header, items, and raw OCR dump.
   static Future<MemoOcrResult> process(File imageFile, AppDatabase db) async {
-    // Step 1+2: OCR → rows
-    final (:rows, :rawDump) = await runOcr(imageFile);
+    final candidateGenerator = CandidateGenerator(db);
+    await candidateGenerator.init();
 
-    // Step 3: Column detection
-    final cols = detectColumns(rows);
+    final (:headerWords, :tableRows, :rawDump) = await runOcr(imageFile);
+    
+    // We already threw NO_HEADER_DETECTED if there is no header row.
+    final headerRow = tableRows.firstWhere((r) => r.isHeaderRow);
+    
+    final cols = detectColumns(headerRow);
+    final header = extractHeaderSpatial(headerWords);
 
-    // Step 4+5: Item extraction + DB validation
     final items = <ExtractedMemoItem>[];
-    final headerText = rows
-        .where((r) => !r.isHeaderRow)
-        .take(5)
-        .map((r) => r.fullText)
-        .join('\n');
-    final header = extractHeader('$headerText\n$rawDump');
 
-    // Find the header row Y to skip anything above it (title/company info)
-    int? headerRowY;
-    for (final row in rows) {
-      if (row.isHeaderRow) {
-        headerRowY = row.approximateY;
-        break;
-      }
-    }
-
-    for (final row in rows) {
-      if (row.isHeaderRow) continue;
-      if (headerRowY != null && row.approximateY <= headerRowY) continue;
+    print('TOTAL ROWS EXTRACTED: ${tableRows.length}');
+    print('HEADER ROW TEXT: ${headerRow.words.map((w) => w.text).join(' ')}');
+    for (final row in tableRows) {
       if (row.words.isEmpty) continue;
 
       try {
-        final item = await extractItemFromRow(row, cols, db);
+        final item = await extractItemFromRow(row, cols, candidateGenerator);
         if (item != null) items.add(item);
-      } catch (e) {
-        if (kDebugMode) print('[MemoOcrEngine] Row extraction error: $e');
+      } catch (e, stack) {
+        print('[MemoOcrEngine] Row extraction error: $e\n$stack');
       }
     }
 
-    // Deduplicate by correctedPartNo (keep first occurrence)
     final seen = <String>{};
     final deduped = items.where((i) => seen.add(i.correctedPartNo)).toList();
 
