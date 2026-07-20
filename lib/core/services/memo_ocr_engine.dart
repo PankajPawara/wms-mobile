@@ -144,7 +144,7 @@ class MemoOcrEngine {
 
   static const int _yThreshold = 28;
 
-  static Future<({List<OcrWord> headerWords, List<OcrRow> tableRows, String rawDump})> runOcr(File imageFile) async {
+  static Future<({List<OcrWord> headerWords, List<OcrRow> tableRows, String rawDump, int maxImageX})> runOcr(File imageFile) async {
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       final inputImage = InputImage.fromFile(imageFile);
@@ -339,13 +339,13 @@ class MemoOcrEngine {
       final headerRegionWords = allWords.where((w) => w.midY < headerRow!.approximateY - 20).toList();
       final tableRows = rows.where((r) => r.approximateY >= headerRow!.approximateY - 10).toList();
 
-      return (headerWords: headerRegionWords, tableRows: tableRows, rawDump: dumpBuffer.toString());
+      return (headerWords: headerRegionWords, tableRows: tableRows, rawDump: dumpBuffer.toString(), maxImageX: maxImageX);
     } finally {
       await textRecognizer.close();
     }
   }
 
-  static ColumnLayout detectColumns(OcrRow headerRow) {
+  static ColumnLayout detectColumns(OcrRow headerRow, int maxImageX) {
     int? srX, partNoX, descX, mrpX, qtyX, locX, packX, stockX;
     
     for (final word in headerRow.words) {
@@ -360,15 +360,24 @@ class MemoOcrEngine {
       if (upper.contains('STOCK') || upper.contains('STK')) stockX = word.midX;
     }
 
-    // Dynamic Interpolation for missing headers
-    partNoX ??= (descX != null ? descX ~/ 2 : 280);
-    descX ??= (mrpX != null ? mrpX - 140 : 560);
-    mrpX ??= (qtyX != null ? qtyX - 60 : 700);
-    qtyX ??= (mrpX + 60);
-    locX ??= (qtyX + 90);
-    packX ??= (locX + 70);
-    stockX ??= (packX + 70);
-    srX ??= partNoX ~/ 2;
+    // Dynamic Interpolation for missing headers based on image width ratio
+    srX ??= (maxImageX * 0.04).toInt();
+    partNoX ??= (maxImageX * 0.16).toInt();
+    descX ??= (maxImageX * 0.54).toInt();
+    mrpX ??= (maxImageX * 0.62).toInt();
+    qtyX ??= (maxImageX * 0.70).toInt();
+    locX ??= (maxImageX * 0.83).toInt();
+    packX ??= (maxImageX * 0.89).toInt();
+    stockX ??= (maxImageX * 0.95).toInt();
+
+    // Enforce strictly increasing bounds
+    if (partNoX <= srX) partNoX = srX + 10;
+    if (descX <= partNoX) descX = partNoX + 10;
+    if (mrpX <= descX) mrpX = descX + 10;
+    if (qtyX <= mrpX) qtyX = mrpX + 10;
+    if (locX <= qtyX) locX = qtyX + 10;
+    if (packX <= locX) packX = locX + 10;
+    if (stockX <= packX) stockX = packX + 10;
 
     int midpoint(int a, int b) => (a + b) ~/ 2;
 
@@ -567,12 +576,12 @@ class MemoOcrEngine {
     final candidateGenerator = CandidateGenerator(db);
     await candidateGenerator.init();
 
-    final (:headerWords, :tableRows, :rawDump) = await runOcr(imageFile);
+    final (:headerWords, :tableRows, :rawDump, :maxImageX) = await runOcr(imageFile);
     
     // We already threw NO_HEADER_DETECTED if there is no header row.
     final headerRow = tableRows.firstWhere((r) => r.isHeaderRow);
     
-    final cols = detectColumns(headerRow);
+    final cols = detectColumns(headerRow, maxImageX);
     final header = extractHeaderSpatial(headerWords);
 
     final items = <ExtractedMemoItem>[];

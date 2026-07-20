@@ -175,6 +175,26 @@ class SettingsScreen extends ConsumerWidget {
             ]),
             const SizedBox(height: 16),
 
+            // ── DEVELOPER TOOLS ───────────────────────────────────────────────
+            _SectionLabel('DEVELOPER TOOLS'),
+            const SizedBox(height: 8),
+            _SettingsGroup(items: [
+              _SettingsItem(
+                  icon: Icons.science_rounded,
+                  iconColor: const Color(0xFF9333EA),
+                  title: 'OCR Sandbox Laboratory',
+                  subtitle: 'Legacy coordinate-based OCR debugger',
+                  onTap: () => context.push('/settings/ocr-sandbox')),
+              _SettingsItem(
+                  icon: Icons.account_tree_rounded,
+                  iconColor: const Color(0xFF06B6D4),
+                  title: 'Pipeline Sandbox (v2.0)',
+                  subtitle: 'Document Processing Pipeline — Engine 01 · 02 · 02A',
+                  onTap: () => context.push('/settings/pipeline-sandbox'),
+                  showDivider: false),
+            ]),
+            const SizedBox(height: 16),
+
             // ── OTHERS ──────────────────────────────────────────────────────
             _SectionLabel('OTHERS'),
             const SizedBox(height: 8),

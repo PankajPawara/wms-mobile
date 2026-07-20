@@ -104,7 +104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 );
                 await repo.syncInventory(force: true, skipCheck: true);
                 if (mounted) {
-                  Navigator.pop(context); // Close loading dialog
+                  Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog safely
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Inventory synced successfully!')),
                   );
