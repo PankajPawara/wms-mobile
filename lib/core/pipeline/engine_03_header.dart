@@ -64,8 +64,8 @@ class Engine03Header {
         }
       }
 
-      // 4. Spatial Extraction
-      final headerData = _extractSpatial(allWords);
+      // 4. Simple Line-Based Extraction
+      final headerData = _extractSimple(recognizedText.text);
 
       stopwatch.stop();
 
@@ -93,93 +93,64 @@ class Engine03Header {
     return img.decodeImage(Uint8List.fromList(bytes));
   }
 
-  /// Extracts header fields using spatial proximity instead of strict regex strings
-  static Map<String, dynamic> _extractSpatial(List<OcrWord> words) {
-    // Spatial search helpers
-    OcrWord? findWordRegex(String pattern) {
-      final reg = RegExp(pattern, caseSensitive: false);
-      for (final w in words) {
-        if (reg.hasMatch(w.text)) return w;
-      }
-      return null;
-    }
-
-    String grabWordsRightOf(OcrWord anchor, {int maxDistanceX = 600, int maxDistanceY = 20}) {
-      final candidates = words.where((w) {
-        if (w.left <= anchor.right) return false;
-        if (w.left - anchor.right > maxDistanceX) return false;
-        final yDiff = (w.top - anchor.top).abs();
-        return yDiff <= maxDistanceY;
-      }).toList();
-
-      candidates.sort((a, b) => a.left.compareTo(b.left));
-      
-      // Stop collecting if there's a huge gap (next column) or another known label
-      final result = <String>[];
-      int lastRight = anchor.right;
-      for (final w in candidates) {
-        if (w.left - lastRight > 150) break; // gap too big
-        if (w.text == ':' || w.text == '-') {
-           lastRight = w.right;
-           continue; // skip separators
-        }
-        // Stop if we hit another label
-        if (RegExp(r'^(MEMO|DATE|AREA|M/S|PHONE|No)$', caseSensitive: false).hasMatch(w.text)) break;
-        
-        result.add(w.text);
-        lastRight = w.right;
-      }
-      return result.join(' ');
-    }
-
-    // 1. Memo Number
+  /// Extracts header fields using simple regex and line parsing since the structure is fixed.
+  static Map<String, dynamic> _extractSimple(String text) {
+    String customerName = '';
     String memoNo = '';
-    final memoLabel = findWordRegex(r'^MEMO');
-    if (memoLabel != null) {
-      // Sometimes "MEMO No. : 12345". Find the number to the right.
-      memoNo = grabWordsRightOf(memoLabel, maxDistanceX: 400).replaceAll(RegExp(r'[^\d]'), '');
-    }
-
-    // 2. Date
     String memoDate = '';
-    final dateLabel = findWordRegex(r'^DATE');
-    if (dateLabel != null) {
-      memoDate = grabWordsRightOf(dateLabel, maxDistanceX: 300).replaceAll(RegExp(r'[^\d/]'), '');
-    }
-
-    // 3. Area
     String area = '';
-    final areaLabel = findWordRegex(r'^AREA');
-    if (areaLabel != null) {
-      area = grabWordsRightOf(areaLabel);
-    }
-
-    // 4. Phone
     String phone = '';
-    final phoneLabel = findWordRegex(r'^(PHONE|PH|MOB)');
-    if (phoneLabel != null) {
-      phone = grabWordsRightOf(phoneLabel).replaceAll(RegExp(r'[^\d]'), '');
-    } else {
-      // Fallback: look for any 10-digit sequence anywhere in the header
-      for (final w in words) {
-        final clean = w.text.replaceAll(RegExp(r'\D'), '');
+
+    final lines = text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
+    for (final line in lines) {
+      final upper = line.toUpperCase();
+
+      // M/S., SHREE NAVSHAKTI AUTO PARTS PANDESARA
+      if (upper.startsWith('M/S') && customerName.isEmpty) {
+        // Find where the name actually starts
+        final prefixMatch = RegExp(r'M/S\.?,?\s*').firstMatch(upper);
+        if (prefixMatch != null) {
+          customerName = line.substring(prefixMatch.end).trim();
+        }
+      }
+
+      // MEMO No. : 11264       IB05A
+      if (upper.contains('MEMO NO')) {
+        final parts = line.split(':');
+        if (parts.length > 1) {
+          // ' 11264       IB05A' -> split by space and take first
+          final valParts = parts[1].trim().split(RegExp(r'\s+'));
+          if (valParts.isNotEmpty) {
+            memoNo = valParts.first.replaceAll(RegExp(r'[^\d]'), '');
+          }
+        }
+      }
+
+      // MEMO DATE : 21/07/2026
+      if (upper.contains('MEMO DATE') || upper.contains('DATE')) {
+        final parts = line.split(':');
+        if (parts.length > 1) {
+          memoDate = parts[1].trim().split(RegExp(r'\s+')).first;
+          memoDate = memoDate.replaceAll(RegExp(r'[^\d/]'), '');
+        }
+      }
+
+      // AREA       : UDHNA
+      if (upper.contains('AREA')) {
+        final parts = line.split(':');
+        if (parts.length > 1) {
+          area = parts[1].trim();
+        }
+      }
+
+      // Find 10 digit phone anywhere
+      if (phone.isEmpty) {
+        final clean = line.replaceAll(RegExp(r'\D'), '');
         if (clean.length >= 10 && clean.startsWith(RegExp(r'[6-9]'))) {
           phone = clean.substring(0, 10);
-          break;
         }
       }
-    }
-
-    // 5. Customer Name (typically right after M/S., M/S, etc.)
-    String customerName = '';
-    final msLabel = findWordRegex(r'^M/S');
-    if (msLabel != null) {
-      customerName = grabWordsRightOf(msLabel, maxDistanceX: 800);
-      // Clean up common artifacts
-      customerName = customerName.replaceAll(RegExp(r'^[.,\s]+'), '');
-    } else {
-      // Fallback: It's often the largest text line near the top. We'll capture everything before "SHOP" or "NEAR".
-      // Since this is hard without context, we will leave it empty for Gemini to fix if spatial fails.
     }
 
     return {
@@ -191,3 +162,4 @@ class Engine03Header {
     };
   }
 }
+
