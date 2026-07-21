@@ -195,68 +195,62 @@ img.Image _adaptiveThresholdIntegral(img.Image src,
   final half = windowSize ~/ 2;
   final out = src.clone();
 
-  // Build integral images (1-indexed: row 0 and col 0 are always 0)
-  // Using flat arrays for memory efficiency.
   final W1 = w + 1;
   final H1 = h + 1;
   final integral = List<double>.filled(H1 * W1, 0.0);
   final integralSq = List<double>.filled(H1 * W1, 0.0);
 
-  for (int y = 0; y < h; y++) {
-    for (int x = 0; x < w; x++) {
-      final lum = img.getLuminance(src.getPixel(x, y)).toDouble();
-      final idx = (y + 1) * W1 + (x + 1);
-      integral[idx] = lum
-          + integral[y * W1 + (x + 1)]
-          + integral[(y + 1) * W1 + x]
-          - integral[y * W1 + x];
-      integralSq[idx] = lum * lum
-          + integralSq[y * W1 + (x + 1)]
-          + integralSq[(y + 1) * W1 + x]
-          - integralSq[y * W1 + x];
-    }
+  // Build integral image in one fast pass
+  for (final p in src) {
+    final x = p.x;
+    final y = p.y;
+    final lum = p.luminance.toDouble();
+    final idx = (y + 1) * W1 + (x + 1);
+    integral[idx] = lum
+        + integral[y * W1 + (x + 1)]
+        + integral[(y + 1) * W1 + x]
+        - integral[y * W1 + x];
+    integralSq[idx] = lum * lum
+        + integralSq[y * W1 + (x + 1)]
+        + integralSq[(y + 1) * W1 + x]
+        - integralSq[y * W1 + x];
   }
 
-  // Threshold each pixel using the integral image for O(1) window sums
-  for (int y = 0; y < h; y++) {
-    for (int x = 0; x < w; x++) {
-      final x0 = (x - half).clamp(0, w - 1);
-      final y0 = (y - half).clamp(0, h - 1);
-      final x1 = (x + half).clamp(0, w - 1);
-      final y1 = (y + half).clamp(0, h - 1);
+  // Threshold in one fast pass
+  for (final p in out) {
+    final x = p.x;
+    final y = p.y;
+    
+    final x0 = (x - half).clamp(0, w - 1);
+    final y0 = (y - half).clamp(0, h - 1);
+    final x1 = (x + half).clamp(0, w - 1);
+    final y1 = (y + half).clamp(0, h - 1);
 
-      // O(1) sum via integral image
-      final count = ((x1 - x0 + 1) * (y1 - y0 + 1)).toDouble();
-      final sum = integral[(y1 + 1) * W1 + (x1 + 1)]
-                - integral[y0 * W1 + (x1 + 1)]
-                - integral[(y1 + 1) * W1 + x0]
-                + integral[y0 * W1 + x0];
-      final sumSq = integralSq[(y1 + 1) * W1 + (x1 + 1)]
-                  - integralSq[y0 * W1 + (x1 + 1)]
-                  - integralSq[(y1 + 1) * W1 + x0]
-                  + integralSq[y0 * W1 + x0];
+    final count = ((x1 - x0 + 1) * (y1 - y0 + 1)).toDouble();
+    final sum = integral[(y1 + 1) * W1 + (x1 + 1)]
+              - integral[y0 * W1 + (x1 + 1)]
+              - integral[(y1 + 1) * W1 + x0]
+              + integral[y0 * W1 + x0];
+    final sumSq = integralSq[(y1 + 1) * W1 + (x1 + 1)]
+                - integralSq[y0 * W1 + (x1 + 1)]
+                - integralSq[(y1 + 1) * W1 + x0]
+                + integralSq[y0 * W1 + x0];
 
-      final mean = sum / count;
-      final variance = (sumSq / count) - (mean * mean);
+    final mean = sum / count;
+    final variance = (sumSq / count) - (mean * mean);
 
-      // Fast integer sqrt approximation (Newton-Raphson, 5 iterations)
-      double std = 0.0;
-      if (variance > 0.01) {
-        double r = variance;
+    double std = 0.0;
+    if (variance > 0.01) {
+      double r = variance;
+      for (int i = 0; i < 5; i++) {
         r = (r + variance / r) / 2;
-        r = (r + variance / r) / 2;
-        r = (r + variance / r) / 2;
-        r = (r + variance / r) / 2;
-        r = (r + variance / r) / 2;
-        std = r;
       }
-
-      // Sauvola formula: T = mean × (1 - k × (1 - std/R))  where R=128
-      final threshold = mean * (1.0 - k * (1.0 - std / 128.0));
-      final lum = img.getLuminance(src.getPixel(x, y)).toDouble();
-      final val = lum < threshold ? 0 : 255;
-      out.setPixelRgb(x, y, val, val, val);
+      std = r;
     }
+
+    final threshold = mean * (1.0 - k * (1.0 - std / 128.0));
+    final val = p.luminance < threshold ? 0 : 255;
+    p.setRgb(val, val, val);
   }
 
   return out;
@@ -270,40 +264,35 @@ img.Image _autocrop(img.Image src) {
   final w = src.width;
   final h = src.height;
 
-  int top = 0, bottom = h - 1, left = 0, right = w - 1;
+  int minX = w, minY = h, maxX = 0, maxY = 0;
+  bool found = false;
 
-  outer1:
-  for (int y = 0; y < h; y++) {
-    for (int x = 0; x < w; x++) {
-      if (img.getLuminance(src.getPixel(x, y)) < threshold) { top = y; break outer1; }
-    }
-  }
-  outer2:
-  for (int y = h - 1; y >= 0; y--) {
-    for (int x = 0; x < w; x++) {
-      if (img.getLuminance(src.getPixel(x, y)) < threshold) { bottom = y; break outer2; }
-    }
-  }
-  outer3:
-  for (int x = 0; x < w; x++) {
-    for (int y = 0; y < h; y++) {
-      if (img.getLuminance(src.getPixel(x, y)) < threshold) { left = x; break outer3; }
-    }
-  }
-  outer4:
-  for (int x = w - 1; x >= 0; x--) {
-    for (int y = 0; y < h; y++) {
-      if (img.getLuminance(src.getPixel(x, y)) < threshold) { right = x; break outer4; }
+  for (final p in src) {
+    if (p.luminance < threshold) {
+      found = true;
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
     }
   }
 
-  top    = (top    - 10).clamp(0, h - 1);
-  bottom = (bottom + 10).clamp(0, h - 1);
-  left   = (left   - 10).clamp(0, w - 1);
-  right  = (right  + 10).clamp(0, w - 1);
+  if (!found) return src; // Blank image
 
-  if (right <= left || bottom <= top) return src;
-  return img.copyCrop(src, x: left, y: top, width: right - left, height: bottom - top);
+  int top = (minY - 10).clamp(0, h - 1);
+  int bottom = (maxY + 10).clamp(0, h - 1);
+  int left = (minX - 10).clamp(0, w - 1);
+  int right = (maxX + 10).clamp(0, w - 1);
+
+  if (bottom - top <= 10 || right - left <= 10) return src;
+
+  return img.copyCrop(
+    src,
+    x: left,
+    y: top,
+    width: right - left + 1,
+    height: bottom - top + 1,
+  );
 }
 
 // =============================================================================
@@ -316,38 +305,45 @@ img.Image _tileHistogramEqualise(img.Image src, {int tiles = 2}) {
   final tileH = (h / tiles).ceil();
   final out = src.clone();
 
-  for (int ty = 0; ty < tiles; ty++) {
-    for (int tx = 0; tx < tiles; tx++) {
-      final x0 = tx * tileW;
-      final y0 = ty * tileH;
-      final x1 = (x0 + tileW).clamp(0, w);
-      final y1 = (y0 + tileH).clamp(0, h);
+  final hists = List.generate(tiles * tiles, (_) => List<int>.filled(256, 0));
+  final cdfs = List.generate(tiles * tiles, (_) => List<int>.filled(256, 0));
+  final cdfMins = List<int>.filled(tiles * tiles, 1);
+  final totals = List<int>.filled(tiles * tiles, 0);
 
-      final hist = List<int>.filled(256, 0);
-      for (int y = y0; y < y1; y++) {
-        for (int x = x0; x < x1; x++) {
-          hist[img.getLuminance(src.getPixel(x, y)).toInt().clamp(0, 255)]++;
-        }
-      }
+  // 1. Build histograms in one fast pass
+  for (final p in src) {
+    final tx = (p.x ~/ tileW).clamp(0, tiles - 1);
+    final ty = (p.y ~/ tileH).clamp(0, tiles - 1);
+    hists[ty * tiles + tx][p.luminance.toInt().clamp(0, 255)]++;
+    totals[ty * tiles + tx]++;
+  }
 
-      final cdf = List<int>.filled(256, 0);
-      cdf[0] = hist[0];
-      for (int i = 1; i < 256; i++) cdf[i] = cdf[i - 1] + hist[i];
-
-      final cdfMin = cdf.firstWhere((v) => v > 0, orElse: () => 1);
-      final total = (x1 - x0) * (y1 - y0);
-      if (total == 0) continue;
-
-      for (int y = y0; y < y1; y++) {
-        for (int x = x0; x < x1; x++) {
-          final lum = img.getLuminance(src.getPixel(x, y)).toInt().clamp(0, 255);
-          final newVal = (((cdf[lum] - cdfMin) / (total - cdfMin)) * 255)
-              .clamp(0, 255)
-              .toInt();
-          out.setPixelRgb(x, y, newVal, newVal, newVal);
-        }
-      }
+  // 2. Compute CDFs
+  for (int i = 0; i < tiles * tiles; i++) {
+    cdfs[i][0] = hists[i][0];
+    for (int j = 1; j < 256; j++) {
+      cdfs[i][j] = cdfs[i][j - 1] + hists[i][j];
     }
+    cdfMins[i] = cdfs[i].firstWhere((v) => v > 0, orElse: () => 1);
+  }
+
+  // 3. Apply equalization in one fast pass
+  for (final p in out) {
+    final tx = (p.x ~/ tileW).clamp(0, tiles - 1);
+    final ty = (p.y ~/ tileH).clamp(0, tiles - 1);
+    final tileIdx = ty * tiles + tx;
+    
+    final total = totals[tileIdx];
+    if (total == 0) continue;
+
+    final lum = p.luminance.toInt().clamp(0, 255);
+    final cdfMin = cdfMins[tileIdx];
+    
+    final newVal = (((cdfs[tileIdx][lum] - cdfMin) / (total - cdfMin)) * 255)
+        .clamp(0, 255)
+        .toInt();
+    
+    p.setRgb(newVal, newVal, newVal);
   }
 
   return out;
