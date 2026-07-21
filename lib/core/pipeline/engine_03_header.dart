@@ -139,12 +139,21 @@ class Engine03Header {
     for (final line in lines) {
       final upper = line.toUpperCase();
 
-      // M/S., SHREE NAVSHAKTI AUTO PARTS PANDESARA
+      // M/S., SHREE NAVSHAKTI AUTO PARTS PANDESARA   MEMO No. : 11264
       if (upper.startsWith('M/S') && customerName.isEmpty) {
         // Find where the name actually starts
         final prefixMatch = RegExp(r'M/S\.?,?\s*').firstMatch(upper);
         if (prefixMatch != null) {
-          customerName = line.substring(prefixMatch.end).trim();
+          String rawName = line.substring(prefixMatch.end).trim();
+          
+          // Since we reconstructed physical lines, "MEMO No." might be on the same line!
+          // We must chop off the name if it hits another known label.
+          final stopMatch = RegExp(r'\b(MEMO|DATE|AREA|PHONE|PH|MOB)\b', caseSensitive: false).firstMatch(rawName);
+          if (stopMatch != null) {
+            rawName = rawName.substring(0, stopMatch.start).trim();
+          }
+          
+          customerName = rawName;
         }
       }
 
