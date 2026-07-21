@@ -274,8 +274,13 @@ class ColumnExtractors {
 
   static String _extractPartNo(List<dynamic> words) {
     if (words.isEmpty) return '';
+    // Concatenate all tokens
     String raw = words.map((w) => w['text']).join('');
     raw = raw.replaceAll(RegExp(r'\s+'), '');
+    // Strip ALL pipe and backslash characters (column separators misread)
+    raw = raw.replaceAll(RegExp(r'[|\\]'), '');
+    // Reject if only non-part-number content
+    if (raw.replaceAll(RegExp(r'[^A-Za-z0-9\-]'), '').isEmpty) return '';
     return raw;
   }
 
@@ -286,7 +291,16 @@ class ColumnExtractors {
 
   static double? _extractMrp(List<dynamic> words) {
     if (words.isEmpty) return null;
-    final raw = words.map((w) => w['text']).join('').replaceAll(RegExp(r'[^\d.]'), '');
+    // Join all tokens, remove all non-numeric except decimal point
+    // Also handle the case where '|' is read as '1' at the end (e.g., '427.001' → '427.00')
+    String raw = words.map((w) => w['text']).join('');
+    // Strip trailing pipe characters before cleaning
+    raw = raw.replaceAll(RegExp(r'[|\\]+$'), '');
+    raw = raw.replaceAll(RegExp(r'[^\d.]'), '');
+    // If ends with multiple decimals (e.g. '427.001' → trim trailing non-standard digits)
+    // Check: valid MRP format is digits.digits (max 2 decimal places)
+    final match = RegExp(r'^(\d+\.\d{1,2})').firstMatch(raw);
+    if (match != null) return double.tryParse(match.group(1)!);
     return double.tryParse(raw);
   }
 
@@ -298,7 +312,19 @@ class ColumnExtractors {
 
   static String _extractLocation(List<dynamic> words) {
     if (words.isEmpty) return '';
-    return words.map((w) => w['text']).join('');
+    String raw = words.map((w) => w['text']).join('');
+    // Strip all pipe characters (column separators leaking into location)
+    raw = raw.replaceAll(RegExp(r'[|\\]'), '');
+    // Strip leading lowercase 'i' which is a common misread of '|'
+    raw = raw.replaceAll(RegExp(r'^i(?=[A-Z0-9])'), '');
+    // Strip leading standalone '1' that is actually the PACK column separator
+    // Pattern: starts with '1' followed by location format (3-4 uppercase letters/digits)
+    // e.g. '1032Q' where the actual location is '032Q'
+    // Only strip if the '1' is followed by exactly a 3-digit+letter or digit+letter pattern
+    raw = raw.replaceAll(RegExp(r'^1(?=\d{3}[A-Z])'), '');
+    // Clean trailing dots or commas
+    raw = raw.replaceAll(RegExp(r'[.,]+$'), '');
+    return raw.trim();
   }
 
   static int? _extractPack(List<dynamic> words) {

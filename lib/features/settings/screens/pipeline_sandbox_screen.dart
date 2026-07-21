@@ -132,7 +132,11 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
     }
     setState(() { _e02aRunning = true; _e02aError = null; });
     try {
-      final result = await Engine02aOptimization.optimize(_processingOutput!);
+      // Added a timeout guard so the UI doesn't hang infinitely if something goes wrong
+      final result = await Engine02aOptimization.optimize(_processingOutput!)
+          .timeout(const Duration(seconds: 15), onTimeout: () {
+        throw Exception('Engine 02A timed out after 15 seconds. Processing is stuck.');
+      });
       setState(() {
         _e02aRunning = false;
         _e02aTiming = result.timingMs;

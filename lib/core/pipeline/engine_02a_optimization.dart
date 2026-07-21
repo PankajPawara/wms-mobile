@@ -1,23 +1,24 @@
 // =============================================================================
-// ENGINE 02A — IMAGE OPTIMIZATION
+// ENGINE 02A — IMAGE OPTIMIZATION (v2 — Fast Integral Image)
 //
 // Responsibilities:
-//   - Crop unused white margins
-//   - Convert to Grayscale (reduces file size + helps OCR)
-//   - Apply CLAHE-style adaptive contrast (histogram equalisation per tile)
-//   - Apply Adaptive Threshold (Sauvola-inspired) for binarization
-//   - Morphological cleanup (dilation/erosion to connect broken characters)
-//   - Text sharpening
-//   - Resize intelligently (max 2000px wide for OCR — beyond that is wasteful)
-//   - Compress to JPEG (optimized_upload.jpg)
-//   - Output optimization_report.json metrics
+//   - STEP 1: Resize first (max 1500px) BEFORE any expensive algorithms
+//   - STEP 2: Autocrop white margins
+//   - STEP 3: Convert to Grayscale
+//   - STEP 4: CLAHE tile histogram equalisation
+//   - STEP 5: Fast Adaptive Threshold using Integral Images (O(n·m) not O(n·m·w²))
+//   - STEP 6: Text sharpening
+//   - STEP 7: JPEG compression + report
+//
+// THE ROOT CAUSE OF THE HANG:
+//   The previous version ran a 51×51 window loop for EVERY pixel.
+//   For a 2868px-wide image that is ~21 BILLION operations.
+//   The Integral Image approach reduces this to O(1) per pixel lookup.
 //
 // Input:  processed_image.png (from Engine 02)
-// Output: optimized_upload.jpg  (small, OCR-ready)
-//         OptimizationReport (metrics)
+// Output: optimized_upload.jpg + OptimizationReport
 //
-// Does NOT run OCR.
-// The objective is OCR readability, not visual quality.
+// Performance target: < 3 seconds on a mid-range Android device.
 // =============================================================================
 
 import 'dart:io';
@@ -49,8 +50,12 @@ class OptimizationOutput {
 class Engine02aOptimization {
   Engine02aOptimization._();
 
-  static const int _maxOcrWidthPx = 2000; // beyond this, OCR gains nothing
-  static const int _jpegQuality = 85;     // good quality vs. size tradeoff
+  /// Max width BEFORE running any expensive per-pixel algorithms.
+  /// Resizing first is the single biggest performance win.
+  static const int _maxProcessingWidthPx = 1500;
+
+  /// JPEG quality for the final compressed output.
+  static const int _jpegQuality = 85;
 
   static Future<PipelineResult<OptimizationOutput>> optimize(
       ProcessingOutput processing) async {
@@ -68,7 +73,7 @@ class Engine02aOptimization {
       // Run optimization pipeline in isolate (CPU-intensive)
       final optimized = await compute(
         _runOptimizationPipeline,
-        _OptimizationArgs(image, _maxOcrWidthPx),
+        _OptimizationArgs(image, _maxProcessingWidthPx),
       );
 
       // Save as JPEG
@@ -77,7 +82,9 @@ class Engine02aOptimization {
 
       stopwatch.stop();
 
-      final ratio = originalSizeBytes / optimizedSizeBytes;
+      final ratio = originalSizeBytes > 0
+          ? originalSizeBytes / optimizedSizeBytes
+          : 1.0;
       final report = OptimizationReport(
         originalSizeMB: originalSizeBytes / (1024 * 1024),
         optimizedSizeMB: optimizedSizeBytes / (1024 * 1024),
@@ -116,7 +123,7 @@ class Engine02aOptimization {
 }
 
 // =============================================================================
-// ISOLATE TASKS
+// ISOLATE TASKS — all top-level for compute() compatibility
 // =============================================================================
 
 img.Image? _decodeBytes(List<int> bytes) {
@@ -132,31 +139,9 @@ class _OptimizationArgs {
 img.Image _runOptimizationPipeline(_OptimizationArgs args) {
   img.Image out = args.image;
 
-  // Step 1: Trim white margins (autocrop)
-  out = _autocrop(out);
-
-  // Step 2: Convert to grayscale
-  out = img.grayscale(out);
-
-  // Step 3: Adaptive histogram equalisation (CLAHE approximation)
-  // We do a simple per-tile histogram equalisation (4x4 tiles)
-  out = _tileHistogramEqualise(out, tiles: 4);
-
-  // Step 4: Sauvola-inspired adaptive threshold binarization
-  // This converts the image to clean black text on white background
-  out = _adaptiveThreshold(out, windowSize: 51, k: 0.2);
-
-  // Step 5: Morphological cleanup — small blur to smooth broken character edges
-  out = img.gaussianBlur(out, radius: 1);
-
-  // Step 6: Sharpen text edges (div must be a double in image v4.x)
-  out = img.convolution(out, filter: [
-     0, -1,  0,
-    -1,  5, -1,
-     0, -1,  0,
-  ], div: 1.0);
-
-  // Step 7: Resize to max OCR width if too large
+  // ─── STEP 1: RESIZE FIRST ────────────────────────────────────────────────
+  // This is the most important step. All subsequent operations run on a
+  // smaller image, making them dramatically faster.
   if (out.width > args.maxWidth) {
     final scale = args.maxWidth / out.width;
     out = img.copyResize(
@@ -167,68 +152,164 @@ img.Image _runOptimizationPipeline(_OptimizationArgs args) {
     );
   }
 
+  // ─── STEP 2: AUTOCROP WHITE MARGINS ─────────────────────────────────────
+  out = _autocrop(out);
+
+  // ─── STEP 3: CONVERT TO GRAYSCALE ───────────────────────────────────────
+  out = img.grayscale(out);
+
+  // ─── STEP 4: CLAHE TILE HISTOGRAM EQUALISATION ──────────────────────────
+  // Using 2x2 tiles for speed. 4x4 tiles add detail but are 4x slower.
+  out = _tileHistogramEqualise(out, tiles: 2);
+
+  // ─── STEP 5: FAST ADAPTIVE THRESHOLD (Integral Image / O(n·m)) ──────────
+  // Replaces the broken O(n·m·w²) per-pixel loop with an integral image
+  // that answers "sum over any rectangular region" in O(1).
+  out = _adaptiveThresholdIntegral(out, windowSize: 31, k: 0.15);
+
+  // ─── STEP 6: TEXT SHARPENING ─────────────────────────────────────────────
+  out = img.convolution(out, filter: [
+     0, -1,  0,
+    -1,  5, -1,
+     0, -1,  0,
+  ], div: 1.0);
+
   return out;
 }
 
-/// Trim uniform white/light borders from all 4 sides.
+// =============================================================================
+// FAST ADAPTIVE THRESHOLD — INTEGRAL IMAGE APPROACH
+//
+// Classic Sauvola threshold is O(n·m·w²). This version is O(n·m) by
+// pre-computing a 2D prefix-sum (integral image) that answers
+// "sum of luminance values in any rectangle" in exactly 4 array lookups.
+//
+// For a 1500×2000 image with windowSize=31:
+//   Old approach:  1500×2000×31² = ~2.9 billion ops  (HANGS)
+//   New approach:  1500×2000×1   = ~3 million ops     (< 1 second)
+// =============================================================================
+img.Image _adaptiveThresholdIntegral(img.Image src,
+    {int windowSize = 31, double k = 0.15}) {
+  final w = src.width;
+  final h = src.height;
+  final half = windowSize ~/ 2;
+  final out = src.clone();
+
+  // Build integral images (1-indexed: row 0 and col 0 are always 0)
+  // Using flat arrays for memory efficiency.
+  final W1 = w + 1;
+  final H1 = h + 1;
+  final integral = List<double>.filled(H1 * W1, 0.0);
+  final integralSq = List<double>.filled(H1 * W1, 0.0);
+
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      final lum = img.getLuminance(src.getPixel(x, y)).toDouble();
+      final idx = (y + 1) * W1 + (x + 1);
+      integral[idx] = lum
+          + integral[y * W1 + (x + 1)]
+          + integral[(y + 1) * W1 + x]
+          - integral[y * W1 + x];
+      integralSq[idx] = lum * lum
+          + integralSq[y * W1 + (x + 1)]
+          + integralSq[(y + 1) * W1 + x]
+          - integralSq[y * W1 + x];
+    }
+  }
+
+  // Threshold each pixel using the integral image for O(1) window sums
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      final x0 = (x - half).clamp(0, w - 1);
+      final y0 = (y - half).clamp(0, h - 1);
+      final x1 = (x + half).clamp(0, w - 1);
+      final y1 = (y + half).clamp(0, h - 1);
+
+      // O(1) sum via integral image
+      final count = ((x1 - x0 + 1) * (y1 - y0 + 1)).toDouble();
+      final sum = integral[(y1 + 1) * W1 + (x1 + 1)]
+                - integral[y0 * W1 + (x1 + 1)]
+                - integral[(y1 + 1) * W1 + x0]
+                + integral[y0 * W1 + x0];
+      final sumSq = integralSq[(y1 + 1) * W1 + (x1 + 1)]
+                  - integralSq[y0 * W1 + (x1 + 1)]
+                  - integralSq[(y1 + 1) * W1 + x0]
+                  + integralSq[y0 * W1 + x0];
+
+      final mean = sum / count;
+      final variance = (sumSq / count) - (mean * mean);
+
+      // Fast integer sqrt approximation (Newton-Raphson, 5 iterations)
+      double std = 0.0;
+      if (variance > 0.01) {
+        double r = variance;
+        r = (r + variance / r) / 2;
+        r = (r + variance / r) / 2;
+        r = (r + variance / r) / 2;
+        r = (r + variance / r) / 2;
+        r = (r + variance / r) / 2;
+        std = r;
+      }
+
+      // Sauvola formula: T = mean × (1 - k × (1 - std/R))  where R=128
+      final threshold = mean * (1.0 - k * (1.0 - std / 128.0));
+      final lum = img.getLuminance(src.getPixel(x, y)).toDouble();
+      final val = lum < threshold ? 0 : 255;
+      out.setPixelRgb(x, y, val, val, val);
+    }
+  }
+
+  return out;
+}
+
+// =============================================================================
+// AUTOCROP — trim uniform light borders from all 4 sides
+// =============================================================================
 img.Image _autocrop(img.Image src) {
-  const threshold = 240; // pixels brighter than this are considered background
+  const threshold = 240.0;
   final w = src.width;
   final h = src.height;
 
   int top = 0, bottom = h - 1, left = 0, right = w - 1;
 
-  // Find top boundary
-  outer:
+  outer1:
   for (int y = 0; y < h; y++) {
     for (int x = 0; x < w; x++) {
-      final lum = img.getLuminance(src.getPixel(x, y));
-      if (lum < threshold) { top = y; break outer; }
+      if (img.getLuminance(src.getPixel(x, y)) < threshold) { top = y; break outer1; }
     }
   }
-  // Find bottom boundary
-  outer:
+  outer2:
   for (int y = h - 1; y >= 0; y--) {
     for (int x = 0; x < w; x++) {
-      final lum = img.getLuminance(src.getPixel(x, y));
-      if (lum < threshold) { bottom = y; break outer; }
+      if (img.getLuminance(src.getPixel(x, y)) < threshold) { bottom = y; break outer2; }
     }
   }
-  // Find left boundary
-  outer:
+  outer3:
   for (int x = 0; x < w; x++) {
     for (int y = 0; y < h; y++) {
-      final lum = img.getLuminance(src.getPixel(x, y));
-      if (lum < threshold) { left = x; break outer; }
+      if (img.getLuminance(src.getPixel(x, y)) < threshold) { left = x; break outer3; }
     }
   }
-  // Find right boundary
-  outer:
+  outer4:
   for (int x = w - 1; x >= 0; x--) {
     for (int y = 0; y < h; y++) {
-      final lum = img.getLuminance(src.getPixel(x, y));
-      if (lum < threshold) { right = x; break outer; }
+      if (img.getLuminance(src.getPixel(x, y)) < threshold) { right = x; break outer4; }
     }
   }
 
-  // Add 10px padding
   top    = (top    - 10).clamp(0, h - 1);
   bottom = (bottom + 10).clamp(0, h - 1);
   left   = (left   - 10).clamp(0, w - 1);
   right  = (right  + 10).clamp(0, w - 1);
 
-  if (right <= left || bottom <= top) return src; // safety guard
-
-  return img.copyCrop(src,
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top,
-  );
+  if (right <= left || bottom <= top) return src;
+  return img.copyCrop(src, x: left, y: top, width: right - left, height: bottom - top);
 }
 
-/// Simplified per-tile histogram equalisation (CLAHE approximation).
-img.Image _tileHistogramEqualise(img.Image src, {int tiles = 4}) {
+// =============================================================================
+// CLAHE-APPROXIMATION — per-tile histogram equalisation
+// =============================================================================
+img.Image _tileHistogramEqualise(img.Image src, {int tiles = 2}) {
   final w = src.width;
   final h = src.height;
   final tileW = (w / tiles).ceil();
@@ -242,90 +323,30 @@ img.Image _tileHistogramEqualise(img.Image src, {int tiles = 4}) {
       final x1 = (x0 + tileW).clamp(0, w);
       final y1 = (y0 + tileH).clamp(0, h);
 
-      // Build histogram for this tile
       final hist = List<int>.filled(256, 0);
       for (int y = y0; y < y1; y++) {
         for (int x = x0; x < x1; x++) {
-          final lum = img.getLuminance(src.getPixel(x, y)).toInt().clamp(0, 255);
-          hist[lum]++;
+          hist[img.getLuminance(src.getPixel(x, y)).toInt().clamp(0, 255)]++;
         }
       }
 
-      // Build CDF
       final cdf = List<int>.filled(256, 0);
       cdf[0] = hist[0];
       for (int i = 1; i < 256; i++) cdf[i] = cdf[i - 1] + hist[i];
 
       final cdfMin = cdf.firstWhere((v) => v > 0, orElse: () => 1);
-      final totalPixels = (x1 - x0) * (y1 - y0);
-      if (totalPixels == 0) continue;
+      final total = (x1 - x0) * (y1 - y0);
+      if (total == 0) continue;
 
-      // Equalise tile pixels
       for (int y = y0; y < y1; y++) {
         for (int x = x0; x < x1; x++) {
           final lum = img.getLuminance(src.getPixel(x, y)).toInt().clamp(0, 255);
-          final newVal = (((cdf[lum] - cdfMin) / (totalPixels - cdfMin)) * 255)
+          final newVal = (((cdf[lum] - cdfMin) / (total - cdfMin)) * 255)
               .clamp(0, 255)
               .toInt();
           out.setPixelRgb(x, y, newVal, newVal, newVal);
         }
       }
-    }
-  }
-
-  return out;
-}
-
-/// Sauvola-inspired adaptive threshold.
-/// Each pixel is compared to the local mean in a windowSize×windowSize window.
-/// Pixels below (mean * (1 - k * (1 - std/128))) become black (0), else white (255).
-img.Image _adaptiveThreshold(img.Image src, {int windowSize = 51, double k = 0.2}) {
-  final w = src.width;
-  final h = src.height;
-  final out = src.clone();
-  final half = windowSize ~/ 2;
-
-  for (int y = 0; y < h; y++) {
-    for (int x = 0; x < w; x++) {
-      final x0 = (x - half).clamp(0, w - 1);
-      final y0 = (y - half).clamp(0, h - 1);
-      final x1 = (x + half).clamp(0, w - 1);
-      final y1 = (y + half).clamp(0, h - 1);
-
-      double sum = 0;
-      double sumSq = 0;
-      int count = 0;
-
-      for (int wy = y0; wy <= y1; wy++) {
-        for (int wx = x0; wx <= x1; wx++) {
-          final lum = img.getLuminance(src.getPixel(wx, wy));
-          sum += lum;
-          sumSq += lum * lum;
-          count++;
-        }
-      }
-
-      if (count == 0) continue;
-      final mean = sum / count;
-      final variance = (sumSq / count) - (mean * mean);
-      final safeVariance = variance < 0 ? 0.0 : variance;
-      // Newton-Raphson sqrt (dart:math not available in isolate without import)
-      double std = 0.0;
-      if (safeVariance > 0) {
-        double sqx = safeVariance;
-        double sqprev = -1;
-        int iter = 0;
-        while ((sqx - sqprev).abs() > 0.001 && iter < 20) {
-          sqprev = sqx; sqx = (sqx + safeVariance / sqx) / 2; iter++;
-        }
-        std = sqx;
-      }
-
-      final threshold = mean * (1.0 - k * (1.0 - std / 128.0));
-      final lum = img.getLuminance(src.getPixel(x, y));
-
-      final val = lum < threshold ? 0 : 255;
-      out.setPixelRgb(x, y, val, val, val);
     }
   }
 
