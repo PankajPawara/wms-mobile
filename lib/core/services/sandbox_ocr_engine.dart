@@ -221,14 +221,38 @@ class CellMatrixBuilder {
     for (int i = 0; i < rows.length; i++) {
       final r = rows[i];
       
-      final srWords = r.where((w) => w.left >= geom.srStartX && w.right < geom.partNoStartX).toList();
-      final partWords = r.where((w) => w.left >= geom.partNoStartX && w.right < geom.descStartX).toList();
-      final descWords = r.where((w) => w.left >= geom.descStartX && w.right < geom.mrpStartX).toList();
-      final mrpWords = r.where((w) => w.left >= geom.mrpStartX && w.right < geom.qtyStartX).toList();
-      final qtyWords = r.where((w) => w.left >= geom.qtyStartX && w.right < geom.locStartX).toList();
-      final locWords = r.where((w) => w.left >= geom.locStartX && w.right < geom.packStartX).toList();
-      final packWords = r.where((w) => w.left >= geom.packStartX && w.right < geom.stockStartX).toList();
-      final stockWords = r.where((w) => w.left >= geom.stockStartX && w.right <= geom.tableRightX + 50).toList();
+      final srWords = r.where((w) {
+        final cx = (w.left + w.right) / 2;
+        return cx >= geom.srStartX && cx < geom.partNoStartX;
+      }).toList();
+      final partWords = r.where((w) {
+        final cx = (w.left + w.right) / 2;
+        return cx >= geom.partNoStartX && cx < geom.descStartX;
+      }).toList();
+      final descWords = r.where((w) {
+        final cx = (w.left + w.right) / 2;
+        return cx >= geom.descStartX && cx < geom.mrpStartX;
+      }).toList();
+      final mrpWords = r.where((w) {
+        final cx = (w.left + w.right) / 2;
+        return cx >= geom.mrpStartX && cx < geom.qtyStartX;
+      }).toList();
+      final qtyWords = r.where((w) {
+        final cx = (w.left + w.right) / 2;
+        return cx >= geom.qtyStartX && cx < geom.locStartX;
+      }).toList();
+      final locWords = r.where((w) {
+        final cx = (w.left + w.right) / 2;
+        return cx >= geom.locStartX && cx < geom.packStartX;
+      }).toList();
+      final packWords = r.where((w) {
+        final cx = (w.left + w.right) / 2;
+        return cx >= geom.packStartX && cx < geom.stockStartX;
+      }).toList();
+      final stockWords = r.where((w) {
+        final cx = (w.left + w.right) / 2;
+        return cx >= geom.stockStartX && cx <= geom.tableRightX + 50;
+      }).toList();
       
       matrix.add({
         'row': i + 1,
@@ -286,7 +310,12 @@ class ColumnExtractors {
 
   static String _extractDescription(List<dynamic> words) {
     if (words.isEmpty) return '';
-    return words.map((w) => w['text']).join(' ');
+    String raw = words.map((w) => w['text']).join(' ');
+    // Strip pipe characters which are column delimiters
+    raw = raw.replaceAll(RegExp(r'[|\\]'), '');
+    // Clean up multiple spaces that might have resulted from stripping
+    raw = raw.replaceAll(RegExp(r'\s+'), ' ');
+    return raw.trim();
   }
 
   static double? _extractMrp(List<dynamic> words) {

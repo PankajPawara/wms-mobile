@@ -23,6 +23,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/pipeline/engine_01_acquisition.dart';
 import '../../../core/pipeline/engine_02_processing.dart';
 import '../../../core/pipeline/engine_02a_optimization.dart';
+import '../../../core/pipeline/engine_03_header.dart';
 
 class PipelineSandboxScreen extends StatefulWidget {
   const PipelineSandboxScreen({super.key});
@@ -39,22 +40,26 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   AcquisitionOutput? _acquisitionOutput;
   ProcessingOutput? _processingOutput;
   OptimizationOutput? _optimizationOutput;
+  HeaderOutput? _headerOutput;
 
   // State tracking
   bool _e01Running = false;
   bool _e02Running = false;
   bool _e02aRunning = false;
+  bool _e03Running = false;
   String? _e01Error;
   String? _e02Error;
   String? _e02aError;
+  String? _e03Error;
   int _e01Timing = 0;
   int _e02Timing = 0;
   int _e02aTiming = 0;
+  int _e03Timing = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -82,6 +87,7 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
           // Reset downstream engines
           _processingOutput = null;
           _optimizationOutput = null;
+          _headerOutput = null;
         } else {
           _e01Error = result.errors.join('\n');
         }
@@ -112,6 +118,7 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
         if (result.isSuccess) {
           _processingOutput = result.data;
           _optimizationOutput = null;
+          _headerOutput = null;
         } else {
           _e02Error = result.errors.join('\n');
         }
@@ -142,12 +149,39 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
         _e02aTiming = result.timingMs;
         if (result.isSuccess) {
           _optimizationOutput = result.data;
+          _headerOutput = null;
         } else {
           _e02aError = result.errors.join('\n');
         }
       });
     } catch (e) {
       setState(() { _e02aRunning = false; _e02aError = e.toString(); });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ENGINE 03 — HEADER
+  // ---------------------------------------------------------------------------
+
+  Future<void> _runEngine03() async {
+    if (_optimizationOutput == null) {
+      _showSnack('Run Engine 02A first.');
+      return;
+    }
+    setState(() { _e03Running = true; _e03Error = null; });
+    try {
+      final result = await Engine03Header.extract(_optimizationOutput!);
+      setState(() {
+        _e03Running = false;
+        _e03Timing = result.timingMs;
+        if (result.isSuccess) {
+          _headerOutput = result.data;
+        } else {
+          _e03Error = result.errors.join('\n');
+        }
+      });
+    } catch (e) {
+      setState(() { _e03Running = false; _e03Error = e.toString(); });
     }
   }
 
@@ -190,6 +224,7 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
             Tab(text: 'Engine 01\nAcquisition', height: 48),
             Tab(text: 'Engine 02\nProcessing', height: 48),
             Tab(text: 'Engine 02A\nOptimization', height: 48),
+            Tab(text: 'Engine 03\nHeader', height: 48),
           ],
         ),
       ),
@@ -228,6 +263,17 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
             onOptimize: _runEngine02a,
             onCopyJson: _optimizationOutput != null
                 ? () => _copyJson(_optimizationOutput!.toJson())
+                : null,
+          ),
+          _Engine03Tab(
+            optimizationOutput: _optimizationOutput,
+            output: _headerOutput,
+            isRunning: _e03Running,
+            error: _e03Error,
+            timingMs: _e03Timing,
+            onExtract: _runEngine03,
+            onCopyJson: _headerOutput != null
+                ? () => _copyJson(_headerOutput!.headerData)
                 : null,
           ),
         ],
@@ -648,6 +694,54 @@ class _JsonPanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// =============================================================================
+// ENGINE 03 TAB
+// =============================================================================
+
+class _Engine03Tab extends StatelessWidget {
+  final OptimizationOutput? optimizationOutput;
+  final HeaderOutput? output;
+  final bool isRunning;
+  final String? error;
+  final int timingMs;
+  final VoidCallback onExtract;
+  final VoidCallback? onCopyJson;
+
+  const _Engine03Tab({
+    required this.optimizationOutput,
+    required this.output,
+    required this.isRunning,
+    required this.error,
+    required this.timingMs,
+    required this.onExtract,
+    required this.onCopyJson,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PipelineTabLayout(
+      stageName: 'Engine 03 — Header Extraction',
+      stageDesc: 'Crops the top 35% of the image, runs ML Kit, and extracts Header fields using spatial proximity.',
+      isRunning: isRunning,
+      error: error,
+      timingMs: timingMs,
+      hasOutput: output != null,
+      prerequisite: optimizationOutput == null ? 'Run Engine 02A first' : null,
+      onCopyJson: onCopyJson,
+      jsonOutput: output?.headerData,
+      imageFile: output?.croppedHeaderImage,
+      actions: [
+        _SandboxButton(
+          icon: Icons.subtitles_rounded,
+          label: 'Extract Header',
+          color: const Color(0xFFEC4899),
+          onTap: (isRunning || optimizationOutput == null) ? null : onExtract,
+        ),
+      ],
     );
   }
 }
