@@ -64,8 +64,11 @@ class Engine03Header {
         }
       }
 
-      // 4. Simple Line-Based Extraction
-      final headerData = _extractSimple(recognizedText.text);
+      // 4. Group words into horizontal lines to defeat ML Kit column separation
+      final physicalLines = _reconstructPhysicalLines(allWords);
+
+      // 5. Simple Line-Based Extraction
+      final headerData = _extractSimple(physicalLines);
 
       stopwatch.stop();
 
@@ -93,15 +96,45 @@ class Engine03Header {
     return img.decodeImage(Uint8List.fromList(bytes));
   }
 
+  /// Groups words into physical horizontal lines based on Y-coordinates
+  static List<String> _reconstructPhysicalLines(List<OcrWord> words) {
+    if (words.isEmpty) return [];
+    
+    // Sort words top-to-bottom
+    final sorted = List<OcrWord>.from(words)..sort((a, b) => a.top.compareTo(b.top));
+    
+    final lines = <List<OcrWord>>[];
+    List<OcrWord> currentLine = [sorted.first];
+    lines.add(currentLine);
+
+    for (int i = 1; i < sorted.length; i++) {
+      final word = sorted[i];
+      final currentLineCenter = (currentLine.first.top + currentLine.first.bottom) / 2;
+      final wordCenter = (word.top + word.bottom) / 2;
+      
+      // If the vertical center is within 25 pixels, consider it the same line
+      if ((wordCenter - currentLineCenter).abs() < 25) {
+        currentLine.add(word);
+      } else {
+        currentLine = [word];
+        lines.add(currentLine);
+      }
+    }
+
+    // Sort each line left-to-right and join with a space
+    return lines.map((line) {
+      line.sort((a, b) => a.left.compareTo(b.left));
+      return line.map((w) => w.text).join(' ');
+    }).toList();
+  }
+
   /// Extracts header fields using simple regex and line parsing since the structure is fixed.
-  static Map<String, dynamic> _extractSimple(String text) {
+  static Map<String, dynamic> _extractSimple(List<String> lines) {
     String customerName = '';
     String memoNo = '';
     String memoDate = '';
     String area = '';
     String phone = '';
-
-    final lines = text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
     for (final line in lines) {
       final upper = line.toUpperCase();
