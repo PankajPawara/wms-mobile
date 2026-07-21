@@ -159,30 +159,26 @@ class Engine03Header {
 
       // MEMO No. : 11264       IB05A
       if (upper.contains('MEMO NO')) {
-        final parts = line.split(':');
-        if (parts.length > 1) {
-          // ' 11264       IB05A' -> split by space and take first
-          final valParts = parts[1].trim().split(RegExp(r'\s+'));
-          if (valParts.isNotEmpty) {
-            memoNo = valParts.first.replaceAll(RegExp(r'[^\d]'), '');
-          }
+        // extract the first sequence of digits that appears after "MEMO NO"
+        final match = RegExp(r'MEMO\s*NO[^\d]*(\d+)', caseSensitive: false).firstMatch(line);
+        if (match != null) {
+          memoNo = match.group(1)!;
         }
       }
 
       // MEMO DATE : 21/07/2026
       if (upper.contains('MEMO DATE') || upper.contains('DATE')) {
-        final parts = line.split(':');
-        if (parts.length > 1) {
-          memoDate = parts[1].trim().split(RegExp(r'\s+')).first;
-          memoDate = memoDate.replaceAll(RegExp(r'[^\d/]'), '');
+        final match = RegExp(r'DATE[^\d]*([\d/]+)', caseSensitive: false).firstMatch(line);
+        if (match != null) {
+          memoDate = match.group(1)!.replaceAll(RegExp(r'[^\d/]'), '');
         }
       }
 
       // AREA       : UDHNA
       if (upper.contains('AREA')) {
-        final parts = line.split(':');
-        if (parts.length > 1) {
-          area = parts[1].trim();
+        final match = RegExp(r'AREA[^A-Za-z]*([A-Za-z]+)', caseSensitive: false).firstMatch(line);
+        if (match != null) {
+          area = match.group(1)!.trim();
         }
       }
 
