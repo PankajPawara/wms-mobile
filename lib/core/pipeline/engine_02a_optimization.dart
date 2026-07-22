@@ -152,8 +152,7 @@ img.Image _runOptimizationPipeline(_OptimizationArgs args) {
     );
   }
 
-  // ─── STEP 2: AUTOCROP WHITE MARGINS ─────────────────────────────────────
-  out = _autocrop(out);
+  // STEP 2: Autocrop removed as it aggressively chopped headers under uneven lighting.
 
   // ─── STEP 3: CONVERT TO GRAYSCALE ───────────────────────────────────────
   out = img.grayscale(out);
@@ -169,44 +168,6 @@ img.Image _runOptimizationPipeline(_OptimizationArgs args) {
 
 
 
-// =============================================================================
-// AUTOCROP — trim uniform light borders from all 4 sides
-// =============================================================================
-img.Image _autocrop(img.Image src) {
-  const threshold = 240.0;
-  final w = src.width;
-  final h = src.height;
-
-  int minX = w, minY = h, maxX = 0, maxY = 0;
-  bool found = false;
-
-  for (final p in src) {
-    if (p.luminance < threshold) {
-      found = true;
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-  }
-
-  if (!found) return src; // Blank image
-
-  int top = (minY - 10).clamp(0, h - 1);
-  int bottom = (maxY + 10).clamp(0, h - 1);
-  int left = (minX - 10).clamp(0, w - 1);
-  int right = (maxX + 10).clamp(0, w - 1);
-
-  if (bottom - top <= 10 || right - left <= 10) return src;
-
-  return img.copyCrop(
-    src,
-    x: left,
-    y: top,
-    width: right - left + 1,
-    height: bottom - top + 1,
-  );
-}
 
 // =============================================================================
 // CLAHE-APPROXIMATION — per-tile histogram equalisation

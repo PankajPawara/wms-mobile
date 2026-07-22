@@ -168,15 +168,15 @@ class Engine03Header {
 
       // MEMO DATE : 21/07/2026
       if (upper.contains('MEMO DATE') || upper.contains('DATE')) {
-        final match = RegExp(r'DATE[^\d]*([\d/]+)', caseSensitive: false).firstMatch(line);
+        final match = RegExp(r'DATE[^\d]*([\d/-]+)', caseSensitive: false).firstMatch(line);
         if (match != null) {
-          memoDate = match.group(1)!.replaceAll(RegExp(r'[^\d/]'), '');
+          memoDate = match.group(1)!.trim();
         }
       }
 
-      // AREA       : UDHNA
+      // AREA       : UDHNA (or NEW DELHI)
       if (upper.contains('AREA')) {
-        final match = RegExp(r'AREA[^A-Za-z]*([A-Za-z]+)', caseSensitive: false).firstMatch(line);
+        final match = RegExp(r'AREA[^A-Za-z]*([A-Za-z\s]+)', caseSensitive: false).firstMatch(line);
         if (match != null) {
           area = match.group(1)!.trim();
         }
