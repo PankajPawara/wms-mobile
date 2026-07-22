@@ -25,6 +25,9 @@ import '../../../core/pipeline/engine_02_processing.dart';
 import '../../../core/pipeline/engine_02a_optimization.dart';
 import '../../../core/pipeline/engine_03_header.dart';
 import '../../../core/pipeline/engine_04_table_detection.dart';
+import '../../../core/pipeline/engine_05_grid.dart';
+import '../../../core/pipeline/engine_06_cell.dart';
+import '../../../core/pipeline/engine_07_row.dart';
 
 class PipelineSandboxScreen extends StatefulWidget {
   const PipelineSandboxScreen({super.key});
@@ -43,6 +46,9 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   OptimizationOutput? _optimizationOutput;
   HeaderOutput? _headerOutput;
   TableGeometryOutput? _tableGeometryOutput;
+  GridGeometryOutput? _gridOutput;
+  CellAssignmentOutput? _cellOutput;
+  RowBuilderOutput? _rowOutput;
 
   // State tracking
   bool _e01Running = false;
@@ -50,21 +56,32 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   bool _e02aRunning = false;
   bool _e03Running = false;
   bool _e04Running = false;
+  bool _e05Running = false;
+  bool _e06Running = false;
+  bool _e07Running = false;
+
   String? _e01Error;
   String? _e02Error;
   String? _e02aError;
   String? _e03Error;
   String? _e04Error;
+  String? _e05Error;
+  String? _e06Error;
+  String? _e07Error;
+
   int _e01Timing = 0;
   int _e02Timing = 0;
   int _e02aTiming = 0;
   int _e03Timing = 0;
   int _e04Timing = 0;
+  int _e05Timing = 0;
+  int _e06Timing = 0;
+  int _e07Timing = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
   }
 
   @override
@@ -218,6 +235,84 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   }
 
   // ---------------------------------------------------------------------------
+  // ENGINE 05 — GRID SYSTEM
+  // ---------------------------------------------------------------------------
+
+  Future<void> _runEngine05() async {
+    if (_tableGeometryOutput == null) {
+      _showSnack('Run Engine 04 first.');
+      return;
+    }
+    setState(() { _e05Running = true; _e05Error = null; });
+    try {
+      final result = await Engine05GridSystem.generate(_tableGeometryOutput!);
+      setState(() {
+        _e05Running = false;
+        _e05Timing = result.timingMs;
+        if (result.isSuccess) {
+          _gridOutput = result.data;
+        } else {
+          _e05Error = result.errors.join('\n');
+        }
+      });
+    } catch (e) {
+      setState(() { _e05Running = false; _e05Error = e.toString(); });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ENGINE 06 — CELL ASSIGNMENT
+  // ---------------------------------------------------------------------------
+
+  Future<void> _runEngine06() async {
+    if (_gridOutput == null) {
+      _showSnack('Run Engine 05 first.');
+      return;
+    }
+    setState(() { _e06Running = true; _e06Error = null; });
+    try {
+      final result = await Engine06CellAssignment.assign(_gridOutput!);
+      setState(() {
+        _e06Running = false;
+        _e06Timing = result.timingMs;
+        if (result.isSuccess) {
+          _cellOutput = result.data;
+        } else {
+          _e06Error = result.errors.join('\n');
+        }
+      });
+    } catch (e) {
+      setState(() { _e06Running = false; _e06Error = e.toString(); });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ENGINE 07 — ROW BUILDER
+  // ---------------------------------------------------------------------------
+
+  Future<void> _runEngine07() async {
+    if (_cellOutput == null) {
+      _showSnack('Run Engine 06 first.');
+      return;
+    }
+    setState(() { _e07Running = true; _e07Error = null; });
+    try {
+      final result = await Engine07RowBuilder.build(_cellOutput!);
+      setState(() {
+        _e07Running = false;
+        _e07Timing = result.timingMs;
+        if (result.isSuccess) {
+          _rowOutput = result.data;
+        } else {
+          _e07Error = result.errors.join('\n');
+        }
+      });
+    } catch (e) {
+      setState(() { _e07Running = false; _e07Error = e.toString(); });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // HELPERS
   // ---------------------------------------------------------------------------
 
@@ -249,15 +344,19 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
         ),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           labelColor: AppColors.primary,
           unselectedLabelColor: Colors.white54,
           indicatorColor: AppColors.primary,
           tabs: const [
-            Tab(text: 'Engine 01\nAcquisition', height: 48),
-            Tab(text: 'Engine 02\nProcessing', height: 48),
-            Tab(text: 'Engine 02A\nOptimization', height: 48),
-            Tab(text: 'Engine 03\nHeader', height: 48),
-            Tab(text: 'Engine 04\nTable', height: 48),
+            Tab(text: 'E01\nAcquisition', height: 48),
+            Tab(text: 'E02\nProcessing', height: 48),
+            Tab(text: 'E02A\nOptimization', height: 48),
+            Tab(text: 'E03\nHeader', height: 48),
+            Tab(text: 'E04\nTable', height: 48),
+            Tab(text: 'E05\nGrid', height: 48),
+            Tab(text: 'E06\nCells', height: 48),
+            Tab(text: 'E07\nRows', height: 48),
           ],
         ),
       ),
@@ -318,6 +417,36 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
             onExtract: _runEngine04,
             onCopyJson: _tableGeometryOutput != null
                 ? () => _copyJson(_tableGeometryOutput!.toJson())
+                : null,
+          ),
+          _Engine05Tab(
+            output: _gridOutput,
+            isRunning: _e05Running,
+            error: _e05Error,
+            timingMs: _e05Timing,
+            onExtract: _runEngine05,
+            onCopyJson: _gridOutput != null
+                ? () => _copyJson(_gridOutput!.toJson())
+                : null,
+          ),
+          _Engine06Tab(
+            output: _cellOutput,
+            isRunning: _e06Running,
+            error: _e06Error,
+            timingMs: _e06Timing,
+            onExtract: _runEngine06,
+            onCopyJson: _cellOutput != null
+                ? () => _copyJson(_cellOutput!.toJson())
+                : null,
+          ),
+          _Engine07Tab(
+            output: _rowOutput,
+            isRunning: _e07Running,
+            error: _e07Error,
+            timingMs: _e07Timing,
+            onExtract: _runEngine07,
+            onCopyJson: _rowOutput != null
+                ? () => _copyJson(_rowOutput!.toJson())
                 : null,
           ),
         ],
@@ -832,6 +961,139 @@ class _Engine04Tab extends StatelessWidget {
           label: 'Detect Table Boundaries',
           color: const Color(0xFFF59E0B),
           onTap: (isRunning || optimizationOutput == null) ? null : onExtract,
+        ),
+      ],
+    );
+  }
+}
+
+
+// =============================================================================
+// ENGINE 05 TAB
+// =============================================================================
+
+class _Engine05Tab extends StatelessWidget {
+  final GridGeometryOutput? output;
+  final bool isRunning;
+  final String? error;
+  final int timingMs;
+  final VoidCallback onExtract;
+  final VoidCallback? onCopyJson;
+
+  const _Engine05Tab({
+    required this.output,
+    required this.isRunning,
+    required this.error,
+    required this.timingMs,
+    required this.onExtract,
+    required this.onCopyJson,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PipelineTabLayout(
+      stageName: 'Engine 05 — Grid System',
+      stageDesc: 'Calculates the vertical boundaries for the 8 columns based on the header.',
+      isRunning: isRunning,
+      error: error,
+      timingMs: timingMs,
+      hasOutput: output != null,
+      onCopyJson: onCopyJson,
+      jsonOutput: output?.toJson(),
+      actions: [
+        _SandboxButton(
+          icon: Icons.grid_goldenratio,
+          label: 'Calculate Grid',
+          color: Colors.green,
+          onTap: isRunning ? null : onExtract,
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// ENGINE 06 TAB
+// =============================================================================
+
+class _Engine06Tab extends StatelessWidget {
+  final CellAssignmentOutput? output;
+  final bool isRunning;
+  final String? error;
+  final int timingMs;
+  final VoidCallback onExtract;
+  final VoidCallback? onCopyJson;
+
+  const _Engine06Tab({
+    required this.output,
+    required this.isRunning,
+    required this.error,
+    required this.timingMs,
+    required this.onExtract,
+    required this.onCopyJson,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PipelineTabLayout(
+      stageName: 'Engine 06 — Cell Assignment',
+      stageDesc: 'Assigns every OCR word in the table to the correct column and merges text on the same line.',
+      isRunning: isRunning,
+      error: error,
+      timingMs: timingMs,
+      hasOutput: output != null,
+      onCopyJson: onCopyJson,
+      jsonOutput: output?.toJson(),
+      actions: [
+        _SandboxButton(
+          icon: Icons.view_column,
+          label: 'Assign Cells',
+          color: Colors.teal,
+          onTap: isRunning ? null : onExtract,
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// ENGINE 07 TAB
+// =============================================================================
+
+class _Engine07Tab extends StatelessWidget {
+  final RowBuilderOutput? output;
+  final bool isRunning;
+  final String? error;
+  final int timingMs;
+  final VoidCallback onExtract;
+  final VoidCallback? onCopyJson;
+
+  const _Engine07Tab({
+    required this.output,
+    required this.isRunning,
+    required this.error,
+    required this.timingMs,
+    required this.onExtract,
+    required this.onCopyJson,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PipelineTabLayout(
+      stageName: 'Engine 07 — Row Builder',
+      stageDesc: 'Links the cells horizontally to build complete Part Rows.',
+      isRunning: isRunning,
+      error: error,
+      timingMs: timingMs,
+      hasOutput: output != null,
+      onCopyJson: onCopyJson,
+      jsonOutput: output?.toJson(),
+      actions: [
+        _SandboxButton(
+          icon: Icons.table_rows,
+          label: 'Build Rows',
+          color: Colors.blue,
+          onTap: isRunning ? null : onExtract,
         ),
       ],
     );
