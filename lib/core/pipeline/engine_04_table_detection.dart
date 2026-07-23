@@ -5,7 +5,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'engine_02a_optimization.dart';
 import 'models/pipeline_result.dart';
 import 'models/pipeline_stage.dart';
-import '../services/memo_ocr_engine.dart' show OcrWord;
+import 'models/ocr_word.dart';
 
 class TableGeometryOutput {
   final int topY;
@@ -14,6 +14,7 @@ class TableGeometryOutput {
   final int rightX;
   final int imageWidth;
   final int imageHeight;
+  final bool hasHeader;
   final List<OcrWord> allWords; // Passed down to prevent re-running OCR
 
   TableGeometryOutput({
@@ -23,6 +24,7 @@ class TableGeometryOutput {
     required this.rightX,
     required this.imageWidth,
     required this.imageHeight,
+    required this.hasHeader,
     required this.allWords,
   });
 
@@ -85,32 +87,48 @@ class Engine04TableDetection {
       
       for (final w in sortedByY) {
         final text = w.text.toUpperCase();
-        if (text.contains('DESCRIPTION') || text.contains('PART') || text.contains('QTY') || text.contains('M.R.P')) {
+        // Trigger if we find anything resembling a column header
+        if (text.contains('DES') || text.contains('PART') || text.contains('PARI') || text.contains('QTY') || text.contains('M.R.P') || text == 'SR' || text == 'S.R') {
           int cy = (w.top + w.bottom) ~/ 2;
           
           final bandWords = words.where((bw) {
             int bcy = (bw.top + bw.bottom) ~/ 2;
-            return (bcy - cy).abs() <= 60; 
+            return (bcy - cy).abs() <= 100; // Expanded band to account for tilt
           }).toList();
           
-          int headerMatches = 0;
+          bool hasSr = false;
+          bool hasPart = false;
+          bool hasDesc = false;
+          bool hasQty = false;
+          bool hasMrp = false;
+          bool hasOther = false;
+
           for (final bw in bandWords) {
             final t = bw.text.toUpperCase();
-            if (t.contains('SR') || t.contains('S.R') || t.contains('PART') || 
-                t.contains('DESC') || t.contains('QTY') || t.contains('LOC') || 
-                t.contains('PACK') || t.contains('STOCK') || t.contains('MRP') || 
-                t.contains('M.R.P')) {
-              headerMatches++;
-            }
+            if (t == 'SR' || t == 'S.R' || t == 'SR.') hasSr = true;
+            else if (t.contains('PART') || t.contains('PARI') || t.contains('PRT') || t.contains('1ART')) hasPart = true;
+            else if (t.contains('DESC') || t == 'DES' || t.contains('DSCR')) hasDesc = true;
+            else if (t.contains('QTY') || t.contains('QTV')) hasQty = true;
+            else if (t.contains('MRP') || t.contains('M.R.P')) hasMrp = true;
+            else if (t.contains('LOC') || t.contains('PACK') || t.contains('STOCK') || t.contains('STK')) hasOther = true;
           }
 
-          if (headerMatches >= 3) {
+          int headerScore = 0;
+          if (hasSr) headerScore++;
+          if (hasPart) headerScore++;
+          if (hasDesc) headerScore++;
+          if (hasQty) headerScore++;
+          if (hasMrp) headerScore++;
+          if (hasOther) headerScore++;
+
+          // If we have at least 3 matches, and it includes PART or DESC, AND includes QTY or MRP, it's very likely the header
+          // Alternatively, if it has 4 matches, it's definitely the header.
+          if (headerScore >= 4 || (headerScore >= 3 && (hasPart || hasDesc) && (hasQty || hasMrp))) {
             headerFound = true;
             int maxBottom = 0;
             for (final bw in bandWords) {
               if (bw.bottom > maxBottom) maxBottom = bw.bottom;
             }
-            // Strict rule: table starts immediately after the lowest pixel of this header row.
             headerBottomY = maxBottom;
             break;
           }
@@ -118,16 +136,28 @@ class Engine04TableDetection {
       }
 
       if (!headerFound) {
-        errors.add("Warning: Could not confidently identify table header. Falling back.");
-        headerBottomY = (imageHeight * 0.35).toInt(); 
+        errors.add("Notice: No clear table header found. Setting table start to top of image.");
+        headerBottomY = -5; // tableTopY will be 0
       }
 
       int tableTopY = headerBottomY + 5;
-      int tableBottomY = imageHeight; 
+      int tableBottomY = imageHeight;  
       
+      final bottomSearchLimit = imageHeight * 0.70; // Only look in the bottom 30% for footer
+
       for (final w in sortedByY.reversed) {
+        if (w.top < bottomSearchLimit) {
+          // If we've searched all the way up to 70% of the image and found no footer, stop searching.
+          break;
+        }
+
         final text = w.text.toUpperCase();
-        if (text.contains('NET') || text.contains('AMOUNT') || text.contains('TOTAL')) {
+        // Check for exact phrases or safe words to avoid 'RR NET 5G' breaking the table
+        if (text.contains('NET AMOUNT') || 
+            text.contains('TOTAL') || 
+            text == 'NET' || 
+            text.contains('DISCOUNT') ||
+            text == 'AMOUNT') {
           if (w.top > tableTopY) {
             tableBottomY = w.top - 10;
             break;
@@ -150,10 +180,11 @@ class Engine04TableDetection {
       final result = TableGeometryOutput(
         topY: tableTopY,
         bottomY: tableBottomY,
-        leftX: minLeft,
-        rightX: maxRight,
+        leftX: minLeft == 999999 ? 0 : minLeft,
+        rightX: maxRight == 0 ? imageWidth : maxRight,
         imageWidth: imageWidth,
         imageHeight: imageHeight,
+        hasHeader: headerFound,
         allWords: words,
       );
 

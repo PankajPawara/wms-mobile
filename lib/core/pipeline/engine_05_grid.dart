@@ -1,7 +1,7 @@
 import 'models/pipeline_result.dart';
 import 'models/pipeline_stage.dart';
 import 'engine_04_table_detection.dart' show TableGeometryOutput;
-import '../services/memo_ocr_engine.dart' show OcrWord;
+import 'models/ocr_word.dart';
 
 class ColumnDef {
   final String key;
@@ -61,20 +61,20 @@ class Engine05GridSystem {
         for (final w in headerWords) {
           final t = w.text.toUpperCase();
           for (final kw in keywords) {
-            if (t.contains(kw)) return w;
+            if (t == kw || t == '$kw.' || t.startsWith('$kw ')) return w;
           }
         }
         return null;
       }
 
       final srWord = findHeader(['SR', 'S.R']);
-      final partWord = findHeader(['PART']);
-      final descWord = findHeader(['DESC']);
+      final partWord = findHeader(['PART', 'PRT', '1ART', 'PARI']);
+      final descWord = findHeader(['DESC', 'DES', 'DSCR', 'DESCRIPTION']);
       final mrpWord = findHeader(['M.R.P', 'MRP']);
-      final qtyWord = findHeader(['QTY']);
+      final qtyWord = findHeader(['QTY', 'QTV']);
       final locWord = findHeader(['LOC']);
-      final packWord = findHeader(['PACK']);
-      final stockWord = findHeader(['STOCK']);
+      final packWord = findHeader(['PACK', 'PKT']);
+      final stockWord = findHeader(['STOCK', 'STK']);
 
       // Calculate column boundaries.
       // A column starts slightly to the left of its header, and ends slightly to the left of the NEXT header.
@@ -82,35 +82,51 @@ class Engine05GridSystem {
 
       final w = input.imageWidth;
       
-      int srX = srWord?.left ?? (w * 0.02).toInt();
-      int partX = partWord?.left ?? (w * 0.08).toInt();
-      int descX = descWord?.left ?? (w * 0.25).toInt();
-      int mrpX = mrpWord?.left ?? (w * 0.58).toInt();
-      int qtyX = qtyWord?.left ?? (w * 0.68).toInt();
-      int locX = locWord?.left ?? (w * 0.74).toInt();
-      int packX = packWord?.left ?? (w * 0.85).toInt();
-      int stockX = stockWord?.left ?? (w * 0.92).toInt();
+      final rawX = <String, int>{};
+      
+      if (!input.hasHeader) {
+        // If no header was confidently found (e.g. continuation page), enforce strict fallback columns
+        rawX['SR'] = (w * 0.02).toInt();
+        rawX['PART'] = (w * 0.12).toInt();
+        rawX['DESC'] = (w * 0.28).toInt();
+        rawX['QTY'] = (w * 0.65).toInt();
+        rawX['MRP'] = (w * 0.75).toInt();
+        rawX['LOC'] = (w * 0.82).toInt();
+        rawX['PACK'] = (w * 0.88).toInt();
+        rawX['STOCK'] = (w * 0.94).toInt();
+      } else {
+        rawX['SR'] = srWord != null ? srWord.left : (w * 0.02).toInt();
+        rawX['PART'] = partWord != null ? partWord.left : (rawX['SR']! + (w * 0.10).toInt());
+        rawX['DESC'] = descWord != null ? descWord.left : (rawX['PART']! + (w * 0.16).toInt());
+        
+        // We MUST define these even if not found, otherwise DESC absorbs the right side of the page
+        rawX['QTY'] = qtyWord != null ? qtyWord.left : (w * 0.65).toInt();
+        rawX['MRP'] = mrpWord != null ? mrpWord.left : (w * 0.75).toInt();
+        rawX['LOC'] = locWord != null ? locWord.left : (w * 0.82).toInt();
+        rawX['PACK'] = packWord != null ? packWord.left : (w * 0.88).toInt();
+        rawX['STOCK'] = stockWord != null ? stockWord.left : (w * 0.94).toInt();
+      }
 
-      // Ensure they are strictly ordered in case OCR jitter misplaced a bounding box
-      if (partX <= srX) partX = srX + 50;
-      if (descX <= partX) descX = partX + 150;
-      if (mrpX <= descX) mrpX = descX + 300;
-      if (qtyX <= mrpX) qtyX = mrpX + 50;
-      if (locX <= qtyX) locX = qtyX + 50;
-      if (packX <= locX) packX = locX + 50;
-      if (stockX <= packX) stockX = packX + 50;
+      final standardOrder = ['SR', 'PART', 'DESC', 'QTY', 'MRP', 'LOC', 'PACK', 'STOCK'];
+      final activeKeys = standardOrder.where((k) => rawX.containsKey(k)).toList();
+      
+      // Ensure strictly ordered in case OCR jitter misplaced a bounding box
+      for (int i = 1; i < activeKeys.length; i++) {
+        final prevKey = activeKeys[i - 1];
+        final currKey = activeKeys[i];
+        if (rawX[currKey]! <= rawX[prevKey]!) {
+          rawX[currKey] = rawX[prevKey]! + 50;
+        }
+      }
 
-      // Create the column boundaries
-      final columns = <ColumnDef>[
-        ColumnDef(key: 'SR', leftX: 0, rightX: partX - 5),
-        ColumnDef(key: 'PART', leftX: partX - 5, rightX: descX - 5),
-        ColumnDef(key: 'DESC', leftX: descX - 5, rightX: mrpX - 5),
-        ColumnDef(key: 'MRP', leftX: mrpX - 5, rightX: qtyX - 5),
-        ColumnDef(key: 'QTY', leftX: qtyX - 5, rightX: locX - 5),
-        ColumnDef(key: 'LOC', leftX: locX - 5, rightX: packX - 5),
-        ColumnDef(key: 'PACK', leftX: packX - 5, rightX: stockX - 5),
-        ColumnDef(key: 'STOCK', leftX: stockX - 5, rightX: w),
-      ];
+      // Create the column boundaries dynamically
+      final columns = <ColumnDef>[];
+      for (int i = 0; i < activeKeys.length; i++) {
+        final key = activeKeys[i];
+        final leftX = (i == 0) ? 0 : rawX[key]! - 5;
+        final rightX = (i == activeKeys.length - 1) ? w : rawX[activeKeys[i + 1]]! - 5;
+        columns.add(ColumnDef(key: key, leftX: leftX, rightX: rightX));
+      }
 
       stopwatch.stop();
 

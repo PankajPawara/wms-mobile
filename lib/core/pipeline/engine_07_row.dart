@@ -84,7 +84,7 @@ class Engine07RowBuilder {
           final a = rawAnchors[i];
           final clusterAvg = currentCluster.reduce((a, b) => a + b) ~/ currentCluster.length;
           
-          if ((a - clusterAvg).abs() < 30) {
+          if ((a - clusterAvg).abs() < 15) {
             currentCluster.add(a);
           } else {
             rowAnchors.add(currentCluster.reduce((a, b) => a + b) ~/ currentCluster.length);
@@ -101,8 +101,8 @@ class Engine07RowBuilder {
         final cells = columns[colKey] ?? [];
         final matches = cells.where((c) {
           // A cell belongs to this row if the anchor Y falls inside the cell's vertical bounds 
-          // (with a generous +/- 20 pixel padding for slight tilt)
-          return anchorY >= (c.topY - 20) && anchorY <= (c.bottomY + 20);
+          // (with a generous +/- 10 pixel padding for slight tilt)
+          return anchorY >= (c.topY - 10) && anchorY <= (c.bottomY + 10);
         }).toList();
 
         if (matches.isEmpty) return '';

@@ -9,7 +9,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/models/extracted_memo.dart';
 import '../../../core/services/image_processor.dart';
-import '../../../core/services/memo_ocr_engine.dart';
+import '../../../core/pipeline/ocr_pipeline_manager.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/empty_state_placeholder.dart';
 import 'package:image_picker/image_picker.dart';
@@ -124,7 +124,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
         _setStep(_PipelineStep.reconstructingRows);
         _setStep(_PipelineStep.validatingDb);
         
-        final result = await MemoOcrEngine.process(workingFile, db);
+        final result = await OcrPipelineManager.process(workingFile, db);
         
         // Merge results
         allItems.addAll(result.items);

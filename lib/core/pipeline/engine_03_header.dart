@@ -8,7 +8,7 @@ import 'dart:math' as math;
 import 'models/pipeline_result.dart';
 import 'models/pipeline_stage.dart';
 import 'engine_02a_optimization.dart';
-import '../services/memo_ocr_engine.dart' show OcrWord;
+import 'models/ocr_word.dart';
 
 /// Result of the Header Engine
 class HeaderOutput {
@@ -147,8 +147,8 @@ class Engine03Header {
           String rawName = line.substring(prefixMatch.end).trim();
           
           // Since we reconstructed physical lines, "MEMO No." might be on the same line!
-          // We must chop off the name if it hits another known label. Handles OCR typos like MSMO.
-          final stopMatch = RegExp(r'\b(M[A-Z0-9]{1,3}O|DATE|AREA|PHONE|PH|MOB)\b', caseSensitive: false).firstMatch(rawName);
+          // We must chop off the name if it hits another known label. Handles OCR typos like MSMO, MEM0.
+          final stopMatch = RegExp(r'\b(M[A-Z0-9]{1,3}[O0]|DATE|AREA|PHONE|PH|MOB)\b', caseSensitive: false).firstMatch(rawName);
           if (stopMatch != null) {
             rawName = rawName.substring(0, stopMatch.start).trim();
           }
@@ -157,10 +157,10 @@ class Engine03Header {
         }
       }
 
-      // MEMO No. : 11264       IB05A (Or OCR typo: MSMO No)
-      if (RegExp(r'M[A-Z0-9]{1,3}O\s*NO', caseSensitive: false).hasMatch(upper)) {
-        // extract the first sequence of digits that appears after "MEMO NO" or "MSMO NO"
-        final match = RegExp(r'M[A-Z0-9]{1,3}O\s*NO[^\d]*(\d+)', caseSensitive: false).firstMatch(line);
+      // MEMO No. : 11264       IB05A (Or OCR typo: MSMO No, MEM0 N0)
+      if (RegExp(r'M[A-Z0-9]{1,3}[O0]\s*N[O0]', caseSensitive: false).hasMatch(upper)) {
+        // extract the first sequence of digits that appears after "MEMO NO"
+        final match = RegExp(r'M[A-Z0-9]{1,3}[O0]\s*N[O0][^\d]*(\d+)', caseSensitive: false).firstMatch(line);
         if (match != null) {
           memoNo = match.group(1)!;
         }
