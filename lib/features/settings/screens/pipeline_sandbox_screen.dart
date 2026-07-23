@@ -291,13 +291,13 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> _runEngine07() async {
-    if (_cellOutput == null) {
-      _showSnack('Run Engine 06 first.');
+    if (_tableGeometryOutput == null) {
+      _showSnack('Run Engine 04 first.');
       return;
     }
     setState(() { _e07Running = true; _e07Error = null; });
     try {
-      final result = await Engine07RowBuilder.build(_cellOutput!);
+      final result = await Engine07RowBuilder.build(_tableGeometryOutput!);
       setState(() {
         _e07Running = false;
         _e07Timing = result.timingMs;
