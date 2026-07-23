@@ -11,8 +11,6 @@ import 'package:wms_mobile/core/pipeline/engine_02_processing.dart';
 import 'package:wms_mobile/core/pipeline/engine_02a_optimization.dart';
 import 'package:wms_mobile/core/pipeline/engine_03_header.dart';
 import 'package:wms_mobile/core/pipeline/engine_04_table_detection.dart';
-import 'package:wms_mobile/core/pipeline/engine_05_grid.dart';
-import 'package:wms_mobile/core/pipeline/engine_06_cell.dart';
 import 'package:wms_mobile/core/pipeline/engine_07_row.dart';
 
 void main() {
@@ -68,57 +66,23 @@ void main() {
           continue;
         }
 
-        // Engine 04
+        // ENGINE 04
         final e04Result = await Engine04TableDetection.detect(e02aResult.data!);
-        if (!e04Result.isSuccess) {
-          print('FAILED AT ENGINE 04: ${e04Result.errors}');
-          continue;
-        }
+        expect(e04Result.isSuccess, true, reason: 'Engine 04 failed: ${e04Result.errors}');
 
-        // Engine 05
-        final e05Result = await Engine05GridSystem.generate(e04Result.data!);
-        if (!e05Result.isSuccess) {
-          print('FAILED AT ENGINE 05: ${e05Result.errors}');
-          continue;
-        }
-
-        // Engine 06
-        final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
-        if (!e06Result.isSuccess) {
-          print('FAILED AT ENGINE 06: ${e06Result.errors}');
-          continue;
-        }
-
-        // Engine 07
-        final e07Result = await Engine07RowBuilder.build(e06Result.data!);
-        if (!e07Result.isSuccess) {
-          print('FAILED AT ENGINE 07: ${e07Result.errors}');
-          continue;
-        }
+        // ENGINE 07 (Regex-Spatial Row Builder)
+        final e07Result = await Engine07RowBuilder.build(e04Result.data!);
+        expect(e07Result.isSuccess, true, reason: 'Engine 07 failed: ${e07Result.errors}');
 
         final String e03RawText = e03Result.data!.rawWords.map((w) => w.text).join(' ');
         final int topY = e04Result.data!.topY;
         final int bottomY = e04Result.data!.bottomY;
-        
-        List<int?> getColBounds(String key) {
-          try {
-            final col = e05Result.data!.columns.firstWhere((c) => c.key == key);
-            return [col.leftX, col.rightX];
-          } catch (e) {
-            return [null, null];
-          }
-        }
 
         final finalJson = {
           'image': imageName,
           'header_raw_text': e03RawText,
           'table_top_y': topY,
           'table_bottom_y': bottomY,
-          'grid_cols': {
-            'SR': getColBounds('SR'),
-            'PART': getColBounds('PART'),
-            'DESC': getColBounds('DESC'),
-          },
           'header': e03Result.data!.headerData,
           'rows': e07Result.data!.rows.map((r) => r.toJson()).toList(),
         };

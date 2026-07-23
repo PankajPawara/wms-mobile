@@ -99,9 +99,15 @@ class CandidateGenerator {
 
     InventoryData? bestFuzzyMatch;
     double bestScore = 0.0;
+    
+    // Normalize location to compare
+    final normalizedRawLoc = _applyOcrCorrection(location.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase());
 
     for (final item in _cache) {
       final dbPartNo = item.partNo;
+      final normalizedDbLoc = _applyOcrCorrection(item.location.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase());
+      
+      bool locationMatches = location.isNotEmpty && normalizedDbLoc == normalizedRawLoc;
 
       // Tier 1: Exact Match (100%)
       if (dbPartNo == rawPartNo) {
@@ -112,18 +118,25 @@ class CandidateGenerator {
 
       // Tier 2: Normalized Match (95%)
       if (normalizedDb == normalizedRaw) {
-        return _buildItem(rawPartNo, dbPartNo, item, MatchConfidence.normalized, mrp, qty, pack, description);
+        return _buildItem(rawPartNo, dbPartNo, item, locationMatches ? MatchConfidence.exact : MatchConfidence.normalized, mrp, qty, pack, description);
       }
 
       // Tier 3: OCR Corrected Match (85%)
       final correctedDb = _applyOcrCorrection(normalizedDb);
       if (correctedDb == correctedRaw) {
-        return _buildItem(rawPartNo, dbPartNo, item, MatchConfidence.fuzzy, mrp, qty, pack, description);
+        return _buildItem(rawPartNo, dbPartNo, item, locationMatches ? MatchConfidence.normalized : MatchConfidence.fuzzy, mrp, qty, pack, description);
       }
 
       // Keep track of the best fuzzy match score using Levenshtein distance
       // Compare the normalized strings to ignore dashes
-      final score = _levenshteinSimilarity(normalizedDb, normalizedRaw);
+      double score = _levenshteinSimilarity(normalizedDb, normalizedRaw);
+      
+      // If the part number is a decent fuzzy match AND the location matches perfectly, 
+      // it's highly likely to be the correct part (boosting the score).
+      if (locationMatches && score >= 0.5) {
+        score += 0.3; // Huge boost for matching location
+      }
+      
       if (score > bestScore) {
         bestScore = score;
         bestFuzzyMatch = item;
@@ -133,11 +146,74 @@ class CandidateGenerator {
     // Tier 4: Best Fuzzy Match (above threshold)
     // 0.8 is typically a good threshold for part numbers (allows ~2 edits on a 10 char string)
     if (bestScore >= 0.80 && bestFuzzyMatch != null) {
-      return _buildItem(rawPartNo, bestFuzzyMatch.partNo, bestFuzzyMatch, MatchConfidence.fuzzy, mrp, qty, pack, description);
+      final normalizedDbLoc = _applyOcrCorrection(bestFuzzyMatch.location.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase());
+      bool locationMatches = location.isNotEmpty && normalizedDbLoc == normalizedRawLoc;
+      
+      return _buildItem(rawPartNo, bestFuzzyMatch.partNo, bestFuzzyMatch, locationMatches ? MatchConfidence.normalized : MatchConfidence.fuzzy, mrp, qty, pack, description);
     }
 
     // Unmatched
     return _buildUnmatchedItem(rawPartNo, description, mrp, qty, location, pack, stock);
+  }
+
+  /// Attempts to find a part number from a phrase (list of words) by testing combinations.
+  /// Useful when OCR blends the part number and description without clear boundaries.
+  Future<ExtractedMemoItem> findBestMatchFromPhrase({
+    required List<String> phraseWords,
+    required double mrp,
+    required int qty,
+    required String location,
+    required int pack,
+    required int stock,
+  }) async {
+    if (phraseWords.isEmpty) {
+       return _buildUnmatchedItem('', '', mrp, qty, location, pack, stock);
+    }
+    
+    // We test up to the first 4 words as potential part numbers (since parts like "AAAA AAAAAA" are 2 words, etc.)
+    ExtractedMemoItem? bestItem;
+    double highestScore = -1.0;
+    
+    int maxWords = math.min(phraseWords.length, 4);
+    for (int i = 1; i <= maxWords; i++) {
+      final potentialPartNo = phraseWords.sublist(0, i).join(' ');
+      final potentialDesc = phraseWords.sublist(i).join(' ');
+      
+      final item = await findBestMatch(
+        rawPartNo: potentialPartNo,
+        description: potentialDesc,
+        mrp: mrp,
+        qty: qty,
+        location: location,
+        pack: pack,
+        stock: stock,
+      );
+      
+      double score = 0.0;
+      if (item.confidence == MatchConfidence.exact) score = 1.0;
+      else if (item.confidence == MatchConfidence.normalized) score = 0.95;
+      else if (item.confidence == MatchConfidence.fuzzy) score = 0.85;
+      else score = 0.0;
+      
+      // If we find an exact or normalized match, we can stop immediately!
+      if (score >= 0.95) {
+        return item;
+      }
+      
+      if (score > highestScore) {
+        highestScore = score;
+        bestItem = item;
+      }
+    }
+    
+    // If no fuzzy match was found, default to just the first word as the part no.
+    if (bestItem == null || highestScore == 0.0) {
+       final fallbackPart = phraseWords[0];
+       final fallbackDesc = phraseWords.sublist(1).join(' ');
+       return _buildUnmatchedItem(fallbackPart, fallbackDesc, mrp, qty, location, pack, stock);
+    }
+    
+    return bestItem;
   }
 
   ExtractedMemoItem _buildItem(

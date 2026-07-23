@@ -28,44 +28,24 @@ class GeminiFallbackService {
     );
 
     final String prompt = '''
-You are an expert OCR corrector for Honda auto parts pickup memos. 
-I have extracted text from a memo using ML Kit. The text has Y-coordinates to help you understand the physical layout (e.g., items on the same row have similar Y coordinates).
-My geometry-based parser attempted to extract the data, but some items might be missing, or part numbers might be corrupted (e.g., 1 instead of L, 0 instead of O).
-Also, ML Kit sometimes merges the Pack and Stock numbers, completely ignoring "0"s, etc. I am passing you the original image as well. Please look at the image to verify the actual values for QTY, Pack, and Stock.
+You are reviewing OCR output.
 
-Here is the RAW OCR DUMP (with Y coordinates):
+Inputs:
+1. Original processed memo image
+2. Extracted JSON:
+{
+  "header": ${jsonEncode(extractedHeader)},
+  "items": ${jsonEncode(extractedItems)}
+}
+3. Validation report:
 $rawOcrDump
 
-Here is what my local parser managed to extract:
-Header: ${jsonEncode(extractedHeader)}
-Items: ${jsonEncode(extractedItems)}
-
-TASK:
-1. Look at the original image provided and compare it to the RAW OCR DUMP and local parser output.
-2. Find the correct Customer Name, Area (city), and Memo No from the top of the document.
-3. Find all table rows. A row contains: SR No, Part No, Description, MRP, Qty, Location, Pack, Stock.
-4. Correct any mistakes the local parser made (especially for QTY, Pack, and Stock).
-5. Output a single strict JSON object containing the corrected data. Do NOT include markdown blocks like ```json. Just raw JSON.
-
-FORMAT:
-{
-  "header": {
-    "customer": "M/S., MAHAVIR AUTO GARAGE",
-    "area": "BILIMORA",
-    "memo_no": "9513"
-  },
-  "items": [
-    {
-      "part_no": "150350-K24-G00",
-      "description": "...",
-      "mrp": "...",
-      "qty": 1,
-      "location": "103T",
-      "pack": 1,
-      "stock": 100
-    }
-  ]
-}
+Rules:
+- Never rewrite correct values.
+- Only modify fields that clearly conflict with the image.
+- Preserve the JSON schema exactly.
+- If uncertain, keep the original value and mark it as low confidence.
+- Return only the corrected JSON.
 ''';
 
     final List<Part> parts = [TextPart(prompt)];

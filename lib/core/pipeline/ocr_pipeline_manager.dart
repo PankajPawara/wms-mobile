@@ -8,8 +8,6 @@ import 'engine_02_processing.dart';
 import 'engine_02a_optimization.dart';
 import 'engine_03_header.dart';
 import 'engine_04_table_detection.dart';
-import 'engine_05_grid.dart';
-import 'engine_06_cell.dart';
 import 'engine_07_row.dart';
 import '../services/candidate_generator.dart';
 
@@ -39,17 +37,9 @@ class OcrPipelineManager {
     // ENGINE 04
     final e04Result = await Engine04TableDetection.detect(e02aResult.data!);
     if (!e04Result.isSuccess) throw Exception('Engine 04 Failed: ${e04Result.errors}');
-    
-    // ENGINE 05
-    final e05Result = await Engine05GridSystem.generate(e04Result.data!);
-    if (!e05Result.isSuccess) throw Exception('Engine 05 Failed: ${e05Result.errors}');
-    
-    // ENGINE 06
-    final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
-    if (!e06Result.isSuccess) throw Exception('Engine 06 Failed: ${e06Result.errors}');
 
-    // ENGINE 07
-    final e07Result = await Engine07RowBuilder.build(e06Result.data!);
+    // ENGINE 07 (Regex-Spatial Row Builder, bypassing grid columns)
+    final e07Result = await Engine07RowBuilder.build(e04Result.data!);
     if (!e07Result.isSuccess) throw Exception('Engine 07 Failed: ${e07Result.errors}');
 
     // Map Engine 03 output to ExtractedMemoHeader
@@ -75,27 +65,20 @@ class OcrPipelineManager {
       final pack = int.tryParse(r.pack.replaceAll(RegExp(r'\D'), '')) ?? 0;
       final stock = int.tryParse(r.stock.replaceAll(RegExp(r'\D'), '')) ?? 0;
 
-      // Handle cases where multiple part numbers get clustered into a single row
-      // (often happens on rotated images or extremely dense receipts)
-      final parts = r.partNo.split(' ').map((s) => s.trim()).where((s) => s.length >= 3).toList();
+      final prefixWords = r.partNo.split(' ').where((s) => s.isNotEmpty).toList();
+      if (prefixWords.isEmpty) continue;
       
-      if (parts.isEmpty) continue;
-
-      for (final p in parts) {
-        final item = await candidateGenerator.findBestMatch(
-          rawPartNo: p,
-          description: r.description.trim(),
-          mrp: mrp,
-          qty: qty,
-          location: r.location.trim(),
-          pack: pack,
-          stock: stock,
-        );
-        
-        // If it's a valid match (or we just keep it as unmatched for the user to see), add it.
-        finalItems.add(item);
-        rawOcrDump += 'Row -> SR: ${r.sr} | PART: $p | DESC: ${r.description} | MRP: ${r.mrp} | QTY: ${r.qty} | LOC: ${r.location}\n';
-      }
+      final item = await candidateGenerator.findBestMatchFromPhrase(
+        phraseWords: prefixWords,
+        mrp: mrp,
+        qty: qty,
+        location: r.location.trim(),
+        pack: pack,
+        stock: stock,
+      );
+      
+      finalItems.add(item);
+      rawOcrDump += 'Row -> SR: ${r.sr} | RAW PREFIX: ${r.partNo} | MRP: ${r.mrp} | QTY: ${r.qty} | LOC: ${r.location}\n';
     }
 
     if (finalItems.isEmpty) {
