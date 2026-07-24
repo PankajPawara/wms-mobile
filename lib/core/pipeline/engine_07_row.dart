@@ -89,74 +89,74 @@ class Engine07RowBuilder {
 
       final rows = <PartRow>[];
       
-      final mrpRegex = RegExp(r'^[\d,]+[\.,]\d{2}[A-Za-z]?$');
-      final locRegex = RegExp(r'^([O0-9]{3}[A-Z]|BOX-?\d{3})$', caseSensitive: false);
-      final qtyRegex = RegExp(r'^[O0-9]{1,4}$', caseSensitive: false);
+      // MRP is a whole number ending in .00 but OCR might return .0, .OO, etc. with attached noise.
+      final mrpRegex = RegExp(r'^[\d,]+[\.,][0O\d]{1,2}[A-Za-z]?$');
+      
+      // Location uses patterns like 001A, 206D, BOX-001, etc.
+      final locRegex = RegExp(r'^([O0-9]{3}[A-Z]|BOX-?\d{3})[A-Za-z\.]?$', caseSensitive: false);
+      
+      final qtyRegex = RegExp(r'^[O0-9]{1,4}[A-Za-z]?$', caseSensitive: false);
 
       for (final line in lines) {
         // Sort words strictly left-to-right
         line.sort((a, b) => a.left.compareTo(b.left));
         
-        String mrp = '';
+        String fullLine = line.map((w) => w.text).join(' ');
+        
+        final locRegex = RegExp(r'\b([O0-9]{3}[A-Za-z]|BOX\s*-?\s*\d{3})[A-Za-z\.]?\s*$', caseSensitive: false);
+        final qtyRegex = RegExp(r'\s+([O0-9]{1,4}[A-Za-z]?)\s*$');
+        final mrpRegex = RegExp(r'\s+([\d,]+[\.,][0O\d]{1,2}[A-Za-z]?)\s*$');
+        final srRegex = RegExp(r'^\s*([0-9]{1,3})\s+');
+
         String loc = '';
         String qty = '';
-        
-        int mrpIndex = -1;
-        int locIndex = -1;
-        int qtyIndex = -1;
-        
-        // Scan right-to-left for Location
-        for (int i = line.length - 1; i >= 0; i--) {
-          final text = line[i].text.replaceAll(' ', '').toUpperCase();
-          if (locRegex.hasMatch(text)) {
-            loc = text;
-            locIndex = i;
-            break;
-          }
-        }
-        
-        // Scan left-to-right for MRP (take the first match, avoiding AMOUNT on the far right)
-        // Skip index 0 as it's definitely Part No.
-        int mrpSearchEnd = locIndex != -1 ? locIndex : line.length;
-        for (int i = 1; i < mrpSearchEnd; i++) {
-          final text = line[i].text.replaceAll(' ', '').toUpperCase();
-          if (mrpRegex.hasMatch(text)) {
-            mrp = text;
-            mrpIndex = i;
-            break;
-          }
-        }
-        
-        // Find QTY between MRP and LOC
-        if (mrpIndex != -1) {
-           for (int i = mrpIndex + 1; i < mrpSearchEnd; i++) {
-             final text = line[i].text.replaceAll(' ', '').toUpperCase();
-             if (qtyRegex.hasMatch(text) && text != '0' && text != 'O') {
-               qty = text;
-               qtyIndex = i;
-               break;
-             }
-           }
-        }
-        
-        // The prefix words are everything before MRP (or before LOC if no MRP)
-        int splitIndex = mrpIndex != -1 ? mrpIndex : (locIndex != -1 ? locIndex : line.length);
-        final prefixWords = line.sublist(0, splitIndex).map((w) => w.text).toList();
-        
-        if (prefixWords.isEmpty) continue;
-        
+        String mrp = '';
         String sr = '';
-        
-        // SR is usually the first number if it's isolated and small
-        if (RegExp(r'^\d{1,3}$').hasMatch(prefixWords[0])) {
-          sr = prefixWords[0];
-          prefixWords.removeAt(0);
+
+        // Extract Loc
+        final locMatch = locRegex.firstMatch(fullLine);
+        if (locMatch != null) {
+          loc = locMatch.group(1)!;
+          fullLine = fullLine.substring(0, locMatch.start);
+        }
+
+        // Extract QTY
+        final qtyMatch = qtyRegex.firstMatch(fullLine);
+        if (qtyMatch != null) {
+          qty = qtyMatch.group(1)!;
+          fullLine = fullLine.substring(0, qtyMatch.start);
+        }
+
+        // Extract MRP
+        final mrpMatch = mrpRegex.firstMatch(fullLine);
+        if (mrpMatch != null) {
+          mrp = mrpMatch.group(1)!;
+          fullLine = fullLine.substring(0, mrpMatch.start);
         }
         
-        // We will put all remaining words into partNo, and let CandidateGenerator figure it out.
-        String partNo = prefixWords.join(' ');
+        // Extract SR
+        final srMatch = srRegex.firstMatch(fullLine);
+        if (srMatch != null) {
+          sr = srMatch.group(1)!;
+          fullLine = fullLine.substring(srMatch.end);
+        }
+
+        String partNo = fullLine.trim();
         
-        if (partNo.isNotEmpty) {
+        bool hasValidMrp = mrp.isNotEmpty;
+        bool hasValidLoc = loc.isNotEmpty;
+        
+        // A valid part number usually contains a sequence of digits (e.g. 5 digits) or alphanumeric with hyphens.
+        bool looksLikePartNo = RegExp(r'\d{4,}').hasMatch(partNo) || RegExp(r'[A-Z0-9]+-[A-Z0-9]+').hasMatch(partNo);
+        
+        // Reject noise lines (e.g., headers, dates) that don't have MRP, LOC, and don't look like a part number.
+        // Also reject if it's explicitly a known noise word.
+        bool isNoise = partNo.toUpperCase().contains('MEMO') || 
+                       partNo.toUpperCase().contains('DATE') || 
+                       partNo.toUpperCase().contains('TOTAL') ||
+                       partNo.toUpperCase().contains('AMOUNT');
+
+        if (!isNoise && (hasValidMrp || hasValidLoc || looksLikePartNo)) {
           rows.add(PartRow(
             sr: sr,
             partNo: partNo,
