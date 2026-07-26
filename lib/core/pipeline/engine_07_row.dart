@@ -1,6 +1,6 @@
 import 'models/pipeline_result.dart';
 import 'models/pipeline_stage.dart';
-import 'models/ocr_word.dart';
+import 'engine_06_cell.dart' show CellAssignmentOutput, CellData;
 import 'engine_04_table_detection.dart' show TableGeometryOutput;
 
 class PartRow {
@@ -54,138 +54,111 @@ class RowBuilderOutput {
 }
 
 class Engine07RowBuilder {
-  static Future<PipelineResult<RowBuilderOutput>> build(TableGeometryOutput input) async {
+  static Future<PipelineResult<RowBuilderOutput>> build(CellAssignmentOutput input) async {
     final stopwatch = Stopwatch()..start();
     final errors = <String>[];
 
     try {
-      // Filter words strictly inside the table bounds
-      final tableWords = input.allWords.where((w) {
-        return w.top >= input.topY && w.bottom <= input.bottomY;
-      }).toList();
-
-      // 1. Cluster words into horizontal lines by Y-coordinate
-      tableWords.sort((a, b) => a.top.compareTo(b.top));
+      // 1. Collect all cells across all columns to find unique row Y-clusters
+      final allCells = <CellData>[];
+      for (final colCells in input.columns.values) {
+        allCells.addAll(colCells);
+      }
       
-      final lines = <List<OcrWord>>[];
-      if (tableWords.isNotEmpty) {
-        List<OcrWord> currentLine = [tableWords.first];
-        for (int i = 1; i < tableWords.length; i++) {
-          final w = tableWords[i];
-          final lineAvgY = currentLine.map((e) => (e.top + e.bottom) / 2).reduce((a, b) => a + b) / currentLine.length;
-          final wordAvgY = (w.top + w.bottom) / 2;
+      allCells.sort((a, b) => a.topY.compareTo(b.topY));
+      
+      final rowClusters = <List<CellData>>[];
+      if (allCells.isNotEmpty) {
+        List<CellData> currentRow = [allCells.first];
+        for (int i = 1; i < allCells.length; i++) {
+          final c = allCells[i];
+          final lineAvgY = currentRow.map((e) => (e.topY + e.bottomY) / 2).reduce((a, b) => a + b) / currentRow.length;
+          final cellAvgY = (c.topY + c.bottomY) / 2;
           
-          if ((wordAvgY - lineAvgY).abs() < 15) { // 15px threshold for same line
-            currentLine.add(w);
+          if ((cellAvgY - lineAvgY).abs() < 25) {
+            currentRow.add(c);
           } else {
-            lines.add(currentLine);
-            currentLine = [w];
+            rowClusters.add(currentRow);
+            currentRow = [c];
           }
         }
-        if (currentLine.isNotEmpty) {
-          lines.add(currentLine);
+        if (currentRow.isNotEmpty) {
+          rowClusters.add(currentRow);
         }
       }
 
       final rows = <PartRow>[];
       
-      // MRP is a whole number ending in .00 but OCR might return .0, .OO, etc. with attached noise.
-      final mrpRegex = RegExp(r'^[\d,]+[\.,][0O\d]{1,2}[A-Za-z]?$');
-      
-      // Location uses patterns like 001A, 206D, BOX-001, etc.
-      final locRegex = RegExp(r'^([O0-9]{3}[A-Z]|BOX-?\d{3})[A-Za-z\.]?$', caseSensitive: false);
-      
-      final qtyRegex = RegExp(r'^[O0-9]{1,4}[A-Za-z]?$', caseSensitive: false);
-
-      for (final line in lines) {
-        // Sort words strictly left-to-right
-        line.sort((a, b) => a.left.compareTo(b.left));
+      for (final cluster in rowClusters) {
+        final minTopY = cluster.map((c) => c.topY).reduce((a, b) => a < b ? a : b) - 10;
+        final maxBottomY = cluster.map((c) => c.bottomY).reduce((a, b) => a > b ? a : b) + 10;
         
-        String fullLine = line.map((w) => w.text).join(' ');
-        
-        final locRegex = RegExp(r'\b([O0-9]{3}[A-Za-z]|BOX\s*-?\s*\d{3})[A-Za-z\.]?\s*$', caseSensitive: false);
-        final qtyRegex = RegExp(r'\s+([O0-9]{1,4}[A-Za-z]?)\s*$');
-        final mrpRegex = RegExp(r'\s+([\d,]+[\.,][0O\d]{1,2}[A-Za-z]?)\s*$');
-        final srRegex = RegExp(r'^\s*([0-9]{1,3})\s+');
-
-        String loc = '';
-        String qty = '';
-        String mrp = '';
-        String sr = '';
-
-        // Extract Loc
-        final locMatch = locRegex.firstMatch(fullLine);
-        if (locMatch != null) {
-          loc = locMatch.group(1)!;
-          fullLine = fullLine.substring(0, locMatch.start);
-        }
-
-        // Extract QTY
-        final qtyMatch = qtyRegex.firstMatch(fullLine);
-        if (qtyMatch != null) {
-          qty = qtyMatch.group(1)!;
-          fullLine = fullLine.substring(0, qtyMatch.start);
-        }
-
-        // Extract MRP
-        final mrpMatch = mrpRegex.firstMatch(fullLine);
-        if (mrpMatch != null) {
-          mrp = mrpMatch.group(1)!;
-          fullLine = fullLine.substring(0, mrpMatch.start);
+        String getTextForCol(String key) {
+           final cellsInCol = input.columns[key] ?? [];
+           final match = cellsInCol.where((c) => 
+               c.topY >= minTopY && c.bottomY <= maxBottomY ||
+               ((c.topY + c.bottomY)/2 >= minTopY && (c.topY + c.bottomY)/2 <= maxBottomY)
+           ).toList();
+           
+           if (match.isEmpty) return '';
+           match.sort((a, b) => a.topY.compareTo(b.topY));
+           return match.map((c) => c.text).join(' ').trim();
         }
         
-        // Extract SR
-        final srMatch = srRegex.firstMatch(fullLine);
-        if (srMatch != null) {
-          sr = srMatch.group(1)!;
-          fullLine = fullLine.substring(srMatch.end);
-        }
-
-        String partNo = fullLine.trim();
+        String sr = getTextForCol('SR');
+        String partNo = getTextForCol('PART');
+        String desc = getTextForCol('DESC');
+        String mrp = getTextForCol('MRP');
+        String qty = getTextForCol('QTY');
+        String loc = getTextForCol('LOC');
+        String pack = getTextForCol('PACK');
+        String stock = getTextForCol('STOCK');
         
-        bool hasValidMrp = mrp.isNotEmpty;
-        bool hasValidLoc = loc.isNotEmpty;
+        // Strip artifacts like |
+        partNo = partNo.replaceAll('|', '').trim();
+        mrp = mrp.replaceAll('|', '').replaceAll('I', '').replaceAll('l', '').trim();
+        qty = qty.replaceAll('|', '').replaceAll('I', '').replaceAll('L', '').trim();
+        loc = loc.replaceAll('|', '').trim();
+        pack = pack.replaceAll('|', '').replaceAll('I', '').trim();
         
-        // A valid part number usually contains a sequence of digits (e.g. 5 digits) or alphanumeric with hyphens.
-        bool looksLikePartNo = RegExp(r'\d{4,}').hasMatch(partNo) || RegExp(r'[A-Z0-9]+-[A-Z0-9]+').hasMatch(partNo);
-        
-        // Reject noise lines (e.g., headers, dates) that don't have MRP, LOC, and don't look like a part number.
-        // Also reject if it's explicitly a known noise word.
         bool isNoise = partNo.toUpperCase().contains('MEMO') || 
                        partNo.toUpperCase().contains('DATE') || 
                        partNo.toUpperCase().contains('TOTAL') ||
                        partNo.toUpperCase().contains('AMOUNT');
-
-        if (!isNoise && (hasValidMrp || hasValidLoc || looksLikePartNo)) {
+                       
+        if (partNo.isEmpty && desc.isEmpty && mrp.isEmpty) continue;
+        
+        if (!isNoise) {
           rows.add(PartRow(
             sr: sr,
             partNo: partNo,
-            description: '',
+            description: desc,
             mrp: mrp,
             qty: qty,
             location: loc,
-            pack: '',
-            stock: '',
+            pack: pack,
+            stock: stock,
           ));
         }
       }
 
       stopwatch.stop();
+
       return PipelineResult(
         data: RowBuilderOutput(
-          tableGeometry: input,
+          tableGeometry: input.gridGeometry.tableGeometry,
           rows: rows,
         ),
         timingMs: stopwatch.elapsedMilliseconds,
         confidence: 1.0,
-        stage: PipelineStage.rowBuilder,
+        stage: PipelineStage.row,
         errors: errors,
       );
 
     } catch (e) {
       stopwatch.stop();
       return PipelineResult.failure(
-        stage: PipelineStage.rowBuilder,
+        stage: PipelineStage.row,
         reason: e.toString(),
         timingMs: stopwatch.elapsedMilliseconds,
       );

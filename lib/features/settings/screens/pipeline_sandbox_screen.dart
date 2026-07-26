@@ -291,13 +291,13 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> _runEngine07() async {
-    if (_tableGeometryOutput == null) {
-      _showSnack('Run Engine 04 first.');
+    if (_cellOutput == null) {
+      _showSnack('Run Engine 06 first.');
       return;
     }
     setState(() { _e07Running = true; _e07Error = null; });
     try {
-      final result = await Engine07RowBuilder.build(_tableGeometryOutput!);
+      final result = await Engine07RowBuilder.build(_cellOutput!);
       setState(() {
         _e07Running = false;
         _e07Timing = result.timingMs;
@@ -1098,6 +1098,7 @@ class _Engine06Tab extends StatelessWidget {
 // =============================================================================
 
 class _Engine07Tab extends StatelessWidget {
+  final CellAssignmentOutput? cellOutput;
   final RowBuilderOutput? output;
   final bool isRunning;
   final String? error;
@@ -1106,6 +1107,7 @@ class _Engine07Tab extends StatelessWidget {
   final VoidCallback? onCopyJson;
 
   const _Engine07Tab({
+    required this.cellOutput,
     required this.output,
     required this.isRunning,
     required this.error,
@@ -1118,19 +1120,20 @@ class _Engine07Tab extends StatelessWidget {
   Widget build(BuildContext context) {
     return _PipelineTabLayout(
       stageName: 'Engine 07 — Row Builder',
-      stageDesc: 'Links the cells horizontally to build complete Part Rows.',
+      stageDesc: 'Transforms vertical columns into horizontal structured row records.',
       isRunning: isRunning,
       error: error,
       timingMs: timingMs,
       hasOutput: output != null,
+      prerequisite: cellOutput == null ? 'Run Engine 06 first' : null,
       onCopyJson: onCopyJson,
       jsonOutput: output?.toJson(),
       actions: [
         _SandboxButton(
-          icon: Icons.table_rows,
+          icon: Icons.list_alt_rounded,
           label: 'Build Rows',
-          color: Colors.blue,
-          onTap: isRunning ? null : onExtract,
+          color: Colors.redAccent,
+          onTap: (isRunning || cellOutput == null) ? null : onExtract,
         ),
       ],
     );

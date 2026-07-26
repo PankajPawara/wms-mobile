@@ -107,10 +107,10 @@ class Engine05GridSystem {
         rawX['STOCK'] = stockWord != null ? stockWord.left : (w * 0.94).toInt();
       }
 
-      final standardOrder = ['SR', 'PART', 'DESC', 'MRP', 'QTY', 'LOC', 'PACK', 'STOCK'];
-      final activeKeys = standardOrder.where((k) => rawX.containsKey(k)).toList();
+      final activeKeys = rawX.keys.toList()..sort((a, b) => rawX[a]!.compareTo(rawX[b]!));
       
-      // Ensure strictly ordered in case OCR jitter misplaced a bounding box
+      // Ensure strictly ordered with minimum spacing in case OCR jitter misplaced a bounding box
+      // or fallbacks overlap with actual headers
       for (int i = 1; i < activeKeys.length; i++) {
         final prevKey = activeKeys[i - 1];
         final currKey = activeKeys[i];
