@@ -12,6 +12,8 @@ import 'package:wms_mobile/core/pipeline/engine_02_processing.dart';
 import 'package:wms_mobile/core/pipeline/engine_02a_optimization.dart';
 import 'package:wms_mobile/core/pipeline/engine_03_header.dart';
 import 'package:wms_mobile/core/pipeline/engine_04_table_detection.dart';
+import 'package:wms_mobile/core/pipeline/engine_05_grid.dart';
+import 'package:wms_mobile/core/pipeline/engine_06_cell.dart';
 import 'package:wms_mobile/core/pipeline/engine_07_row.dart';
 import 'package:wms_mobile/core/database/app_database.dart';
 import 'package:wms_mobile/core/services/candidate_generator.dart';
@@ -102,8 +104,16 @@ void main() {
         final e04Result = await Engine04TableDetection.detect(e02aResult.data!);
         expect(e04Result.isSuccess, true, reason: 'Engine 04 failed: ${e04Result.errors}');
 
-        // ENGINE 07 (Regex-Spatial Row Builder)
-        final e07Result = await Engine07RowBuilder.build(e04Result.data!);
+        // ENGINE 05
+        final e05Result = await Engine05GridSystem.generate(e04Result.data!);
+        expect(e05Result.isSuccess, true, reason: 'Engine 05 failed: ${e05Result.errors}');
+
+        // ENGINE 06
+        final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
+        expect(e06Result.isSuccess, true, reason: 'Engine 06 failed: ${e06Result.errors}');
+
+        // ENGINE 07
+        final e07Result = await Engine07RowBuilder.build(e06Result.data!);
         expect(e07Result.isSuccess, true, reason: 'Engine 07 failed: ${e07Result.errors}');
 
         final String e03RawText = e03Result.data!.rawWords.map((w) => w.text).join(' ');

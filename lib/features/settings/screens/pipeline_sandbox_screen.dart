@@ -459,6 +459,7 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
                 : null,
           ),
           _Engine07Tab(
+            cellOutput: _cellOutput,
             output: _rowOutput,
             isRunning: _e07Running,
             error: _e07Error,

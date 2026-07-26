@@ -8,6 +8,8 @@ import 'engine_02_processing.dart';
 import 'engine_02a_optimization.dart';
 import 'engine_03_header.dart';
 import 'engine_04_table_detection.dart';
+import 'engine_05_grid.dart';
+import 'engine_06_cell.dart';
 import 'engine_07_row.dart';
 import '../services/candidate_generator.dart';
 import '../data/validation_data.dart';
@@ -39,8 +41,16 @@ class OcrPipelineManager {
     final e04Result = await Engine04TableDetection.detect(e02aResult.data!);
     if (!e04Result.isSuccess) throw Exception('Engine 04 Failed: ${e04Result.errors}');
 
-    // ENGINE 07 (Regex-Spatial Row Builder, bypassing grid columns)
-    final e07Result = await Engine07RowBuilder.build(e04Result.data!);
+    // ENGINE 05
+    final e05Result = await Engine05GridSystem.generate(e04Result.data!);
+    if (!e05Result.isSuccess) throw Exception('Engine 05 Failed: ${e05Result.errors}');
+
+    // ENGINE 06
+    final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
+    if (!e06Result.isSuccess) throw Exception('Engine 06 Failed: ${e06Result.errors}');
+
+    // ENGINE 07
+    final e07Result = await Engine07RowBuilder.build(e06Result.data!);
     if (!e07Result.isSuccess) throw Exception('Engine 07 Failed: ${e07Result.errors}');
 
     // Map Engine 03 output to ExtractedMemoHeader

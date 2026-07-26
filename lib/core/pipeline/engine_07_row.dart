@@ -151,14 +151,14 @@ class Engine07RowBuilder {
         ),
         timingMs: stopwatch.elapsedMilliseconds,
         confidence: 1.0,
-        stage: PipelineStage.row,
+        stage: PipelineStage.rowBuilder,
         errors: errors,
       );
 
     } catch (e) {
       stopwatch.stop();
       return PipelineResult.failure(
-        stage: PipelineStage.row,
+        stage: PipelineStage.rowBuilder,
         reason: e.toString(),
         timingMs: stopwatch.elapsedMilliseconds,
       );
