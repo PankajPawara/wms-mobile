@@ -342,6 +342,25 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
           'Pipeline Sandbox',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.copy_all),
+            tooltip: 'Copy Full Combined JSON',
+            onPressed: () {
+              final allData = {
+                'E01': _acquisitionOutput?.toJson(),
+                'E02': _processingOutput?.toJson(),
+                'E02A': _optimizationOutput?.toJson(),
+                'E03': _headerOutput?.toJson(),
+                'E04': _tableGeometryOutput?.toJson(),
+                'E05': _gridOutput?.toJson(),
+                'E06': _cellOutput?.toJson(),
+                'E07': _rowOutput?.toJson(),
+              };
+              _copyJson(allData);
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -629,6 +648,7 @@ class _PipelineTabLayout extends StatelessWidget {
   final VoidCallback? onCopyJson;
   final Map<String, dynamic>? jsonOutput;
   final File? imageFile;
+  final Widget? customPreview;
   final List<Widget> actions;
 
   const _PipelineTabLayout({
@@ -643,6 +663,7 @@ class _PipelineTabLayout extends StatelessWidget {
     this.onCopyJson,
     this.jsonOutput,
     this.imageFile,
+    this.customPreview,
   });
 
   @override
@@ -738,7 +759,9 @@ class _PipelineTabLayout extends StatelessWidget {
             const SizedBox(height: 12),
 
             // Image preview
-            if (imageFile != null)
+            if (customPreview != null)
+              customPreview!
+            else if (imageFile != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: Image.file(imageFile!, fit: BoxFit.contain),
@@ -955,6 +978,20 @@ class _Engine04Tab extends StatelessWidget {
       prerequisite: optimizationOutput == null ? 'Run Engine 02A first' : null,
       onCopyJson: onCopyJson,
       jsonOutput: output?.toJson(),
+      customPreview: optimizationOutput?.optimizedImage != null ? LayoutBuilder(
+        builder: (context, constraints) {
+          return ClipRect(
+            child: Align(
+              alignment: Alignment.topCenter,
+              heightFactor: 0.5,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(optimizationOutput!.optimizedImage, fit: BoxFit.contain, width: constraints.maxWidth),
+              ),
+            ),
+          );
+        }
+      ) : null,
       actions: [
         _SandboxButton(
           icon: Icons.grid_on_rounded,
