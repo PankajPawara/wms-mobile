@@ -21,6 +21,12 @@ class HeaderOutput {
     required this.headerData,
     required this.rawWords,
   });
+
+  Map<String, dynamic> toJson() => {
+    'croppedHeaderImagePath': croppedHeaderImage.path,
+    'headerData': headerData,
+    'wordCount': rawWords.length,
+  };
 }
 
 class Engine03Header {
