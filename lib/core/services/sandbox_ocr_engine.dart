@@ -119,6 +119,10 @@ class TableGeometryDetector {
     // Find the exact X for keywords
     for (final w in headerBand) {
       final text = w.text.toUpperCase();
+      // Ignore pure vertical lines which artificially drop the headerBottom
+      if ((text == '|' || text == 'I' || text == 'l') && (w.bottom - w.top) > 2 * (w.right - w.left)) {
+        continue;
+      }
       if (text == 'SR' || text == 'S.R') srX = w.left - 10;
       if (text.contains('PART')) partNoX = w.left - 10;
       if (text.contains('DESC')) descX = w.left - 10;

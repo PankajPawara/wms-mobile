@@ -69,7 +69,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
     } else {
       // Use cunning_document_scanner which uses OpenCV to detect corners natively!
       try {
-        final pictures = await CunningDocumentScanner.getPictures(true);
+        final pictures = await CunningDocumentScanner.getPictures();
         if (pictures != null) {
           paths = pictures;
         }

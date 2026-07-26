@@ -143,6 +143,22 @@ class _OcrSandboxScreenState extends ConsumerState<OcrSandboxScreen> {
               const PopupMenuItem(value: 'test5.jpg', child: Text('Test Image 5 (Rotated)')),
             ],
           ),
+          if (_ocrResult != null)
+            IconButton(
+              icon: const Icon(Icons.copy_all),
+              tooltip: 'Copy Full Combined JSON',
+              onPressed: () {
+                final allData = {
+                  'geometry': _ocrResult!.geometry?.toJson(),
+                  'header': _ocrResult!.headerJson,
+                  'matrix': _ocrResult!.tableMatrixJson,
+                  'pickup': _ocrResult!.pickupJson,
+                  'gemini': _geminiResult,
+                };
+                Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(allData)));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Combined JSON copied to clipboard')));
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Run Pipeline',
@@ -165,6 +181,22 @@ class _OcrSandboxScreenState extends ConsumerState<OcrSandboxScreen> {
                   else if (_error != null)
                     _buildSectionCard('Error', Text(_error!, style: const TextStyle(color: Colors.red)))
                   else if (_ocrResult != null) ...[
+                    if (_ocrResult!.geometry != null)
+                      _buildSectionCard(
+                        'Table Preview',
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            return ClipRect(
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                heightFactor: 0.5, // Just showing the top half of the cropped image for now
+                                child: Image.file(_imageFile!, fit: BoxFit.contain, width: constraints.maxWidth),
+                              ),
+                            );
+                          }
+                        ),
+                      ),
+                    const SizedBox(height: 16),
                     _buildSectionCard(
                       'Table Geometry', 
                       Text(_ocrResult!.geometry != null 

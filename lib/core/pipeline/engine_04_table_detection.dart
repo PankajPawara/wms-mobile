@@ -87,6 +87,11 @@ class Engine04TableDetection {
       
       for (final w in sortedByY) {
         final text = w.text.toUpperCase();
+        // Ignore pure vertical lines which skew geometry
+        if ((text == '|' || text == 'I' || text == 'l') && (w.bottom - w.top) > 2 * (w.right - w.left)) {
+          continue;
+        }
+        
         // Trigger if we find anything resembling a column header
         if (text.contains('DES') || text.contains('PART') || text.contains('PARI') || text.contains('QTY') || text.contains('M.R.P') || text == 'SR' || text == 'S.R') {
           int cy = (w.top + w.bottom) ~/ 2;
@@ -127,7 +132,15 @@ class Engine04TableDetection {
             headerFound = true;
             int maxBottom = 0;
             for (final bw in bandWords) {
-              if (bw.bottom > maxBottom) maxBottom = bw.bottom;
+              final bt = bw.text.toUpperCase();
+              if (bt == 'SR' || bt == 'S.R' || bt == 'SR.' || bt.contains('PART') || bt.contains('PARI') || bt.contains('DESC') || bt == 'DES' || bt.contains('QTY') || bt.contains('MRP') || bt.contains('M.R.P') || bt.contains('LOC') || bt.contains('PACK') || bt.contains('STOCK')) {
+                if (bw.bottom > maxBottom) maxBottom = bw.bottom;
+              }
+            }
+            if (maxBottom == 0) {
+              for (final bw in bandWords) {
+                 if (bw.bottom > maxBottom) maxBottom = bw.bottom;
+              }
             }
             headerBottomY = maxBottom;
             break;

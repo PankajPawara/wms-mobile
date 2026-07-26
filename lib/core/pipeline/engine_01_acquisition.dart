@@ -12,6 +12,7 @@
 // =============================================================================
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
@@ -95,7 +96,7 @@ class Engine01Acquisition {
       
       if (source == 'camera') {
         try {
-          final pictures = await CunningDocumentScanner.getPictures(true);
+          final pictures = await CunningDocumentScanner.getPictures();
           if (pictures != null && pictures.isNotEmpty) pickedPath = pictures.first;
         } catch (e) {
           // Ignore

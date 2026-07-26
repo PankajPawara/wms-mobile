@@ -89,8 +89,8 @@ class Engine05GridSystem {
         rawX['SR'] = (w * 0.02).toInt();
         rawX['PART'] = (w * 0.12).toInt();
         rawX['DESC'] = (w * 0.28).toInt();
-        rawX['QTY'] = (w * 0.65).toInt();
-        rawX['MRP'] = (w * 0.75).toInt();
+        rawX['MRP'] = (w * 0.65).toInt();
+        rawX['QTY'] = (w * 0.75).toInt();
         rawX['LOC'] = (w * 0.82).toInt();
         rawX['PACK'] = (w * 0.88).toInt();
         rawX['STOCK'] = (w * 0.94).toInt();
@@ -100,14 +100,14 @@ class Engine05GridSystem {
         rawX['DESC'] = descWord != null ? descWord.left : (rawX['PART']! + (w * 0.16).toInt());
         
         // We MUST define these even if not found, otherwise DESC absorbs the right side of the page
-        rawX['QTY'] = qtyWord != null ? qtyWord.left : (w * 0.65).toInt();
-        rawX['MRP'] = mrpWord != null ? mrpWord.left : (w * 0.75).toInt();
+        rawX['MRP'] = mrpWord != null ? mrpWord.left : (w * 0.65).toInt();
+        rawX['QTY'] = qtyWord != null ? qtyWord.left : (w * 0.75).toInt();
         rawX['LOC'] = locWord != null ? locWord.left : (w * 0.82).toInt();
         rawX['PACK'] = packWord != null ? packWord.left : (w * 0.88).toInt();
         rawX['STOCK'] = stockWord != null ? stockWord.left : (w * 0.94).toInt();
       }
 
-      final standardOrder = ['SR', 'PART', 'DESC', 'QTY', 'MRP', 'LOC', 'PACK', 'STOCK'];
+      final standardOrder = ['SR', 'PART', 'DESC', 'MRP', 'QTY', 'LOC', 'PACK', 'STOCK'];
       final activeKeys = standardOrder.where((k) => rawX.containsKey(k)).toList();
       
       // Ensure strictly ordered in case OCR jitter misplaced a bounding box
