@@ -113,12 +113,14 @@ class ExtractedMemoHeader {
   final String area;
   final String memoNumber;
   final String? memoDate; // ISO-8601 date string or null if not found
+  final String? subArea; // Formally identified sub-location from the customer name
 
   const ExtractedMemoHeader({
     required this.customerName,
     required this.area,
     required this.memoNumber,
     this.memoDate,
+    this.subArea,
   });
 
   ExtractedMemoHeader copyWith({
@@ -126,12 +128,14 @@ class ExtractedMemoHeader {
     String? area,
     String? memoNumber,
     String? memoDate,
+    String? subArea,
   }) {
     return ExtractedMemoHeader(
       customerName: customerName ?? this.customerName,
       area:         area         ?? this.area,
       memoNumber:   memoNumber   ?? this.memoNumber,
       memoDate:     memoDate     ?? this.memoDate,
+      subArea:      subArea      ?? this.subArea,
     );
   }
 
@@ -140,6 +144,7 @@ class ExtractedMemoHeader {
     'area': area,
     'memoNumber': memoNumber,
     'memoDate': memoDate,
+    'subArea': subArea,
   };
 }
 

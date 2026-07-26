@@ -10,7 +10,8 @@ import 'engine_03_header.dart';
 import 'engine_04_table_detection.dart';
 import 'engine_07_row.dart';
 import '../services/candidate_generator.dart';
-
+import '../data/validation_data.dart';
+import 'dart:math' as math;
 class OcrPipelineManager {
   static Future<MemoOcrResult> process(File originalImage, AppDatabase db) async {
     // ENGINE 01
@@ -44,10 +45,57 @@ class OcrPipelineManager {
 
     // Map Engine 03 output to ExtractedMemoHeader
     final headerData = e03Result.data!.headerData;
+    String customerName = headerData['customerName'] ?? '';
+    String area = headerData['area'] ?? '';
+    String? subArea;
+
+    // Sub-Area Identification
+    final normArea = area.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
+    String? matchedMainArea;
+    
+    // Find closest Main Area
+    for (var mainArea in ValidationData.areaSchedules.keys) {
+      final normMainArea = mainArea.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
+      if (normArea.contains(normMainArea) || _levenshtein(normArea, normMainArea) <= 2) {
+        matchedMainArea = mainArea;
+        break;
+      }
+    }
+
+    if (matchedMainArea != null) {
+      final subAreas = ValidationData.areaSchedules[matchedMainArea]!;
+      for (var sub in subAreas) {
+        final subWords = sub.toUpperCase().split(RegExp(r'[^A-Z]')).where((w) => w.isNotEmpty).toList();
+        final custWords = customerName.toUpperCase().split(RegExp(r'[^A-Z]')).where((w) => w.isNotEmpty).toList();
+        
+        for (int i = 0; i <= custWords.length - subWords.length; i++) {
+          bool match = true;
+          for (int j = 0; j < subWords.length; j++) {
+             final maxDist = subWords[j].length >= 5 ? 2 : (subWords[j].length >= 3 ? 1 : 0);
+             if (_levenshtein(custWords[i+j], subWords[j]) > maxDist) {
+               match = false;
+               break;
+             }
+          }
+          if (match) {
+            subArea = sub;
+            // Correct the sub-area spelling in the customer name if it was misspelled
+            for (int j = 0; j < subWords.length; j++) {
+               custWords[i+j] = subWords[j];
+            }
+            customerName = custWords.join(' ');
+            break;
+          }
+        }
+        if (subArea != null) break;
+      }
+    }
+
     final header = ExtractedMemoHeader(
-      customerName: headerData['customerName'] ?? '',
-      area: headerData['area'] ?? '',
+      customerName: customerName,
+      area: area,
       memoNumber: headerData['memoNo'] ?? '',
+      subArea: subArea,
     );
 
     // Map Engine 07 output to ExtractedMemoItems and Validate with DB
@@ -65,7 +113,26 @@ class OcrPipelineManager {
       final pack = int.tryParse(r.pack.replaceAll(RegExp(r'\D'), '')) ?? 0;
       final stock = int.tryParse(r.stock.replaceAll(RegExp(r'\D'), '')) ?? 0;
 
-      final prefixWords = r.partNo.split(' ').where((s) => s.isNotEmpty).toList();
+      // Part Code OCR Correction
+      String correctedPartNo = r.partNo.toUpperCase();
+      for (var code in ValidationData.validModelCodes) {
+         final mistakeO = code.replaceAll('0', 'O');
+         final mistakeI = code.replaceAll('1', 'I');
+         final mistakeBoth = mistakeO.replaceAll('1', 'I');
+
+         if (mistakeBoth != code && correctedPartNo.contains(mistakeBoth)) {
+            correctedPartNo = correctedPartNo.replaceAll(mistakeBoth, code);
+         } else {
+           if (mistakeO != code && correctedPartNo.contains(mistakeO)) {
+              correctedPartNo = correctedPartNo.replaceAll(mistakeO, code);
+           }
+           if (mistakeI != code && correctedPartNo.contains(mistakeI)) {
+              correctedPartNo = correctedPartNo.replaceAll(mistakeI, code);
+           }
+         }
+      }
+
+      final prefixWords = correctedPartNo.split(' ').where((s) => s.isNotEmpty).toList();
       if (prefixWords.isEmpty) continue;
       
       final item = await candidateGenerator.findBestMatchFromPhrase(
@@ -94,4 +161,21 @@ class OcrPipelineManager {
   }
 
   static String _safeCorrect(String s) => s.replaceAll('O', '0').replaceAll('Q', '0').replaceAll('I', '1');
+
+  static int _levenshtein(String a, String b) {
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+    List<int> v0 = List<int>.filled(b.length + 1, 0);
+    List<int> v1 = List<int>.filled(b.length + 1, 0);
+    for (int i = 0; i <= b.length; i++) v0[i] = i;
+    for (int i = 0; i < a.length; i++) {
+      v1[0] = i + 1;
+      for (int j = 0; j < b.length; j++) {
+        int cost = (a[i] == b[j]) ? 0 : 1;
+        v1[j + 1] = math.min(math.min(v1[j] + 1, v0[j + 1] + 1), v0[j] + cost);
+      }
+      for (int j = 0; j <= b.length; j++) v0[j] = v1[j];
+    }
+    return v0[b.length];
+  }
 }

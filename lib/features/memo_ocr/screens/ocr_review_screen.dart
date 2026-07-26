@@ -296,6 +296,7 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
                   areaCtrl: _areaCtrl,
                   memoNumberCtrl: _memoNumberCtrl,
                   memoDateCtrl: _memoDateCtrl,
+                  subArea: widget.ocrResult.header.subArea,
                 ),
                 const SizedBox(height: AppDimensions.md),
 
@@ -341,12 +342,14 @@ class _HeaderForm extends StatelessWidget {
   final TextEditingController areaCtrl;
   final TextEditingController memoNumberCtrl;
   final TextEditingController memoDateCtrl;
+  final String? subArea;
 
   const _HeaderForm({
     required this.customerNameCtrl,
     required this.areaCtrl,
     required this.memoNumberCtrl,
     required this.memoDateCtrl,
+    this.subArea,
   });
 
   @override
@@ -366,6 +369,18 @@ class _HeaderForm extends StatelessWidget {
                   TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
           const SizedBox(height: 12),
           _field('Customer Name', customerNameCtrl, maxLines: 3),
+          if (subArea != null && subArea!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 2),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified, size: 14, color: AppColors.success),
+                  const SizedBox(width: 4),
+                  Text('Verified Sub-Area: $subArea',
+                      style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: _field('Area', areaCtrl)),
