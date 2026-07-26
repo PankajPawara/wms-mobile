@@ -12,8 +12,9 @@
 // =============================================================================
 
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 
@@ -90,11 +91,21 @@ class Engine01Acquisition {
     final stopwatch = Stopwatch()..start();
     try {
       final picker = ImagePicker();
-      final XFile? picked = source == 'camera'
-          ? await picker.pickImage(source: ImageSource.camera, imageQuality: 95)
-          : await picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
+      String? pickedPath;
+      
+      if (source == 'camera') {
+        try {
+          final pictures = await CunningDocumentScanner.getPictures(true);
+          if (pictures != null && pictures.isNotEmpty) pickedPath = pictures.first;
+        } catch (e) {
+          // Ignore
+        }
+      } else {
+        final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
+        pickedPath = picked?.path;
+      }
 
-      if (picked == null) {
+      if (pickedPath == null) {
         stopwatch.stop();
         return PipelineResult.failure(
           stage: PipelineStage.acquisition,
@@ -103,7 +114,7 @@ class Engine01Acquisition {
         );
       }
 
-      final file = File(picked.path);
+      final file = File(pickedPath);
       final output = await _normaliseAndSave(file, source);
       stopwatch.stop();
 

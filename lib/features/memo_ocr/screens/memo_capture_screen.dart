@@ -13,6 +13,7 @@ import '../../../core/pipeline/ocr_pipeline_manager.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/empty_state_placeholder.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 
 /// Pipeline step labels shown in the progress UI.
 enum _PipelineStep {
@@ -60,19 +61,32 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    List<XFile> pickedFiles = [];
+    List<String> paths = [];
     
     if (source == ImageSource.gallery) {
-      pickedFiles = await picker.pickMultiImage(imageQuality: 90, maxWidth: 2000);
+      final pickedFiles = await picker.pickMultiImage(imageQuality: 90, maxWidth: 2000);
+      paths = pickedFiles.map((x) => x.path).toList();
     } else {
-      final picked = await picker.pickImage(source: source, imageQuality: 90, maxWidth: 2000);
-      if (picked != null) pickedFiles.add(picked);
+      // Use cunning_document_scanner which uses OpenCV to detect corners natively!
+      try {
+        final pictures = await CunningDocumentScanner.getPictures(true);
+        if (pictures != null) {
+          paths = pictures;
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+             _error = 'Scanner failed: $e';
+          });
+        }
+        return;
+      }
     }
     
-    if (pickedFiles.isEmpty) return;
+    if (paths.isEmpty) return;
     
     setState(() {
-      _imageFiles.addAll(pickedFiles.map((x) => File(x.path)));
+      _imageFiles.addAll(paths.map((p) => File(p)));
       _error = null;
       _qualityWarnings = [];
       _currentStep = _PipelineStep.idle;
