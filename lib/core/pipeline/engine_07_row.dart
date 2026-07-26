@@ -72,10 +72,10 @@ class Engine07RowBuilder {
         List<CellData> currentRow = [allCells.first];
         for (int i = 1; i < allCells.length; i++) {
           final c = allCells[i];
-          final lineAvgY = currentRow.map((e) => (e.topY + e.bottomY) / 2).reduce((a, b) => a + b) / currentRow.length;
-          final cellAvgY = (c.topY + c.bottomY) / 2;
+          // Anchor the row to the top of its first cell to prevent rolling average drift
+          final anchorTopY = currentRow.first.topY;
           
-          if ((cellAvgY - lineAvgY).abs() < 25) {
+          if ((c.topY - anchorTopY).abs() < 20) {
             currentRow.add(c);
           } else {
             rowClusters.add(currentRow);
