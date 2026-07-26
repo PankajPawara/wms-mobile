@@ -10,7 +10,9 @@ import 'engine_03_header.dart';
 import 'engine_04_table_detection.dart';
 import 'engine_05_grid.dart';
 import 'engine_06_cell.dart';
+import 'engine_06b_zone_ocr.dart';
 import 'engine_07_row.dart';
+import 'engine_08_database_match.dart';
 import '../services/candidate_generator.dart';
 import '../data/validation_data.dart';
 import 'dart:math' as math;
@@ -45,13 +47,17 @@ class OcrPipelineManager {
     final e05Result = await Engine05GridSystem.generate(e04Result.data!);
     if (!e05Result.isSuccess) throw Exception('Engine 05 Failed: ${e05Result.errors}');
 
-    // ENGINE 06
-    final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
-    if (!e06Result.isSuccess) throw Exception('Engine 06 Failed: ${e06Result.errors}');
+    // ENGINE 06B (Zone OCR replaces Engine 06)
+    final e06Result = await Engine06BZoneOcr.processZones(e02aResult.data!, e05Result.data!);
+    if (!e06Result.isSuccess) throw Exception('Engine 06B Failed: ${e06Result.errors}');
 
     // ENGINE 07
     final e07Result = await Engine07RowBuilder.build(e06Result.data!);
     if (!e07Result.isSuccess) throw Exception('Engine 07 Failed: ${e07Result.errors}');
+
+    // ENGINE 08 (Database Validation)
+    final e08Result = await Engine08DatabaseMatch.validateAndCorrect(e07Result.data!);
+    if (!e08Result.isSuccess) throw Exception('Engine 08 Failed: ${e08Result.errors}');
 
     // Map Engine 03 output to ExtractedMemoHeader
     final headerData = e03Result.data!.headerData;
@@ -115,7 +121,7 @@ class OcrPipelineManager {
     final List<ExtractedMemoItem> finalItems = [];
     String rawOcrDump = '--- Header Raw Text ---\n${e03Result.data!.rawWords.map((w) => w.text).join(' ')}\n\n';
     
-    for (var r in e07Result.data!.rows) {
+    for (var r in e08Result.data!.rows) {
       if (r.partNo.trim().isEmpty) continue;
       
       final mrp = double.tryParse(r.mrp.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;

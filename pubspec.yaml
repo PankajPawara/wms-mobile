@@ -76,6 +76,7 @@ flutter:
     - .env
     - test_assets/rawfiles/
     - assets/test_images/
+    - assets/data/
 #    - assets/images/
 #
 #  fonts:

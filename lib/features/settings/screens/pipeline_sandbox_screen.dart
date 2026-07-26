@@ -27,7 +27,9 @@ import '../../../core/pipeline/engine_03_header.dart';
 import '../../../core/pipeline/engine_04_table_detection.dart';
 import '../../../core/pipeline/engine_05_grid.dart';
 import '../../../core/pipeline/engine_06_cell.dart';
+import '../../../core/pipeline/engine_06b_zone_ocr.dart';
 import '../../../core/pipeline/engine_07_row.dart';
+import '../../../core/pipeline/engine_08_database_match.dart';
 
 class PipelineSandboxScreen extends StatefulWidget {
   const PipelineSandboxScreen({super.key});
@@ -269,9 +271,13 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
       _showSnack('Run Engine 05 first.');
       return;
     }
+    if (_optimizationOutput == null) {
+      _showSnack('Run Engine 02A first for optimization output.');
+      return;
+    }
     setState(() { _e06Running = true; _e06Error = null; });
     try {
-      final result = await Engine06CellAssignment.assign(_gridOutput!);
+      final result = await Engine06BZoneOcr.processZones(_optimizationOutput!, _gridOutput!);
       setState(() {
         _e06Running = false;
         _e06Timing = result.timingMs;
@@ -297,7 +303,11 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
     }
     setState(() { _e07Running = true; _e07Error = null; });
     try {
-      final result = await Engine07RowBuilder.build(_cellOutput!);
+      final e07Result = await Engine07RowBuilder.build(_cellOutput!);
+      if (!e07Result.isSuccess) throw Exception(e07Result.errors.join('\n'));
+      
+      final result = await Engine08DatabaseMatch.validateAndCorrect(e07Result.data!);
+      
       setState(() {
         _e07Running = false;
         _e07Timing = result.timingMs;
