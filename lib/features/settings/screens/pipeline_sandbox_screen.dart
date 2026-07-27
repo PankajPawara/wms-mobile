@@ -51,6 +51,7 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   GridGeometryOutput? _gridOutput;
   CellAssignmentOutput? _cellOutput;
   RowBuilderOutput? _rowOutput;
+  RowBuilderOutput? _validatedOutput; // E08 output
 
   // State tracking
   bool _e01Running = false;
@@ -59,8 +60,9 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   bool _e03Running = false;
   bool _e04Running = false;
   bool _e05Running = false;
-  bool _e06Running = false;
+  bool _e06bRunning = false;
   bool _e07Running = false;
+  bool _e08Running = false;
 
   String? _e01Error;
   String? _e02Error;
@@ -70,6 +72,7 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   String? _e05Error;
   String? _e06Error;
   String? _e07Error;
+  String? _e08Error;
 
   int _e01Timing = 0;
   int _e02Timing = 0;
@@ -77,13 +80,14 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   int _e03Timing = 0;
   int _e04Timing = 0;
   int _e05Timing = 0;
-  int _e06Timing = 0;
+  int _e06bTiming = 0;
   int _e07Timing = 0;
+  int _e08Timing = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this);
+    _tabController = TabController(length: 9, vsync: this);
   }
 
   @override
@@ -263,10 +267,10 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // ENGINE 06 — CELL ASSIGNMENT
+  // ENGINE 06B — ZONE OCR
   // ---------------------------------------------------------------------------
 
-  Future<void> _runEngine06() async {
+  Future<void> _runEngine06b() async {
     if (_gridOutput == null) {
       _showSnack('Run Engine 05 first.');
       return;
@@ -275,12 +279,12 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
       _showSnack('Run Engine 02A first for optimization output.');
       return;
     }
-    setState(() { _e06Running = true; _e06Error = null; });
+    setState(() { _e06bRunning = true; _e06Error = null; });
     try {
       final result = await Engine06BZoneOcr.processZones(_optimizationOutput!, _gridOutput!);
       setState(() {
-        _e06Running = false;
-        _e06Timing = result.timingMs;
+        _e06bRunning = false;
+        _e06bTiming = result.timingMs;
         if (result.isSuccess) {
           _cellOutput = result.data;
         } else {
@@ -288,7 +292,7 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
         }
       });
     } catch (e) {
-      setState(() { _e06Running = false; _e06Error = e.toString(); });
+      setState(() { _e06bRunning = false; _e06Error = e.toString(); });
     }
   }
 
@@ -298,27 +302,51 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
 
   Future<void> _runEngine07() async {
     if (_cellOutput == null) {
-      _showSnack('Run Engine 06 first.');
+      _showSnack('Run Engine 06B first.');
       return;
     }
     setState(() { _e07Running = true; _e07Error = null; });
     try {
       final e07Result = await Engine07RowBuilder.build(_cellOutput!);
-      if (!e07Result.isSuccess) throw Exception(e07Result.errors.join('\n'));
-      
-      final result = await Engine08DatabaseMatch.validateAndCorrect(e07Result.data!);
       
       setState(() {
         _e07Running = false;
-        _e07Timing = result.timingMs;
-        if (result.isSuccess) {
-          _rowOutput = result.data;
+        _e07Timing = e07Result.timingMs;
+        if (e07Result.isSuccess) {
+          _rowOutput = e07Result.data;
         } else {
-          _e07Error = result.errors.join('\n');
+          _e07Error = e07Result.errors.join('\n');
         }
       });
     } catch (e) {
       setState(() { _e07Running = false; _e07Error = e.toString(); });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ENGINE 08 — DATABASE MATCH
+  // ---------------------------------------------------------------------------
+
+  Future<void> _runEngine08() async {
+    if (_rowOutput == null) {
+      _showSnack('Run Engine 07 first.');
+      return;
+    }
+    setState(() { _e08Running = true; _e08Error = null; });
+    try {
+      final result = await Engine08DatabaseMatch.validateAndCorrect(_rowOutput!);
+      
+      setState(() {
+        _e08Running = false;
+        _e08Timing = result.timingMs;
+        if (result.isSuccess) {
+          _validatedOutput = result.data;
+        } else {
+          _e08Error = result.errors.join('\n');
+        }
+      });
+    } catch (e) {
+      setState(() { _e08Running = false; _e08Error = e.toString(); });
     }
   }
 
@@ -364,8 +392,9 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
                 'E03': _headerOutput?.toJson(),
                 'E04': _tableGeometryOutput?.toJson(),
                 'E05': _gridOutput?.toJson(),
-                'E06': _cellOutput?.toJson(),
+                'E06B': _cellOutput?.toJson(),
                 'E07': _rowOutput?.toJson(),
+                'E08': _validatedOutput?.toJson(),
               };
               _copyJson(allData);
             },
@@ -384,8 +413,9 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
             Tab(text: 'E03\nHeader', height: 48),
             Tab(text: 'E04\nTable', height: 48),
             Tab(text: 'E05\nGrid', height: 48),
-            Tab(text: 'E06\nCells', height: 48),
+            Tab(text: 'E06B\nZone OCR', height: 48),
             Tab(text: 'E07\nRows', height: 48),
+            Tab(text: 'E08\nValidate', height: 48),
           ],
         ),
       ),
@@ -460,10 +490,10 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
           ),
           _Engine06Tab(
             output: _cellOutput,
-            isRunning: _e06Running,
+            isRunning: _e06bRunning,
             error: _e06Error,
-            timingMs: _e06Timing,
-            onExtract: _runEngine06,
+            timingMs: _e06bTiming,
+            onExtract: _runEngine06b,
             onCopyJson: _cellOutput != null
                 ? () => _copyJson(_cellOutput!.toJson())
                 : null,
@@ -477,6 +507,17 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
             onExtract: _runEngine07,
             onCopyJson: _rowOutput != null
                 ? () => _copyJson(_rowOutput!.toJson())
+                : null,
+          ),
+          _Engine08Tab(
+            rowOutput: _rowOutput,
+            output: _validatedOutput,
+            isRunning: _e08Running,
+            error: _e08Error,
+            timingMs: _e08Timing,
+            onExtract: _runEngine08,
+            onCopyJson: _validatedOutput != null
+                ? () => _copyJson(_validatedOutput!.toJson())
                 : null,
           ),
         ],
@@ -1061,7 +1102,7 @@ class _Engine05Tab extends StatelessWidget {
 }
 
 // =============================================================================
-// ENGINE 06 TAB
+// ENGINE 06B TAB
 // =============================================================================
 
 class _Engine06Tab extends StatelessWidget {
@@ -1084,8 +1125,8 @@ class _Engine06Tab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _PipelineTabLayout(
-      stageName: 'Engine 06 — Cell Assignment',
-      stageDesc: 'Assigns every OCR word in the table to the correct column and merges text on the same line.',
+      stageName: 'Engine 06B — Zone OCR',
+      stageDesc: 'Crops each column based on grid boundaries and runs independent OCR to eliminate cross-column bleeding (pipe `|` issue).',
       isRunning: isRunning,
       error: error,
       timingMs: timingMs,
@@ -1095,7 +1136,7 @@ class _Engine06Tab extends StatelessWidget {
       actions: [
         _SandboxButton(
           icon: Icons.view_column,
-          label: 'Assign Cells',
+          label: 'Run Zone OCR',
           color: Colors.teal,
           onTap: isRunning ? null : onExtract,
         ),
@@ -1136,7 +1177,7 @@ class _Engine07Tab extends StatelessWidget {
       error: error,
       timingMs: timingMs,
       hasOutput: output != null,
-      prerequisite: cellOutput == null ? 'Run Engine 06 first' : null,
+      prerequisite: cellOutput == null ? 'Run Engine 06B first' : null,
       onCopyJson: onCopyJson,
       jsonOutput: output?.toJson(),
       actions: [
@@ -1145,6 +1186,53 @@ class _Engine07Tab extends StatelessWidget {
           label: 'Build Rows',
           color: Colors.redAccent,
           onTap: (isRunning || cellOutput == null) ? null : onExtract,
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// ENGINE 08 TAB
+// =============================================================================
+
+class _Engine08Tab extends StatelessWidget {
+  final RowBuilderOutput? rowOutput;
+  final RowBuilderOutput? output;
+  final bool isRunning;
+  final String? error;
+  final int timingMs;
+  final VoidCallback onExtract;
+  final VoidCallback? onCopyJson;
+
+  const _Engine08Tab({
+    required this.rowOutput,
+    required this.output,
+    required this.isRunning,
+    required this.error,
+    required this.timingMs,
+    required this.onExtract,
+    required this.onCopyJson,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PipelineTabLayout(
+      stageName: 'Engine 08 — Database Validation',
+      stageDesc: 'Cross-references raw OCR rows with the local parts database to fix typos, substitutions, and standardize barcodes.',
+      isRunning: isRunning,
+      error: error,
+      timingMs: timingMs,
+      hasOutput: output != null,
+      prerequisite: rowOutput == null ? 'Run Engine 07 first' : null,
+      onCopyJson: onCopyJson,
+      jsonOutput: output?.toJson(),
+      actions: [
+        _SandboxButton(
+          icon: Icons.storage_rounded,
+          label: 'Validate & Correct',
+          color: const Color(0xFF16A34A),
+          onTap: (isRunning || rowOutput == null) ? null : onExtract,
         ),
       ],
     );

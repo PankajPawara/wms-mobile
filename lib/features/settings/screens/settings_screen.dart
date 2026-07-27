@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' hide Column;
 
+import 'package:intl/intl.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../repositories/inventory_repository.dart';
@@ -90,27 +92,41 @@ class SettingsScreen extends ConsumerWidget {
             if (role == 'Admin') ...[
               _SectionLabel('DATA MANAGEMENT'),
               const SizedBox(height: 8),
-              _SettingsGroup(items: [
-                _SettingsItem(
-                    icon: Icons.file_upload_outlined,
-                    iconColor: const Color(0xFF16A34A),
-                    title: 'Import Excel File',
-                    subtitle: 'Import or update inventory data',
-                    onTap: () => _showImportExcelDialog(context)),
-                _SettingsItem(
-                    icon: Icons.storage_rounded,
-                    iconColor: const Color(0xFF16A34A),
-                    title: 'Database & Sync Diagnostics',
-                    subtitle: 'Sync logs and SQLite catalog viewer',
-                    onTap: () => context.push('/diagnostics')),
-                _SettingsItem(
-                    icon: Icons.refresh_rounded,
-                    iconColor: const Color(0xFF16A34A),
-                    title: 'Re-import Database',
-                    subtitle: 'Replace existing data',
-                    onTap: () => _runManualSync(context, ref),
-                    showDivider: false),
-              ]),
+              StreamBuilder<InventoryMeta?>(
+                stream: ref.watch(appDatabaseProvider).select(ref.watch(appDatabaseProvider).inventoryMetas).watchSingleOrNull(),
+                builder: (context, snapshot) {
+                  final meta = snapshot.data;
+                  String lastUpdatedStr = 'Never updated';
+                  if (meta != null && meta.lastUpdated.isNotEmpty) {
+                    try {
+                      final dt = DateTime.parse(meta.lastUpdated).toLocal();
+                      lastUpdatedStr = 'Last Updated: ${DateFormat('dd/MM/yyyy hh:mm a').format(dt)}';
+                    } catch (_) {}
+                  }
+
+                  return _SettingsGroup(items: [
+                    _SettingsItem(
+                        icon: Icons.file_upload_outlined,
+                        iconColor: const Color(0xFF16A34A),
+                        title: 'Import Excel File',
+                        subtitle: 'Import or update inventory data',
+                        onTap: () => _showImportExcelDialog(context)),
+                    _SettingsItem(
+                        icon: Icons.storage_rounded,
+                        iconColor: const Color(0xFF16A34A),
+                        title: 'Database & Sync Diagnostics',
+                        subtitle: lastUpdatedStr,
+                        onTap: () => context.push('/diagnostics')),
+                    _SettingsItem(
+                        icon: Icons.refresh_rounded,
+                        iconColor: const Color(0xFF16A34A),
+                        title: 'Re-import Database',
+                        subtitle: 'Replace existing data',
+                        onTap: () => _runManualSync(context, ref),
+                        showDivider: false),
+                  ]);
+                }
+              ),
               const SizedBox(height: 16),
             ],
 
