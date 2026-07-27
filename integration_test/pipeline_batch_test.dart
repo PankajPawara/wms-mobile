@@ -14,7 +14,9 @@ import 'package:wms_mobile/core/pipeline/engine_03_header.dart';
 import 'package:wms_mobile/core/pipeline/engine_04_table_detection.dart';
 import 'package:wms_mobile/core/pipeline/engine_05_grid.dart';
 import 'package:wms_mobile/core/pipeline/engine_06_cell.dart';
+import 'package:wms_mobile/core/pipeline/engine_06b_zone_ocr.dart';
 import 'package:wms_mobile/core/pipeline/engine_07_row.dart';
+import 'package:wms_mobile/core/pipeline/engine_08_database_match.dart';
 import 'package:wms_mobile/core/database/app_database.dart';
 import 'package:wms_mobile/core/services/candidate_generator.dart';
 
@@ -108,13 +110,17 @@ void main() {
         final e05Result = await Engine05GridSystem.generate(e04Result.data!);
         expect(e05Result.isSuccess, true, reason: 'Engine 05 failed: ${e05Result.errors}');
 
-        // ENGINE 06
-        final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
-        expect(e06Result.isSuccess, true, reason: 'Engine 06 failed: ${e06Result.errors}');
+        // ENGINE 06B
+        final e06Result = await Engine06BZoneOcr.processZones(e02aResult.data!, e05Result.data!);
+        expect(e06Result.isSuccess, true, reason: 'Engine 06B failed: ${e06Result.errors}');
 
         // ENGINE 07
         final e07Result = await Engine07RowBuilder.build(e06Result.data!);
         expect(e07Result.isSuccess, true, reason: 'Engine 07 failed: ${e07Result.errors}');
+
+        // ENGINE 08
+        final e08Result = await Engine08DatabaseMatch.validateAndCorrect(e07Result.data!);
+        expect(e08Result.isSuccess, true, reason: 'Engine 08 failed: ${e08Result.errors}');
 
         final String e03RawText = e03Result.data!.rawWords.map((w) => w.text).join(' ');
         final int topY = e04Result.data!.topY;
@@ -126,7 +132,7 @@ void main() {
           'table_top_y': topY,
           'table_bottom_y': bottomY,
           'header': e03Result.data!.headerData,
-          'rows': e07Result.data!.rows.map((r) => r.toJson()).toList(),
+          'rows': e08Result.data!.rows.map((r) => r.toJson()).toList(),
         };
 
         allResults.add(finalJson);
