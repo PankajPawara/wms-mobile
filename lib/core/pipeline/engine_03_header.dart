@@ -146,20 +146,28 @@ class Engine03Header {
       final upper = line.toUpperCase();
 
       // M/S., SHREE NAVSHAKTI AUTO PARTS PANDESARA   MEMO No. : 11264
-      if (upper.startsWith('M/S') && customerName.isEmpty) {
-        // Find where the name actually starts
-        final prefixMatch = RegExp(r'M/S\.?,?\s*').firstMatch(upper);
-        if (prefixMatch != null) {
-          String rawName = line.substring(prefixMatch.end).trim();
-          
-          // Since we reconstructed physical lines, "MEMO No." might be on the same line!
-          // We must chop off the name if it hits another known label. Handles OCR typos like MSMO, MEM0.
+      if (customerName.isEmpty && upper.isNotEmpty && !upper.contains('PICKING LIST') && !upper.contains('MEMO NO')) {
+        if (upper.startsWith('M/S')) {
+          final prefixMatch = RegExp(r'M/S\.?,?\s*').firstMatch(upper);
+          if (prefixMatch != null) {
+            String rawName = line.substring(prefixMatch.end).trim();
+            final stopMatch = RegExp(r'\b(M[A-Z0-9]{1,3}[O0]|DATE|AREA|PHONE|PH|MOB)\b', caseSensitive: false).firstMatch(rawName);
+            if (stopMatch != null) {
+              rawName = rawName.substring(0, stopMatch.start).trim();
+            }
+            customerName = rawName;
+          }
+        } else {
+          // Fallback: If the first valid line doesn't start with M/S, use the whole line
+          // but chop it off if it contains other keywords
+          String rawName = line.trim();
           final stopMatch = RegExp(r'\b(M[A-Z0-9]{1,3}[O0]|DATE|AREA|PHONE|PH|MOB)\b', caseSensitive: false).firstMatch(rawName);
           if (stopMatch != null) {
             rawName = rawName.substring(0, stopMatch.start).trim();
           }
-          
-          customerName = rawName;
+          if (rawName.isNotEmpty && !rawName.startsWith(',')) {
+            customerName = rawName.replaceAll(RegExp(r'^[,.\s]+'), '').trim();
+          }
         }
       }
 
@@ -173,10 +181,20 @@ class Engine03Header {
       }
 
       // MEMO DATE : 21/07/2026
-      if (upper.contains('MEMO DATE') || upper.contains('DATE')) {
-        final match = RegExp(r'DATE[^\d]*([\d/-]+)', caseSensitive: false).firstMatch(line);
-        if (match != null) {
-          memoDate = match.group(1)!.trim();
+      if (memoDate.isEmpty) {
+        // First try finding explicit DATE keyword
+        if (upper.contains('MEMO DATE') || upper.contains('DATE')) {
+          final match = RegExp(r'DATE[^\d]*([\d/-]+)', caseSensitive: false).firstMatch(line);
+          if (match != null) {
+            memoDate = match.group(1)!.trim();
+          }
+        }
+        // Fallback: look for ANY date format in the line
+        if (memoDate.isEmpty) {
+          final match = RegExp(r'\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b').firstMatch(line);
+          if (match != null) {
+            memoDate = match.group(1)!;
+          }
         }
       }
 

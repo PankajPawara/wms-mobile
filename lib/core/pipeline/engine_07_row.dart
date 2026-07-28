@@ -12,6 +12,7 @@ class PartRow {
   final String location;
   final String pack;
   final String stock;
+  final bool isDbVerified;
 
   PartRow({
     required this.sr,
@@ -22,6 +23,7 @@ class PartRow {
     required this.location,
     required this.pack,
     required this.stock,
+    this.isDbVerified = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -33,6 +35,7 @@ class PartRow {
         'location': location,
         'pack': pack,
         'stock': stock,
+        'isDbVerified': isDbVerified,
       };
 }
 
@@ -83,14 +86,37 @@ class Engine07RowBuilder {
       String? anchorKey;
       List<CellData> anchorCells = [];
 
+      // Find the most common cell count among the major columns (mode)
+      final counts = <int, int>{};
       for (final key in _anchorPriority) {
-        final cells = input.columns[key];
-        if (cells != null && cells.length > anchorCells.length) {
-          anchorKey = key;
-          anchorCells = List.from(cells);
+        if (input.columns[key] != null) {
+          final c = input.columns[key]!.length;
+          if (c > 0) {
+            counts[c] = (counts[c] ?? 0) + 1;
+          }
+        }
+      }
+      
+      int bestCount = 0;
+      int maxFreq = 0;
+      for (final entry in counts.entries) {
+        if (entry.value > maxFreq || (entry.value == maxFreq && entry.key > bestCount)) {
+          maxFreq = entry.value;
+          bestCount = entry.key;
         }
       }
 
+      // Pick the highest priority column that has EXACTLY bestCount cells
+      for (final key in _anchorPriority) {
+        final cells = input.columns[key];
+        if (cells != null && cells.length == bestCount) {
+          anchorKey = key;
+          anchorCells = List.from(cells);
+          break;
+        }
+      }
+
+      // Fallback if no major columns found
       if (anchorCells.isEmpty) {
         for (final entry in input.columns.entries) {
           if (entry.value.length > anchorCells.length) {
@@ -112,37 +138,60 @@ class Engine07RowBuilder {
       anchorCells.sort((a, b) => a.topY.compareTo(b.topY));
 
       // -----------------------------------------------------------------------
-      // STEP 2 — Derive non-overlapping row bands from anchor cell top-Y values
+      // STEP 2 — Calculate regression line for each row to handle perspective skew
       // -----------------------------------------------------------------------
-      final rowBands = <(int, int)>[];
-      for (int i = 0; i < anchorCells.length; i++) {
-        final cell = anchorCells[i];
-        final bandStart = i == 0
-            ? cell.topY - 30
-            : (anchorCells[i - 1].topY + cell.topY) ~/ 2;
-        final bandEnd = i == anchorCells.length - 1
-            ? cell.bottomY + 30
-            : (cell.topY + anchorCells[i + 1].topY) ~/ 2;
-        rowBands.add((bandStart, bandEnd));
+      // Find all columns that perfectly match the row count (mode)
+      final referenceColumns = <String, List<CellData>>{};
+      for (final entry in input.columns.entries) {
+        if (entry.value.length == bestCount) {
+          final sorted = List<CellData>.from(entry.value)..sort((a, b) => a.topY.compareTo(b.topY));
+          referenceColumns[entry.key] = sorted;
+        }
+      }
+
+      // Pre-calculate column center X coordinates
+      final colCenters = <String, double>{};
+      for (final col in input.gridGeometry.columns) {
+        colCenters[col.key] = (col.leftX + col.rightX) / 2.0;
+      }
+
+      // For each row (0 to bestCount - 1), calculate slope and intercept
+      final rowRegressions = <int, (double slope, double intercept)>{};
+      for (int i = 0; i < bestCount; i++) {
+        final xs = <double>[];
+        final ys = <double>[];
+        for (final entry in referenceColumns.entries) {
+          final colKey = entry.key;
+          final cell = entry.value[i];
+          final centerX = colCenters[colKey] ?? 0.0;
+          xs.add(centerX);
+          ys.add(cell.topY.toDouble());
+        }
+
+        double slope = 0.0;
+        double intercept = anchorCells[i].topY.toDouble();
+
+        if (xs.length >= 2) {
+          double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+          for (int j = 0; j < xs.length; j++) {
+            sumX += xs[j];
+            sumY += ys[j];
+            sumXY += xs[j] * ys[j];
+            sumX2 += xs[j] * xs[j];
+          }
+          final n = xs.length.toDouble();
+          final denom = (n * sumX2 - sumX * sumX);
+          if (denom != 0) {
+            slope = (n * sumXY - sumX * sumY) / denom;
+            intercept = (sumY - slope * sumX) / n;
+          }
+        }
+        rowRegressions[i] = (slope, intercept);
       }
 
       // -----------------------------------------------------------------------
-      // STEP 3 — Hybrid cell matching strategy
-      //
-      // PROBLEM: Different columns have a consistent vertical offset from the
-      // anchor column. E.g., PART cells are ~28px HIGHER than the corresponding
-      // MRP cells on the same physical row. This causes two PART cells to fall
-      // within the first MRP band when the band is defined by midpoints.
-      //
-      // SOLUTION:
-      //   - If a column has the SAME number of cells as the anchor → ORDER match
-      //     (assign column[i] to anchor row[i] by sorted topY). This perfectly
-      //     handles the vertical-offset case since both columns have equal counts.
-      //   - If a column has DIFFERENT (usually fewer) cells → BAND match using
-      //     topY (not center-Y) as the inclusion test; when multiple cells fall
-      //     in a band, pick the one with topY closest to anchor cell's topY.
+      // STEP 3 — Hybrid cell matching strategy (Perspective Projection)
       // -----------------------------------------------------------------------
-
       // Pre-sort all column cells by topY once
       final sortedColumns = <String, List<CellData>>{};
       for (final entry in input.columns.entries) {
@@ -150,49 +199,48 @@ class Engine07RowBuilder {
           ..sort((a, b) => a.topY.compareTo(b.topY));
         sortedColumns[entry.key] = sorted;
       }
-      final anchorCount = anchorCells.length;
 
-      // Order-based getter: returns the i-th cell text (used when column count == anchor count)
-      String getByOrder(String key, int index) {
+      String getRaw(String key, int rowIndex) {
         final cells = sortedColumns[key] ?? [];
-        if (index >= cells.length) return '';
-        return cells[index].text;
-      }
-
-      // Band-based getter: returns best matching cell within [bandStart, bandEnd)
-      // "Best" = topY inside band; if multiple, closest to anchorTopY.
-      String getByBand(String key, int bandStart, int bandEnd, int anchorTopY) {
-        final cells = sortedColumns[key] ?? [];
-        final inBand = cells.where((c) => c.topY >= bandStart && c.topY < bandEnd).toList();
-        if (inBand.isEmpty) return '';
-        if (inBand.length == 1) return inBand.first.text;
-        inBand.sort((a, b) =>
-            (a.topY - anchorTopY).abs().compareTo((b.topY - anchorTopY).abs()));
-        return inBand.first.text;
-      }
-
-      String getRaw(String key, int bandIndex, int bandStart, int bandEnd, int anchorTopY) {
-        final cellCount = (sortedColumns[key] ?? []).length;
-        if (cellCount == anchorCount) {
-          return getByOrder(key, bandIndex);
+        if (cells.isEmpty) return '';
+        
+        // If column has perfect cell count, map 1-to-1 by order
+        if (cells.length == bestCount) {
+          return cells[rowIndex].text;
         }
-        return getByBand(key, bandStart, bandEnd, anchorTopY);
+
+        // If not, use regression projection to find the closest expected Y
+        final regression = rowRegressions[rowIndex]!;
+        final slope = regression.$1;
+        final intercept = regression.$2;
+        
+        double bestDist = 40.0; // threshold
+        CellData? bestCell;
+        final centerX = colCenters[key] ?? 0.0;
+        
+        for (final cell in cells) {
+          final expectedY = slope * centerX + intercept;
+          final dist = (cell.topY - expectedY).abs();
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestCell = cell;
+          }
+        }
+        
+        return bestCell?.text ?? '';
       }
 
       final rows = <PartRow>[];
 
-      for (int bandIndex = 0; bandIndex < rowBands.length; bandIndex++) {
-        final (bandStart, bandEnd) = rowBands[bandIndex];
-        final anchorTopY = anchorCells[bandIndex].topY;
-
-        final rawSr    = getRaw('SR',    bandIndex, bandStart, bandEnd, anchorTopY);
-        final rawPart  = getRaw('PART',  bandIndex, bandStart, bandEnd, anchorTopY);
-        final rawDesc  = getRaw('DESC',  bandIndex, bandStart, bandEnd, anchorTopY);
-        final rawMrp   = getRaw('MRP',   bandIndex, bandStart, bandEnd, anchorTopY);
-        final rawQty   = getRaw('QTY',   bandIndex, bandStart, bandEnd, anchorTopY);
-        final rawLoc   = getRaw('LOC',   bandIndex, bandStart, bandEnd, anchorTopY);
-        final rawPack  = getRaw('PACK',  bandIndex, bandStart, bandEnd, anchorTopY);
-        final rawStock = getRaw('STOCK', bandIndex, bandStart, bandEnd, anchorTopY);
+      for (int i = 0; i < bestCount; i++) {
+        final rawSr    = getRaw('SR',    i);
+        final rawPart  = getRaw('PART',  i);
+        final rawDesc  = getRaw('DESC',  i);
+        final rawMrp   = getRaw('MRP',   i);
+        final rawQty   = getRaw('QTY',   i);
+        final rawLoc   = getRaw('LOC',   i);
+        final rawPack  = getRaw('PACK',  i);
+        final rawStock = getRaw('STOCK', i);
 
         // Clean SR — digits only
         final sr = rawSr.replaceAll(RegExp(r'[^0-9]'), '').trim();
@@ -202,13 +250,12 @@ class Engine07RowBuilder {
         final partNo = partResult['part']!;
         final desc   = partResult['desc']!;
 
-        // Clean MRP — OCR substitutions, trailing noise
-        final mrp = _cleanMrp(rawMrp);
-
-        // Extract QTY (numeric) and LOC (location code) — may be interleaved
-        final qtyLoc = _extractQtyAndLoc(rawQty, rawLoc);
-        final qty = qtyLoc['qty']!;
-        final loc = qtyLoc['loc']!;
+        // Extract QTY, MRP, and LOC together from right-side columns
+        // Physical misalignment often merges these three into one or two cells
+        final rightSideData = _extractMrpQtyLoc(rawMrp, rawQty, rawLoc);
+        final mrp = rightSideData['mrp']!;
+        final qty = rightSideData['qty']!;
+        final loc = rightSideData['loc']!;
 
         // Clean PACK — first number only
         final pack = _cleanCount(rawPack);
@@ -320,62 +367,54 @@ class Engine07RowBuilder {
   }
 
   // ---------------------------------------------------------------------------
-  // Extract QTY and LOC from the raw QTY-column text.
+  // Unified extraction of QTY, MRP, and LOC from the right-side columns.
   //
-  // Root cause: E05 sometimes defines the QTY column boundary too wide, causing
-  // location codes (e.g. 001L, 035X) to land in the QTY column during E06
-  // cell assignment. This post-processing step separates them.
-  //
-  // Examples:
-  //   "5 001L"   → qty=5,  loc=001L
-  //   "20 021G"  → qty=20, loc=021G
-  //   "035X 6"   → qty=6,  loc=035X   (loc before qty)
-  //   "I 219A"   → qty="", loc=219A   (pipe artefact + loc only, qty OCR-missed)
-  //   "5 I 311A" → qty=5,  loc=311A
+  // Root cause: E05 grid detection often merges MRP, QTY, and LOC into just
+  // one or two columns.
+  //   e.g. "20 6.00|" (QTY 20, MRP 6.00) in MRP column
+  //   e.g. "92-001 5" (MRP 92.00, QTY 5) in MRP column
   // ---------------------------------------------------------------------------
-  static Map<String, String> _extractQtyAndLoc(
-      String rawQty, String rawLoc) {
-    // Remove pipe characters and known artefacts
-    String qtyText = rawQty
-        .replaceAll(RegExp(r'[|!]'), ' ')
+  static Map<String, String> _extractMrpQtyLoc(String rawMrp, String rawQty, String rawLoc) {
+    // Combine everything on the right side
+    String rawRightSide = '$rawMrp $rawQty $rawLoc'
+        .replaceAll(RegExp(r'[|!\}]'), ' ')
+        .replaceAll(RegExp(r'\b[Il](?=\d)'), ' ') // strip I/l attached to start of digits (e.g. I035X)
         .replaceAll(RegExp(r'\bI\b'), ' ')
-        .replaceAll(RegExp(r'\bl\b'), ' ')
-        .trim();
-
-    String loc = rawLoc.replaceAll(RegExp(r'[|!]'), '').trim();
-
-    // Extract location code from QTY text if LOC is empty
-    if (loc.isEmpty) {
-      final locMatch = _locRegex.firstMatch(qtyText);
-      if (locMatch != null) {
-        loc = locMatch.group(1)!;
-        qtyText = qtyText.replaceAll(locMatch.group(0)!, ' ').trim();
-      }
-    }
-
-    // Extract the leading numeric quantity
-    final numMatch = RegExp(r'\d+')
-        .firstMatch(qtyText.replaceAll(RegExp(r'[^0-9 ]'), ' ').trim());
-    final qty = numMatch != null ? numMatch.group(0)! : '';
-
-    return {'qty': qty, 'loc': loc};
-  }
-
-  // ---------------------------------------------------------------------------
-  // Clean MRP value.
-  // Handles: "77.00|"→"77.00", "192.d0"→"192.00", "860.001"→"860.00"
-  // OCR often reads 0 as d, O, or o; and appends the next column pipe as 1.
-  // ---------------------------------------------------------------------------
-  static String _cleanMrp(String raw) {
-    final s = raw
-        .replaceAll(RegExp(r'[|!]'), '')
-        .replaceAll('O', '0') // letter O → digit 0
+        .replaceAll('O', '0')
         .replaceAll('o', '0')
-        .replaceAll('d', '0') // d misread for 0
+        .replaceAll('d', '0')
         .replaceAll('l', '1')
         .trim();
-    final m = RegExp(r'\d[\d,]*\.\d{2}').firstMatch(s);
-    return m != null ? m.group(0)! : s;
+
+    // Fix colon in decimals (e.g. "92:00" -> "92.00")
+    rawRightSide = rawRightSide.replaceAllMapped(RegExp(r':(\d{2})\b'), (m) => '.${m.group(1)}');
+
+    // Fix hyphenated decimals (e.g. "92-00" -> "92.00")
+    rawRightSide = rawRightSide.replaceAllMapped(RegExp(r'(\d+)-(\d{2})\b'), (m) => '${m.group(1)}.${m.group(2)}');
+    // Fix OCR pipe attached to decimal (e.g. "0.001" -> "0.00")
+    rawRightSide = rawRightSide.replaceAllMapped(RegExp(r'(\.\d{2})1\b'), (m) => m.group(1)!);
+
+    String loc = '';
+    final locMatch = _locRegex.firstMatch(rawRightSide);
+    if (locMatch != null) {
+      loc = locMatch.group(1)!;
+      rawRightSide = rawRightSide.replaceAll(locMatch.group(0)!, ' ');
+    }
+
+    String mrp = '';
+    final mrpMatch = RegExp(r'\d[\d,]*\.\d{2}').firstMatch(rawRightSide);
+    if (mrpMatch != null) {
+      mrp = mrpMatch.group(0)!;
+      rawRightSide = rawRightSide.replaceAll(mrpMatch.group(0)!, ' ');
+    }
+
+    String qty = '';
+    final qtyMatch = RegExp(r'\b\d+\b').firstMatch(rawRightSide);
+    if (qtyMatch != null) {
+      qty = qtyMatch.group(0)!;
+    }
+
+    return {'qty': qty, 'mrp': mrp, 'loc': loc};
   }
 
   // ---------------------------------------------------------------------------

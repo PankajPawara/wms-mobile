@@ -30,7 +30,6 @@ class PartsDatabase {
     }
   }
 
-  // Fuzzy match (allow up to 2 character differences)
   static Map<String, dynamic>? fuzzyMatch(String rawPart) {
     if (_parts == null) return null;
     final normalized = rawPart.replaceAll(RegExp(r'[^A-Z0-9]'), '');
@@ -68,6 +67,55 @@ class PartsDatabase {
     }
     return v0[b.length];
   }
+
+  static ({Map<String, dynamic> dbPart, int startRaw, int endRaw})? findBestSubstringMatch(String rawText) {
+    if (_parts == null || rawText.isEmpty) return null;
+    
+    List<int> rawIndices = [];
+    String normalized = "";
+    for (int i = 0; i < rawText.length; i++) {
+      if (RegExp(r'[A-Z0-9]').hasMatch(rawText[i])) {
+        normalized += rawText[i];
+        rawIndices.add(i);
+      }
+    }
+
+    if (normalized.length < 5) return null;
+    
+    Map<String, dynamic>? bestMatch;
+    int bestDist = 999;
+    int bestStart = 0;
+    int bestEnd = 0;
+    
+    for (final p in _parts!) {
+      final b = p['b'] as String;
+      if (b.length < 5) continue;
+      
+      for (int start = 0; start < normalized.length; start++) {
+        int minLen = b.length > 3 ? b.length - 3 : 1;
+        int maxLen = normalized.length - start < b.length + 3 ? normalized.length - start : b.length + 3;
+        
+        for (int len = minLen; len <= maxLen; len++) {
+          int end = start + len;
+          int cost = _levenshtein(b, normalized.substring(start, end));
+          int maxDist = b.length >= 10 ? 4 : 2;
+          if (cost < bestDist && cost <= maxDist) {
+            bestDist = cost;
+            bestStart = start;
+            bestEnd = end;
+            bestMatch = p;
+          }
+        }
+      }
+    }
+    
+    if (bestMatch == null) return null;
+    
+    int actualRawStart = rawIndices[bestStart];
+    int actualRawEnd = bestEnd > 0 ? rawIndices[bestEnd - 1] + 1 : 0;
+    
+    return (dbPart: bestMatch, startRaw: actualRawStart, endRaw: actualRawEnd);
+  }
 }
 
 class Engine08DatabaseMatch {
@@ -83,14 +131,17 @@ class Engine08DatabaseMatch {
       for (final row in input.rows) {
         String correctedPartNo = row.partNo;
         String correctedLocation = row.location;
+        String correctedSr = row.sr;
+        String correctedDesc = row.description;
         bool correctedFromDb = false;
 
         // Strip dashes and spaces to form a barcode for lookup
         final barcode = correctedPartNo.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+        Map<String, dynamic>? dbMatch;
         
         if (barcode.isNotEmpty) {
           // 1. Try exact match
-          var dbMatch = PartsDatabase.findByBarcode(barcode);
+          dbMatch = PartsDatabase.findByBarcode(barcode);
           
           // 2. Try common OCR mistake replacement if no exact match
           if (dbMatch == null) {
@@ -110,31 +161,41 @@ class Engine08DatabaseMatch {
           if (dbMatch == null) {
             dbMatch = PartsDatabase.fuzzyMatch(barcode);
           }
+        }
 
-          // If we found a match, apply corrections
-          if (dbMatch != null) {
-            correctedPartNo = dbMatch['p'] as String; // The fully formatted part number with dashes
-            // If OCR missed the location completely, or we want to trust the DB more:
-            // For now, if OCR has a location, we keep it, but if empty, we fill it.
-            // Or we can overwrite OCR location with DB location since DB is ground truth.
-            if (correctedLocation.isEmpty) {
-               correctedLocation = dbMatch['l'] as String;
-            }
-            correctedFromDb = true;
+        // 4. If still no match (or if partNo was completely empty due to grid layout issues),
+        // try to find the barcode inside the combined text of the row.
+        if (dbMatch == null) {
+          final rawRowText = row.sr + " " + row.partNo + " " + row.description;
+          final substringMatch = PartsDatabase.findBestSubstringMatch(rawRowText);
+          
+          if (substringMatch != null) {
+             dbMatch = substringMatch.dbPart;
+             // Trim part number out of SR and DESC
+             correctedSr = rawRowText.substring(0, substringMatch.startRaw).replaceAll(RegExp(r'[^0-9]'), '').trim();
+             correctedDesc = rawRowText.substring(substringMatch.endRaw).replaceAll(RegExp(r'^[-\s\|]+'), '').trim();
           }
         }
 
-        // If partNo is still empty but we have description, we can't easily look up partNo without a full parts catalog text search.
-        // We'll keep it as is.
+        // If we found a match, apply corrections
+        if (dbMatch != null) {
+          correctedPartNo = dbMatch['p'] as String; // The fully formatted part number with dashes
+          if (correctedLocation.isEmpty) {
+             correctedLocation = dbMatch['l'] as String;
+          }
+          correctedFromDb = true;
+        }
+
         correctedRows.add(PartRow(
-          sr: row.sr,
+          sr: correctedSr,
           partNo: correctedPartNo,
-          description: row.description,
+          description: correctedDesc,
           mrp: row.mrp,
           qty: row.qty,
           location: correctedLocation,
           pack: row.pack,
           stock: row.stock,
+          isDbVerified: correctedFromDb,
         ));
       }
 
