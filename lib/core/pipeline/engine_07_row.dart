@@ -56,6 +56,14 @@ class RowBuilderOutput {
   }
 }
 
+class _ProjectedCell {
+  final String columnKey;
+  final CellData cell;
+  final double baseY;
+
+  _ProjectedCell(this.columnKey, this.cell, this.baseY);
+}
+
 class Engine07RowBuilder {
   // Priority order for anchor column selection.
   // MRP has exactly one clean price-format cell per data row — the best anchor.
@@ -81,166 +89,119 @@ class Engine07RowBuilder {
 
     try {
       // -----------------------------------------------------------------------
-      // STEP 1 — Choose the anchor column
+      // STEP 1 — Calculate Global Skew (Slope)
       // -----------------------------------------------------------------------
-      String? anchorKey;
-      List<CellData> anchorCells = [];
-
-      // Find the most common cell count among the major columns (mode)
-      final counts = <int, int>{};
-      for (final key in _anchorPriority) {
-        if (input.columns[key] != null) {
-          final c = input.columns[key]!.length;
-          if (c > 0) {
-            counts[c] = (counts[c] ?? 0) + 1;
-          }
-        }
-      }
-      
-      int bestCount = 0;
-      int maxFreq = 0;
-      for (final entry in counts.entries) {
-        if (entry.value > maxFreq || (entry.value == maxFreq && entry.key > bestCount)) {
-          maxFreq = entry.value;
-          bestCount = entry.key;
-        }
-      }
-
-      // Pick the highest priority column that has EXACTLY bestCount cells
-      for (final key in _anchorPriority) {
-        final cells = input.columns[key];
-        if (cells != null && cells.length == bestCount) {
-          anchorKey = key;
-          anchorCells = List.from(cells);
-          break;
-        }
-      }
-
-      // Fallback if no major columns found
-      if (anchorCells.isEmpty) {
-        for (final entry in input.columns.entries) {
-          if (entry.value.length > anchorCells.length) {
-            anchorKey = entry.key;
-            anchorCells = List.from(entry.value);
-          }
-        }
-      }
-
-      if (anchorCells.isEmpty) {
-        stopwatch.stop();
-        return PipelineResult.failure(
-          stage: PipelineStage.rowBuilder,
-          reason: 'No cells found in any column.',
-          timingMs: stopwatch.elapsedMilliseconds,
-        );
-      }
-
-      anchorCells.sort((a, b) => a.topY.compareTo(b.topY));
-
-      // -----------------------------------------------------------------------
-      // STEP 2 — Calculate regression line for each row to handle perspective skew
-      // -----------------------------------------------------------------------
-      // Find all columns that perfectly match the row count (mode)
-      final referenceColumns = <String, List<CellData>>{};
-      for (final entry in input.columns.entries) {
-        if (entry.value.length == bestCount) {
-          final sorted = List<CellData>.from(entry.value)..sort((a, b) => a.topY.compareTo(b.topY));
-          referenceColumns[entry.key] = sorted;
-        }
-      }
-
       // Pre-calculate column center X coordinates
       final colCenters = <String, double>{};
       for (final col in input.gridGeometry.columns) {
         colCenters[col.key] = (col.leftX + col.rightX) / 2.0;
       }
 
-      // For each row (0 to bestCount - 1), calculate slope and intercept
-      final rowRegressions = <int, (double slope, double intercept)>{};
-      for (int i = 0; i < bestCount; i++) {
-        final xs = <double>[];
-        final ys = <double>[];
-        for (final entry in referenceColumns.entries) {
-          final colKey = entry.key;
-          final cell = entry.value[i];
-          final centerX = colCenters[colKey] ?? 0.0;
-          xs.add(centerX);
-          ys.add(cell.topY.toDouble());
-        }
+      // Collect pairs of adjacent cells to calculate slopes
+      final slopes = <double>[];
+      final colKeys = input.gridGeometry.columns.map((c) => c.key).toList();
+      
+      for (int i = 0; i < colKeys.length - 1; i++) {
+        final leftKey = colKeys[i];
+        final rightKey = colKeys[i + 1];
+        final leftCells = input.columns[leftKey] ?? [];
+        final rightCells = input.columns[rightKey] ?? [];
+        
+        final leftX = colCenters[leftKey] ?? 0.0;
+        final rightX = colCenters[rightKey] ?? 0.0;
+        if (rightX - leftX < 10) continue; // avoid divide by zero
 
-        double slope = 0.0;
-        double intercept = anchorCells[i].topY.toDouble();
-
-        if (xs.length >= 2) {
-          double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-          for (int j = 0; j < xs.length; j++) {
-            sumX += xs[j];
-            sumY += ys[j];
-            sumXY += xs[j] * ys[j];
-            sumX2 += xs[j] * xs[j];
+        // For each left cell, find the closest right cell in Y
+        for (final lCell in leftCells) {
+          CellData? bestR;
+          int bestDist = 30; // max reasonable Y drift between adjacent columns
+          for (final rCell in rightCells) {
+            final dist = (lCell.topY - rCell.topY).abs();
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestR = rCell;
+            }
           }
-          final n = xs.length.toDouble();
-          final denom = (n * sumX2 - sumX * sumX);
-          if (denom != 0) {
-            slope = (n * sumXY - sumX * sumY) / denom;
-            intercept = (sumY - slope * sumX) / n;
+          if (bestR != null) {
+            final slope = (bestR.topY - lCell.topY) / (rightX - leftX);
+            slopes.add(slope);
           }
         }
-        rowRegressions[i] = (slope, intercept);
+      }
+
+      double globalSlope = 0.0;
+      if (slopes.isNotEmpty) {
+        slopes.sort();
+        globalSlope = slopes[slopes.length ~/ 2];
       }
 
       // -----------------------------------------------------------------------
-      // STEP 3 — Hybrid cell matching strategy (Perspective Projection)
+      // STEP 2 — Project all cells to Base Y (X = 0) and Cluster
       // -----------------------------------------------------------------------
-      // Pre-sort all column cells by topY once
-      final sortedColumns = <String, List<CellData>>{};
+      // Wrapper to hold cell with its projected base Y
+      final allProjected = <_ProjectedCell>[];
       for (final entry in input.columns.entries) {
-        final sorted = List<CellData>.from(entry.value)
-          ..sort((a, b) => a.topY.compareTo(b.topY));
-        sortedColumns[entry.key] = sorted;
+        final key = entry.key;
+        final centerX = colCenters[key] ?? 0.0;
+        for (final cell in entry.value) {
+          final baseY = cell.topY - (centerX * globalSlope);
+          allProjected.add(_ProjectedCell(key, cell, baseY));
+        }
       }
 
-      String getRaw(String key, int rowIndex) {
-        final cells = sortedColumns[key] ?? [];
-        if (cells.isEmpty) return '';
-        
-        // If column has perfect cell count, map 1-to-1 by order
-        if (cells.length == bestCount) {
-          return cells[rowIndex].text;
-        }
+      // Sort all cells globally by their flattened baseY
+      allProjected.sort((a, b) => a.baseY.compareTo(b.baseY));
 
-        // If not, use regression projection to find the closest expected Y
-        final regression = rowRegressions[rowIndex]!;
-        final slope = regression.$1;
-        final intercept = regression.$2;
-        
-        double bestDist = 40.0; // threshold
-        CellData? bestCell;
-        final centerX = colCenters[key] ?? 0.0;
-        
-        for (final cell in cells) {
-          final expectedY = slope * centerX + intercept;
-          final dist = (cell.topY - expectedY).abs();
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestCell = cell;
+      // 1D Clustering
+      final rowClusters = <List<_ProjectedCell>>[];
+      List<_ProjectedCell> currentCluster = [];
+      
+      for (final pc in allProjected) {
+        if (currentCluster.isEmpty) {
+          currentCluster.add(pc);
+        } else {
+          final avgBaseY = currentCluster.map((c) => c.baseY).reduce((a, b) => a + b) / currentCluster.length;
+          if ((pc.baseY - avgBaseY).abs() < 15.0) { // row tolerance
+            currentCluster.add(pc);
+          } else {
+            rowClusters.add(currentCluster);
+            currentCluster = [pc];
           }
         }
-        
-        return bestCell?.text ?? '';
+      }
+      if (currentCluster.isNotEmpty) {
+        rowClusters.add(currentCluster);
       }
 
+      // -----------------------------------------------------------------------
+      // STEP 3 — Assemble Rows
+      // -----------------------------------------------------------------------
       final rows = <PartRow>[];
 
-      for (int i = 0; i < bestCount; i++) {
-        final rawSr    = getRaw('SR',    i);
-        final rawPart  = getRaw('PART',  i);
-        final rawDesc  = getRaw('DESC',  i);
-        final rawMrp   = getRaw('MRP',   i);
-        final rawQty   = getRaw('QTY',   i);
-        final rawLoc   = getRaw('LOC',   i);
-        final rawPack  = getRaw('PACK',  i);
-        final rawStock = getRaw('STOCK', i);
+      for (final cluster in rowClusters) {
+        // Find average BaseY for this cluster to resolve duplicate columns
+        final avgBaseY = cluster.map((c) => c.baseY).reduce((a, b) => a + b) / cluster.length;
+
+        // If multiple cells in the cluster belong to the SAME column, pick the one closest to avgBaseY
+        final columnMap = <String, CellData>{};
+        final columnBestDist = <String, double>{};
+
+        for (final pc in cluster) {
+          final dist = (pc.baseY - avgBaseY).abs();
+          if (!columnMap.containsKey(pc.columnKey) || dist < columnBestDist[pc.columnKey]!) {
+            columnMap[pc.columnKey] = pc.cell;
+            columnBestDist[pc.columnKey] = dist;
+          }
+        }
+
+        final rawSr    = columnMap['SR']?.text ?? '';
+        final rawPart  = columnMap['PART']?.text ?? '';
+        final rawDesc  = columnMap['DESC']?.text ?? '';
+        final rawMrp   = columnMap['MRP']?.text ?? '';
+        final rawQty   = columnMap['QTY']?.text ?? '';
+        final rawLoc   = columnMap['LOC']?.text ?? '';
+        final rawPack  = columnMap['PACK']?.text ?? '';
+        final rawStock = columnMap['STOCK']?.text ?? '';
 
         // Clean SR — digits only
         final sr = rawSr.replaceAll(RegExp(r'[^0-9]'), '').trim();
@@ -251,7 +212,6 @@ class Engine07RowBuilder {
         final desc   = partResult['desc']!;
 
         // Extract QTY, MRP, and LOC together from right-side columns
-        // Physical misalignment often merges these three into one or two cells
         final rightSideData = _extractMrpQtyLoc(rawMrp, rawQty, rawLoc);
         final mrp = rightSideData['mrp']!;
         final qty = rightSideData['qty']!;
@@ -281,7 +241,6 @@ class Engine07RowBuilder {
           stock: stock,
         ));
       }
-
       stopwatch.stop();
 
       return PipelineResult(

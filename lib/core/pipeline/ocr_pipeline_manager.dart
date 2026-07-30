@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 import '../database/app_database.dart';
 import '../models/extracted_memo.dart';
@@ -10,7 +12,6 @@ import 'engine_03_header.dart';
 import 'engine_04_table_detection.dart';
 import 'engine_05_grid.dart';
 import 'engine_06_cell.dart';
-import 'engine_06b_zone_ocr.dart';
 import 'engine_07_row.dart';
 import 'engine_08_database_match.dart';
 import '../services/candidate_generator.dart';
@@ -47,9 +48,9 @@ class OcrPipelineManager {
     final e05Result = await Engine05GridSystem.generate(e04Result.data!);
     if (!e05Result.isSuccess) throw Exception('Engine 05 Failed: ${e05Result.errors}');
 
-    // ENGINE 06B (Zone OCR replaces Engine 06)
-    final e06Result = await Engine06BZoneOcr.processZones(e02aResult.data!, e05Result.data!);
-    if (!e06Result.isSuccess) throw Exception('Engine 06B Failed: ${e06Result.errors}');
+    // ENGINE 06: Map cells to Grid
+    final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
+    if (!e06Result.isSuccess) throw Exception('Engine 06 Failed: ${e06Result.errors}');
 
     // ENGINE 07
     final e07Result = await Engine07RowBuilder.build(e06Result.data!);
@@ -168,12 +169,22 @@ class OcrPipelineManager {
       throw Exception('NO_HEADER_DETECTED: No valid rows were found.');
     }
 
-    return MemoOcrResult(
+    final result = MemoOcrResult(
       header: header,
       items: finalItems,
       rawOcrDump: rawOcrDump,
       imagePath: originalImage.path,
     );
+    
+    if (kDebugMode) {
+      debugPrint('\n=== OCR PIPELINE OUTPUT ===\n');
+      debugPrint(const JsonEncoder.withIndent('  ').convert({
+        'E07': e07Result.data!.toJson(),
+      }));
+      debugPrint('\n===========================\n');
+    }
+
+    return result;
   }
 
   static String _safeCorrect(String s) => s.replaceAll('O', '0').replaceAll('Q', '0').replaceAll('I', '1');

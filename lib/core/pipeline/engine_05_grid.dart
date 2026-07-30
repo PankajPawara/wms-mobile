@@ -44,87 +44,100 @@ class Engine05GridSystem {
     final errors = <String>[];
 
     try {
-      final headerWords = <OcrWord>[];
-      // The header is just above the table topY (Engine 04 added +5 to the lowest pixel of the header)
-      final headerSearchBottom = input.topY;
-      final headerSearchTop = input.topY - 100;
-
-      for (final w in input.allWords) {
-        int cy = (w.top + w.bottom) ~/ 2;
-        if (cy >= headerSearchTop && cy <= headerSearchBottom) {
-          headerWords.add(w);
-        }
-      }
-
-      // Helper to find a word's horizontal bounds
-      OcrWord? findHeader(List<String> keywords) {
-        for (final w in headerWords) {
-          final t = w.text.toUpperCase();
-          for (final kw in keywords) {
-            if (t == kw || t == '$kw.' || t.startsWith('$kw ')) return w;
+      // PIPES ALGORITHM: Use vertical separators (|) to define column boundaries
+      final w = input.imageWidth;
+      final pipes = <OcrWord>[];
+      
+      // 1. Find all vertical pipe-like characters in the table area
+      for (final word in input.allWords) {
+        if (word.top < input.topY || word.bottom > input.bottomY) continue;
+        
+        final text = word.text.trim();
+        if (text == '|' || text == 'I' || text == 'l' || text == '1' || text == '!') {
+          // Verify it is tall and narrow
+          if ((word.bottom - word.top) > 1.2 * (word.right - word.left)) {
+            pipes.add(word);
           }
         }
-        return null;
       }
 
-      final srWord = findHeader(['SR', 'S.R']);
-      final partWord = findHeader(['PART', 'PRT', '1ART', 'PARI']);
-      final descWord = findHeader(['DESC', 'DES', 'DSCR', 'DESCRIPTION']);
-      final mrpWord = findHeader(['M.R.P', 'MRP']);
-      final qtyWord = findHeader(['QTY', 'QTV']);
-      final locWord = findHeader(['LOC']);
-      final packWord = findHeader(['PACK', 'PKT']);
-      final stockWord = findHeader(['STOCK', 'STK']);
-
-      // Calculate column boundaries.
-      // A column starts slightly to the left of its header, and ends slightly to the left of the NEXT header.
-      // We use absolute fallbacks based on typical image width if a header is missing.
-
-      final w = input.imageWidth;
+      // 2. Cluster pipes by their X coordinates
+      pipes.sort((a, b) => ((a.left + a.right) ~/ 2).compareTo((b.left + b.right) ~/ 2));
       
-      final rawX = <String, int>{};
-      
-      if (!input.hasHeader) {
-        // If no header was confidently found (e.g. continuation page), enforce strict fallback columns
-        rawX['SR'] = (w * 0.02).toInt();
-        rawX['PART'] = (w * 0.12).toInt();
-        rawX['DESC'] = (w * 0.28).toInt();
-        rawX['MRP'] = (w * 0.65).toInt();
-        rawX['QTY'] = (w * 0.75).toInt();
-        rawX['LOC'] = (w * 0.82).toInt();
-        rawX['PACK'] = (w * 0.88).toInt();
-        rawX['STOCK'] = (w * 0.94).toInt();
-      } else {
-        rawX['SR'] = srWord != null ? srWord.left : (w * 0.02).toInt();
-        rawX['PART'] = partWord != null ? partWord.left : (rawX['SR']! + (w * 0.10).toInt());
-        rawX['DESC'] = descWord != null ? descWord.left : (rawX['PART']! + (w * 0.16).toInt());
-        
-        // We MUST define these even if not found, otherwise DESC absorbs the right side of the page
-        rawX['MRP'] = mrpWord != null ? mrpWord.left : (w * 0.65).toInt();
-        rawX['QTY'] = qtyWord != null ? qtyWord.left : (w * 0.75).toInt();
-        rawX['LOC'] = locWord != null ? locWord.left : (w * 0.82).toInt();
-        rawX['PACK'] = packWord != null ? packWord.left : (w * 0.88).toInt();
-        rawX['STOCK'] = stockWord != null ? stockWord.left : (w * 0.94).toInt();
-      }
-
-      final activeKeys = rawX.keys.toList()..sort((a, b) => rawX[a]!.compareTo(rawX[b]!));
-      
-      // Ensure strictly ordered with minimum spacing in case OCR jitter misplaced a bounding box
-      // or fallbacks overlap with actual headers
-      for (int i = 1; i < activeKeys.length; i++) {
-        final prevKey = activeKeys[i - 1];
-        final currKey = activeKeys[i];
-        if (rawX[currKey]! <= rawX[prevKey]!) {
-          rawX[currKey] = rawX[prevKey]! + 50;
+      final clusters = <List<OcrWord>>[];
+      for (final p in pipes) {
+        final cx = (p.left + p.right) ~/ 2;
+        bool added = false;
+        for (final c in clusters) {
+          final avgX = c.map((w) => (w.left + w.right) ~/ 2).reduce((a, b) => a + b) ~/ c.length;
+          // If within 40 pixels (about 2.5% of width), group them
+          if ((cx - avgX).abs() < 40) {
+            c.add(p);
+            added = true;
+            break;
+          }
+        }
+        if (!added) {
+          clusters.add([p]);
         }
       }
 
-      // Create the column boundaries dynamically
+      // Keep clusters that have at least 3 pipes (forming a true column divider)
+      clusters.removeWhere((c) => c.length < 3);
+
+      // Get median X coordinate for each valid cluster
+      final dividerXs = clusters.map((c) {
+        final xs = c.map((w) => (w.left + w.right) ~/ 2).toList()..sort();
+        return xs[xs.length ~/ 2];
+      }).toList()..sort();
+
+      // 3. Map detected dividers to expected columns using proportional fallbacks
+      final expectedXs = {
+        'SR_PART': w * 0.12,
+        'PART_DESC': w * 0.28,
+        'DESC_MRP': w * 0.65,
+        'MRP_QTY': w * 0.75,
+        'QTY_LOC': w * 0.82,
+        'LOC_PACK': w * 0.88,
+        'PACK_STOCK': w * 0.92,
+      };
+
+      final actualXs = <String, int>{};
+      for (final entry in expectedXs.entries) {
+        final expectedX = entry.value;
+        int? closestX;
+        double minDiff = w * 0.06; // Max tolerance 6% of page width
+        
+        for (final x in dividerXs) {
+          final diff = (x - expectedX).abs();
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestX = x;
+          }
+        }
+        
+        actualXs[entry.key] = closestX ?? expectedX.toInt();
+      }
+
+      // 4. Construct Column Definitions
+      final activeKeys = ['SR', 'PART', 'DESC', 'MRP', 'QTY', 'LOC', 'PACK', 'STOCK'];
+      
+      final rawX = <String, int>{
+        'SR': 0,
+        'PART': actualXs['SR_PART']!,
+        'DESC': actualXs['PART_DESC']!,
+        'MRP': actualXs['DESC_MRP']!,
+        'QTY': actualXs['MRP_QTY']!,
+        'LOC': actualXs['QTY_LOC']!,
+        'PACK': actualXs['LOC_PACK']!,
+        'STOCK': actualXs['PACK_STOCK']!,
+      };
+
       final columns = <ColumnDef>[];
       for (int i = 0; i < activeKeys.length; i++) {
         final key = activeKeys[i];
-        final leftX = (i == 0) ? 0 : rawX[key]! - 5;
-        final rightX = (i == activeKeys.length - 1) ? w : rawX[activeKeys[i + 1]]! - 5;
+        final leftX = rawX[key]!;
+        final rightX = (i == activeKeys.length - 1) ? w : rawX[activeKeys[i + 1]]!;
         columns.add(ColumnDef(key: key, leftX: leftX, rightX: rightX));
       }
 

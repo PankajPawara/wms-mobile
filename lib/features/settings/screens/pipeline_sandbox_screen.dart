@@ -27,7 +27,6 @@ import '../../../core/pipeline/engine_03_header.dart';
 import '../../../core/pipeline/engine_04_table_detection.dart';
 import '../../../core/pipeline/engine_05_grid.dart';
 import '../../../core/pipeline/engine_06_cell.dart';
-import '../../../core/pipeline/engine_06b_zone_ocr.dart';
 import '../../../core/pipeline/engine_07_row.dart';
 import '../../../core/pipeline/engine_08_database_match.dart';
 
@@ -281,7 +280,7 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
     }
     setState(() { _e06bRunning = true; _e06Error = null; });
     try {
-      final result = await Engine06BZoneOcr.processZones(_optimizationOutput!, _gridOutput!);
+      final result = await Engine06CellAssignment.assign(_gridOutput!);
       setState(() {
         _e06bRunning = false;
         _e06bTiming = result.timingMs;
