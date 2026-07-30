@@ -77,7 +77,12 @@ class Engine07RowBuilder {
       RegExp(r'(?<!\d)(\d{5}-[A-Z0-9]{2,5}-[A-Z0-9]{2,5})(?!\d)');
 
   // Location code: exactly 3 digits + 1 capital letter  (001L, 035X, 219A …)
+  // Strict version for the combined right-side string.
   static final _locRegex = RegExp(r'\b([0-9]{3}[A-Z])\b');
+
+  // Fuzzy version: 3 digits + any alphanum — catches OCR letter substitutions
+  // e.g. "073J" misread as "0733", "007U" misread as "0071".
+  static final _locFuzzyRegex = RegExp(r'\b([0-9]{3}[A-Z0-9])\b');
 
   // ---------------------------------------------------------------------------
   // Main
@@ -230,10 +235,13 @@ class Engine07RowBuilder {
         if (partNo.isEmpty && desc.isEmpty && mrp.isEmpty) continue;
         if (_isNoiseLine(partNo, desc)) continue;
 
+        // Clean description: remove leading/trailing pipes, star patterns
+        final cleanDesc = _cleanDescription(desc);
+
         rows.add(PartRow(
           sr: sr,
           partNo: partNo,
-          description: desc,
+          description: cleanDesc,
           mrp: mrp,
           qty: qty,
           location: loc,
@@ -332,8 +340,20 @@ class Engine07RowBuilder {
   // one or two columns.
   //   e.g. "20 6.00|" (QTY 20, MRP 6.00) in MRP column
   //   e.g. "92-001 5" (MRP 92.00, QTY 5) in MRP column
+  //
+  // LOCATION STRATEGY (critical):
+  //   First, we attempt to parse the location DIRECTLY from rawLoc before
+  //   combining all right-side text. This avoids OCR letter substitutions
+  //   (e.g. "007U" → "007 1") causing "007" to fall into the QTY field.
+  //   Only fall back to combined-string extraction if rawLoc parsing fails.
   // ---------------------------------------------------------------------------
   static Map<String, String> _extractMrpQtyLoc(String rawMrp, String rawQty, String rawLoc) {
+    // -------------------------------------------------------------------------
+    // STEP 0 — Pre-extract location from the dedicated LOC column text.
+    // Strip all spaces, pipes, and letter-noise then try strict then fuzzy match.
+    // -------------------------------------------------------------------------
+    String loc = _parseLocCode(rawLoc);
+
     // Combine everything on the right side
     String rawRightSide = '$rawMrp $rawQty $rawLoc'
         .replaceAll(RegExp(r'[|!\}]'), ' ')
@@ -353,11 +373,27 @@ class Engine07RowBuilder {
     // Fix OCR pipe attached to decimal (e.g. "0.001" -> "0.00")
     rawRightSide = rawRightSide.replaceAllMapped(RegExp(r'(\.\d{2})1\b'), (m) => m.group(1)!);
 
-    String loc = '';
-    final locMatch = _locRegex.firstMatch(rawRightSide);
-    if (locMatch != null) {
-      loc = locMatch.group(1)!;
-      rawRightSide = rawRightSide.replaceAll(locMatch.group(0)!, ' ');
+    // Extract location from combined string only if pre-pass failed.
+    if (loc.isEmpty) {
+      final locMatch = _locRegex.firstMatch(rawRightSide);
+      if (locMatch != null) {
+        loc = locMatch.group(1)!;
+        rawRightSide = rawRightSide.replaceAll(locMatch.group(0)!, ' ');
+      } else {
+        // Last resort fuzzy match (catches letter-as-digit substitutions)
+        final locFuzzy = _locFuzzyRegex.firstMatch(rawRightSide);
+        if (locFuzzy != null) {
+          loc = locFuzzy.group(1)!;
+          rawRightSide = rawRightSide.replaceAll(locFuzzy.group(0)!, ' ');
+        }
+      }
+    } else {
+      // We already have loc — remove the raw loc digits from combined string
+      // so they don't accidentally get picked up as QTY.
+      if (loc.length >= 3) {
+        rawRightSide = rawRightSide.replaceAll(
+          RegExp(r'\b' + RegExp.escape(loc.substring(0, 3)) + r'\b'), ' ');
+      }
     }
 
     String mrp = '';
@@ -367,23 +403,80 @@ class Engine07RowBuilder {
       rawRightSide = rawRightSide.replaceAll(mrpMatch.group(0)!, ' ');
     }
 
+    // QTY: only accept 1-2 digit numbers (Honda picking qty is typically 1-20).
+    // Any 3+ digit number here is almost certainly a location code fragment.
     String qty = '';
-    final qtyMatch = RegExp(r'\b\d+\b').firstMatch(rawRightSide);
+    final qtyMatch = RegExp(r'\b([1-9]\d?)\b').firstMatch(rawRightSide);
     if (qtyMatch != null) {
-      qty = qtyMatch.group(0)!;
+      qty = qtyMatch.group(1)!;
     }
 
     return {'qty': qty, 'mrp': mrp, 'loc': loc};
   }
 
   // ---------------------------------------------------------------------------
+  // Parse a Honda warehouse location code from raw LOC column text.
+  // Handles OCR substitutions:
+  //   "007U"  → scanned correctly → "007U"
+  //   "007 1" → "U" misread as space+"1" → compresses to "0071" (fuzzy)
+  //   "073J"  → misread as "0733" → captured as 4-digit fuzzy → "0733"
+  //   "I 182E" → leading pipe/I stripped → "182E"
+  // ---------------------------------------------------------------------------
+  static String _parseLocCode(String rawLoc) {
+    if (rawLoc.trim().isEmpty) return '';
+
+    // Step 1: strip common OCR noise characters and collapse spaces
+    final cleaned = rawLoc
+        .replaceAll(RegExp(r'[|!]'), '')
+        .toUpperCase()
+        .trim();
+
+    // Step 2: remove any leading non-digit characters (I, spaces, etc.)
+    final stripped = cleaned.replaceAll(RegExp(r'^[^0-9]+'), '');
+
+    // Step 3: try strict match — 3 digits + uppercase letter
+    final strict = RegExp(r'^([0-9]{3}[A-Z])').firstMatch(stripped);
+    if (strict != null) return strict.group(1)!;
+
+    // Step 4: try with space removal — handles "007 1" ("007U" misread)
+    final compact = stripped.replaceAll(' ', '');
+    final strictCompact = RegExp(r'^([0-9]{3}[A-Z])').firstMatch(compact);
+    if (strictCompact != null) return strictCompact.group(1)!;
+
+    // Step 5: fuzzy — 4 all-digit sequence (letter was misread as digit)
+    final fuzzy = RegExp(r'^([0-9]{4})').firstMatch(compact);
+    if (fuzzy != null) return fuzzy.group(1)!;
+
+    // Step 6: partial — just 3 digits (trailing letter completely lost)
+    final partial = RegExp(r'^([0-9]{3})').firstMatch(compact);
+    if (partial != null) return partial.group(1)!;
+
+    return '';
+  }
+
+  // ---------------------------------------------------------------------------
   // Clean a count column (PACK, STOCK): strip pipe/letter noise, return first number.
-  // "6 I" → "6",  "6 !" → "6",  "1" → "1"
+  // "6 I" → "6",  "6 !" → "6",  "I 21" → "21", "S3" → "53", "1" → "1"
   // ---------------------------------------------------------------------------
   static String _cleanCount(String raw) {
     final s = raw.replaceAll(RegExp(r'[|!]'), ' ').trim();
-    final m = RegExp(r'^\d+').firstMatch(s);
-    return m != null ? m.group(0)! : s.replaceAll(RegExp(r'[^0-9]'), '').trim();
+    // Strip leading non-digit characters (I, S, l, etc. that are OCR noise)
+    final stripped = s.replaceAll(RegExp(r'^[^0-9]+'), '').trim();
+    final m = RegExp(r'^\d+').firstMatch(stripped);
+    return m != null ? m.group(0)! : stripped.replaceAll(RegExp(r'[^0-9]'), '').trim();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Clean description: remove leading/trailing pipes, star-wrapped words,
+  // and other OCR artefacts that bleed in from adjacent columns.
+  // ---------------------------------------------------------------------------
+  static String _cleanDescription(String raw) {
+    return raw
+        .replaceAll(RegExp(r'^[|*\s]+'), '')   // leading pipes, stars, spaces
+        .replaceAll(RegExp(r'[|*\s]+$'), '')   // trailing pipes, stars, spaces
+        .replaceAll(RegExp(r'\*[^*]*\*'), '')  // *SHINE B* style star-wrapped tokens
+        .replaceAll(RegExp(r'\s+'), ' ')        // collapse multiple spaces
+        .trim();
   }
 
   static bool _isNoiseLine(String partNo, String desc) {
