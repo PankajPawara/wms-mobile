@@ -14,6 +14,7 @@ import 'engine_05_grid.dart';
 import 'engine_06_cell.dart';
 import 'engine_07_row.dart';
 import 'engine_08_database_match.dart';
+import 'engine_09_gemini_ocr.dart';
 import '../services/candidate_generator.dart';
 import '../data/validation_data.dart';
 import 'dart:math' as math;
@@ -49,16 +50,73 @@ class OcrPipelineManager {
     if (!e05Result.isSuccess) throw Exception('Engine 05 Failed: ${e05Result.errors}');
 
     // ENGINE 06: Map cells to Grid
+    
     final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
     if (!e06Result.isSuccess) throw Exception('Engine 06 Failed: ${e06Result.errors}');
 
     // ENGINE 07
+    
     final e07Result = await Engine07RowBuilder.build(e06Result.data!);
     if (!e07Result.isSuccess) throw Exception('Engine 07 Failed: ${e07Result.errors}');
 
     // ENGINE 08 (Database Validation)
+    
     final e08Result = await Engine08DatabaseMatch.validateAndCorrect(e07Result.data!);
     if (!e08Result.isSuccess) throw Exception('Engine 08 Failed: ${e08Result.errors}');
+
+    // ENGINE 09 — GEMINI FALLBACK
+    // If less than 50% of rows are DB-verified by ML Kit, the image quality
+    // is too poor for on-device OCR. Route to Gemini for superior extraction.
+    final e08Rows = e08Result.data!.rows;
+    final verifiedCount = e08Rows.where((r) => r.isDbVerified).length;
+    final totalCount = e08Rows.length;
+    final matchRate = totalCount > 0 ? verifiedCount / totalCount : 0.0;
+
+    if (kDebugMode) {
+      debugPrint('[Pipeline] E08 match rate: ${(matchRate * 100).toStringAsFixed(0)}% ($verifiedCount/$totalCount verified)');
+    }
+
+    if (matchRate < 0.5) {
+      debugPrint('[Pipeline] Match rate too low — triggering ENGINE 09 Gemini OCR fallback...');
+      final e09Result = await Engine09GeminiOcr.extractFromImage(
+        e02aResult.data!,
+        e04Result.data!,
+      );
+      if (e09Result.isSuccess && e09Result.data!.rows.isNotEmpty) {
+        // Run E08 again on Gemini's output to get DB-verified flags
+        final e08GeminiResult = await Engine08DatabaseMatch.validateAndCorrect(e09Result.data!);
+        if (e08GeminiResult.isSuccess) {
+          if (kDebugMode) {
+            final g08Rows = e08GeminiResult.data!.rows;
+            final gVerified = g08Rows.where((r) => r.isDbVerified).length;
+            debugPrint('[Pipeline] Gemini E08 match rate: ${(gVerified / g08Rows.length * 100).toStringAsFixed(0)}% ($gVerified/${g08Rows.length}).');
+            debugPrint('\n=== OCR PIPELINE OUTPUT (E09 Gemini) ===\n');
+            debugPrint(const JsonEncoder.withIndent('  ').convert({
+              'source': 'gemini-2.5-flash',
+              'E09': e09Result.data!.toJson(),
+              'E08_Gemini': e08GeminiResult.data!.toJson(),
+            }));
+            debugPrint('\n=========================================\n');
+          }
+          // Re-assign rows from Gemini path
+          e08Result.data!.rows
+            ..clear()
+            ..addAll(e08GeminiResult.data!.rows);
+        }
+      } else {
+        debugPrint('[Pipeline] Gemini fallback also failed — using ML Kit results.');
+      }
+    } else {
+      if (kDebugMode) {
+        debugPrint('\n=== OCR PIPELINE OUTPUT (ML Kit) ===\n');
+        debugPrint(const JsonEncoder.withIndent('  ').convert({
+          'source': 'ml-kit',
+          'E07': e07Result.data!.toJson(),
+          'E08': e08Result.data!.toJson(),
+        }));
+        debugPrint('\n=====================================\n');
+      }
+    }
 
     // Map Engine 03 output to ExtractedMemoHeader
     final headerData = e03Result.data!.headerData;
@@ -186,8 +244,6 @@ class OcrPipelineManager {
 
     return result;
   }
-
-  static String _safeCorrect(String s) => s.replaceAll('O', '0').replaceAll('Q', '0').replaceAll('I', '1');
 
   static int _levenshtein(String a, String b) {
     if (a.isEmpty) return b.length;
