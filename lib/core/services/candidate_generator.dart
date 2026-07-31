@@ -78,7 +78,7 @@ class CandidateGenerator {
   /// Uses a tiered approach: Exact -> Normalized -> Fuzzy.
   Future<ExtractedMemoItem> findBestMatch({
     required String rawPartNo,
-    required String description,
+    required String ocrDescription,
     required double mrp,
     required int qty,
     required String location,
@@ -91,7 +91,7 @@ class CandidateGenerator {
 
     if (_cache.isEmpty) {
       // Fallback if DB is empty
-      return _buildUnmatchedItem(rawPartNo, description, mrp, qty, location, pack, stock);
+      return _buildUnmatchedItem(rawPartNo, ocrDescription, mrp, qty, location, pack, stock);
     }
 
     final normalizedRaw = _normalizePartNo(rawPartNo);
@@ -111,20 +111,20 @@ class CandidateGenerator {
 
       // Tier 1: Exact Match (100%)
       if (dbPartNo == rawPartNo) {
-        return _buildItem(rawPartNo, rawPartNo, item, MatchConfidence.exact, mrp, qty, pack, description);
+        return _buildItem(rawPartNo, rawPartNo, item, MatchConfidence.exact, mrp, qty, pack, ocrDescription);
       }
 
       final normalizedDb = _normalizePartNo(dbPartNo);
 
       // Tier 2: Normalized Match (95%)
       if (normalizedDb == normalizedRaw) {
-        return _buildItem(rawPartNo, dbPartNo, item, locationMatches ? MatchConfidence.exact : MatchConfidence.normalized, mrp, qty, pack, description);
+        return _buildItem(rawPartNo, dbPartNo, item, locationMatches ? MatchConfidence.exact : MatchConfidence.normalized, mrp, qty, pack, ocrDescription);
       }
 
       // Tier 3: OCR Corrected Match (85%)
       final correctedDb = _applyOcrCorrection(normalizedDb);
       if (correctedDb == correctedRaw) {
-        return _buildItem(rawPartNo, dbPartNo, item, locationMatches ? MatchConfidence.normalized : MatchConfidence.fuzzy, mrp, qty, pack, description);
+        return _buildItem(rawPartNo, dbPartNo, item, locationMatches ? MatchConfidence.normalized : MatchConfidence.fuzzy, mrp, qty, pack, ocrDescription);
       }
 
       // Keep track of the best fuzzy match score using Levenshtein distance
@@ -149,17 +149,18 @@ class CandidateGenerator {
       final normalizedDbLoc = _applyOcrCorrection(bestFuzzyMatch.location.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase());
       bool locationMatches = location.isNotEmpty && normalizedDbLoc == normalizedRawLoc;
       
-      return _buildItem(rawPartNo, bestFuzzyMatch.partNo, bestFuzzyMatch, locationMatches ? MatchConfidence.normalized : MatchConfidence.fuzzy, mrp, qty, pack, description);
+      return _buildItem(rawPartNo, bestFuzzyMatch.partNo, bestFuzzyMatch, locationMatches ? MatchConfidence.normalized : MatchConfidence.fuzzy, mrp, qty, pack, ocrDescription);
     }
 
     // Unmatched
-    return _buildUnmatchedItem(rawPartNo, description, mrp, qty, location, pack, stock);
+    return _buildUnmatchedItem(rawPartNo, ocrDescription, mrp, qty, location, pack, stock);
   }
 
   /// Attempts to find a part number from a phrase (list of words) by testing combinations.
   /// Useful when OCR blends the part number and description without clear boundaries.
   Future<ExtractedMemoItem> findBestMatchFromPhrase({
     required List<String> phraseWords,
+    required String ocrDescription,
     required double mrp,
     required int qty,
     required String location,
@@ -167,7 +168,7 @@ class CandidateGenerator {
     required int stock,
   }) async {
     if (phraseWords.isEmpty) {
-       return _buildUnmatchedItem('', '', mrp, qty, location, pack, stock);
+       return _buildUnmatchedItem('', ocrDescription, mrp, qty, location, pack, stock);
     }
     
     // We test up to the first 4 words as potential part numbers (since parts like "AAAA AAAAAA" are 2 words, etc.)
@@ -177,11 +178,10 @@ class CandidateGenerator {
     int maxWords = math.min(phraseWords.length, 4);
     for (int i = 1; i <= maxWords; i++) {
       final potentialPartNo = phraseWords.sublist(0, i).join(' ');
-      final potentialDesc = phraseWords.sublist(i).join(' ');
       
       final item = await findBestMatch(
         rawPartNo: potentialPartNo,
-        description: potentialDesc,
+        ocrDescription: ocrDescription,
         mrp: mrp,
         qty: qty,
         location: location,
@@ -209,8 +209,7 @@ class CandidateGenerator {
     // If no fuzzy match was found, default to just the first word as the part no.
     if (bestItem == null || highestScore == 0.0) {
        final fallbackPart = phraseWords[0];
-       final fallbackDesc = phraseWords.sublist(1).join(' ');
-       return _buildUnmatchedItem(fallbackPart, fallbackDesc, mrp, qty, location, pack, stock);
+       return _buildUnmatchedItem(fallbackPart, ocrDescription, mrp, qty, location, pack, stock);
     }
     
     return bestItem;
@@ -226,13 +225,16 @@ class CandidateGenerator {
     int pack,
     String ocrDesc,
   ) {
+    // Priority: DB description > OCR description from E07 desc column
+    final resolvedDesc = (dbItem.description?.isNotEmpty == true)
+        ? dbItem.description!
+        : ocrDesc;
+
     return ExtractedMemoItem(
       rawOcrPartNo: rawOcr,
       correctedPartNo: corrected,
       confidence: confidence,
-      description: dbItem.description?.isNotEmpty == true
-          ? dbItem.description!
-          : ocrDesc,
+      description: resolvedDesc,
       mrp: ocrMrp > 0 ? ocrMrp : dbItem.price,
       qty: qty,
       location: dbItem.location.isNotEmpty ? dbItem.location : 'LOCATION NOT DEFINED',

@@ -212,6 +212,7 @@ class OcrPipelineManager {
       
       final item = await candidateGenerator.findBestMatchFromPhrase(
         phraseWords: prefixWords,
+        ocrDescription: r.description.trim(),
         mrp: mrp,
         qty: qty,
         location: r.location.trim(),

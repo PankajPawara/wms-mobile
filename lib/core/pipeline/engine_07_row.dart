@@ -222,15 +222,11 @@ class Engine07RowBuilder {
         final qty = rightSideData['qty']!;
         final loc = rightSideData['loc']!;
 
-        // Clean PACK — first number only
-        final pack = _cleanCount(rawPack);
+        // Extract PACK and STOCK, handling cases where they merge into the STOCK column
+        final packStockData = _extractPackStock(rawPack, rawStock);
+        final pack = packStockData['pack']!;
+        final stock = packStockData['stock']!;
 
-        // Clean STOCK — OCR letter substitutions
-        final stock = rawStock
-            .replaceAll(RegExp(r'[|!]'), '')
-            .replaceAll('l', '1')
-            .replaceAll('O', '0')
-            .trim();
 
         if (partNo.isEmpty && desc.isEmpty && mrp.isEmpty) continue;
         if (_isNoiseLine(partNo, desc)) continue;
@@ -412,6 +408,30 @@ class Engine07RowBuilder {
     }
 
     return {'qty': qty, 'mrp': mrp, 'loc': loc};
+  }
+
+  // ---------------------------------------------------------------------------
+  // Extract PACK and STOCK from their respective columns.
+  // Because they are so close in dot-matrix, they frequently merge into STOCK.
+  //   e.g. rawPack="" and rawStock="1| 92" -> Pack: 1, Stock: 92
+  // ---------------------------------------------------------------------------
+  static Map<String, String> _extractPackStock(String rawPack, String rawStock) {
+    String p = rawPack.replaceAll(RegExp(r'[|!]'), ' ').trim();
+    String s = rawStock.replaceAll(RegExp(r'[|!]'), ' ').trim();
+
+    // If pack is empty and stock has multiple numeric tokens, split them
+    if (p.isEmpty && s.isNotEmpty) {
+      final tokens = s.split(RegExp(r'\s+')).where((t) => RegExp(r'\d').hasMatch(t)).toList();
+      if (tokens.length >= 2) {
+        p = tokens[0];
+        s = tokens[1];
+      }
+    }
+
+    return {
+      'pack': _cleanCount(p),
+      'stock': _cleanCount(s),
+    };
   }
 
   // ---------------------------------------------------------------------------

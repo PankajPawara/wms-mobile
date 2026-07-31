@@ -147,10 +147,13 @@ class Engine03Header {
 
       // M/S., SHREE NAVSHAKTI AUTO PARTS PANDESARA   MEMO No. : 11264
       if (customerName.isEmpty && upper.isNotEmpty && !upper.contains('PICKING LIST') && !upper.contains('MEMO NO')) {
-        if (upper.startsWith('M/S')) {
-          final prefixMatch = RegExp(r'M/S\.?,?\s*').firstMatch(upper);
+        // Strip noise from the left side until we hit M/S
+        final msIndex = upper.indexOf('M/S');
+        
+        if (msIndex != -1) {
+          final prefixMatch = RegExp(r'M/S\.?,?\s*').firstMatch(upper.substring(msIndex));
           if (prefixMatch != null) {
-            String rawName = line.substring(prefixMatch.end).trim();
+            String rawName = line.substring(msIndex + prefixMatch.end).trim();
             final stopMatch = RegExp(r'\b(M[A-Z0-9]{1,3}[O0]|DATE|AREA|PHONE|PH|MOB)\b', caseSensitive: false).firstMatch(rawName);
             if (stopMatch != null) {
               rawName = rawName.substring(0, stopMatch.start).trim();
@@ -158,15 +161,15 @@ class Engine03Header {
             customerName = rawName;
           }
         } else {
-          // Fallback: If the first valid line doesn't start with M/S, use the whole line
-          // but chop it off if it contains other keywords
+          // Fallback: use the whole line but chop it off if it contains other keywords
           String rawName = line.trim();
           final stopMatch = RegExp(r'\b(M[A-Z0-9]{1,3}[O0]|DATE|AREA|PHONE|PH|MOB)\b', caseSensitive: false).firstMatch(rawName);
           if (stopMatch != null) {
             rawName = rawName.substring(0, stopMatch.start).trim();
           }
           if (rawName.isNotEmpty && !rawName.startsWith(',')) {
-            customerName = rawName.replaceAll(RegExp(r'^[,.\s]+'), '').trim();
+            // Also strip noise digits/symbols at the very beginning (like "3 +C# ")
+            customerName = rawName.replaceAll(RegExp(r'^[^A-Z]+'), '').trim();
           }
         }
       }
