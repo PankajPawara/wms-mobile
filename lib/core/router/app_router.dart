@@ -27,6 +27,7 @@ import '../../features/scan_to_find/screens/ai_vision_test_screen.dart';
 import '../../shared/widgets/app_bottom_nav.dart';
 import '../../core/models/extracted_memo.dart';
 import '../../features/checking/screens/red_label_scan_screen.dart';
+import '../../features/parts_master/screens/parts_master_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -112,6 +113,7 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(path: '/settings/pipeline-sandbox', builder: (_, __) => const PipelineSandboxScreen()),
       GoRoute(path: '/ai-vision-test', builder: (_, __) => const AIVisionTestScreen()),
       GoRoute(path: '/red-label-scan', builder: (_, __) => const RedLabelScanScreen()),
+      GoRoute(path: '/parts-master', builder: (_, __) => const PartsMasterScreen()),
     ],
   );
 }

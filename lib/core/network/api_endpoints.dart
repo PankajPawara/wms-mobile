@@ -33,6 +33,7 @@ class ApiEndpoints {
   static const String syncStatus = '/sync/status';
   static const String syncOrders = '/sync/orders';
   static const String syncOrderItems = '/sync/order-items';
+  static const String syncPartsMaster = '/sync/parts-master';
 
   // System
   static const String systemHealth = '/system/health';

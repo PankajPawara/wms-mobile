@@ -119,6 +119,13 @@ class SyncService {
               .write(const OrderItemsCompanion(isSynced: Value(1)));
         }
       }
+    } else if (item.entityType == 'parts_master') {
+      if (item.operation == 'BATCH_UPDATE') {
+        await _api.post(
+          ApiEndpoints.syncPartsMaster,
+          data: {'parts': payload['parts']},
+        );
+      }
     }
 
     await (_db.delete(_db.syncQueues)..where((t) => t.id.equals(item.id))).go();

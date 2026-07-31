@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/services/parts_master_service.dart';
 import '../../../core/sync/queue_service.dart';
 
 part 'order_repository.g.dart';
@@ -102,6 +103,28 @@ class OrderRepository {
           'status': status,
         },
       );
+    }
+
+    // When an order is submitted for checking or completed, sync the related PartsMaster data
+    if (status == 'checking' || status == 'checked') {
+      final partsService = PartsMasterService(_db);
+      final orderItems = await getLocalOrderItems(orderId);
+      final partNos = orderItems.map((i) => PartsMasterService.normalizePart(i.partNo)).toList();
+      
+      final parts = await (_db.select(_db.partsMaster)
+            ..where((t) => t.partNo.isIn(partNos)))
+          .get();
+
+      if (parts.isNotEmpty) {
+        await _queue.queueSync(
+          entityType: 'parts_master',
+          entityId: orderId.toString(),
+          operation: 'BATCH_UPDATE',
+          payload: {
+            'parts': partsService.toSyncPayload(parts),
+          },
+        );
+      }
     }
   }
 

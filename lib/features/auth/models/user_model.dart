@@ -33,4 +33,7 @@ class UserModel {
   }
 
   bool get isAdmin => role == 'admin';
+  bool get isStockManager => role == 'stock_manager';
+  /// Can view and edit the Parts Master DB (descriptions, locations, MRP).
+  bool get canManagePartsMaster => isAdmin || isStockManager;
 }

@@ -135,6 +135,12 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             _SettingsGroup(items: [
               _SettingsItem(
+                  icon: Icons.inventory_2_rounded,
+                  iconColor: const Color(0xFF16A34A),
+                  title: 'Parts Master Database',
+                  subtitle: 'Browse and manage authoritative part data',
+                  onTap: () => context.push('/parts-master')),
+              _SettingsItem(
                   icon: Icons.qr_code_scanner_rounded,
                   iconColor: const Color(0xFF1D4ED8),
                   title: 'Scanner Test (Diagnostic)',
