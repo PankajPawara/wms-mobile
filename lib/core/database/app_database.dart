@@ -98,6 +98,38 @@ class AppSettings extends Table {
   Set<Column> get primaryKey => {key};
 }
 
+/// Self-learning parts master — built from memo scans + red label scans.
+/// Acts as the primary lookup cache, superseding the Inventory table for known parts.
+class PartsMaster extends Table {
+  /// Normalized Honda part number with dashes (e.g. "33610-KSP-860").
+  TextColumn get partNo      => text()();
+  /// Raw barcode string from QR scan, no dashes (e.g. "33610KSP860").
+  TextColumn get barcode     => text().nullable()();
+  /// Authoritative product description. Red label overrides OCR.
+  TextColumn get description => text().nullable()();
+  /// Warehouse shelf location (e.g. "029G").
+  TextColumn get location    => text().nullable()();
+  /// Latest MRP including all taxes (always overwritten with newest value).
+  RealColumn get mrp         => real().withDefault(const Constant(0.0))();
+  /// Pack quantity per unit (from memo PACK column).
+  IntColumn  get packQty     => integer().withDefault(const Constant(1))();
+  /// Actual warehouse stock quantity (from memo STOCK column).
+  IntColumn  get stockQty    => integer().withDefault(const Constant(0))();
+  /// Manufacturing month string (e.g. "MAY") — from red label.
+  TextColumn get mfgMonth    => text().nullable()();
+  /// Manufacturing year string (e.g. "2026") — from red label.
+  TextColumn get mfgYear     => text().nullable()();
+  /// Source of last update: "memo_scan" | "red_label" | "manual".
+  TextColumn get source      => text().withDefault(const Constant('memo_scan'))();
+  /// ISO-8601 timestamp of last time this part appeared in any scan.
+  TextColumn get lastSeenAt  => text()();
+  /// ISO-8601 timestamp when first added to the local DB.
+  TextColumn get createdAt   => text()();
+
+  @override
+  Set<Column> get primaryKey => {partNo};
+}
+
 @DriftDatabase(tables: [
   CurrentUsers,
   Inventory,
@@ -106,12 +138,13 @@ class AppSettings extends Table {
   OrderItems,
   SyncQueues,
   AppSettings,
+  PartsMaster,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -127,6 +160,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 4) {
             // v4: Add memoDate column to orders table (ADD COLUMN preserves existing rows)
             await m.addColumn(orders, orders.memoDate);
+          }
+          if (from < 5) {
+            // v5: Add PartsMaster table — self-learning parts DB from memo + red label scans
+            await m.create(partsMaster);
           }
         },
       );

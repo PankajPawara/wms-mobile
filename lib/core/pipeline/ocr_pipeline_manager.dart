@@ -16,8 +16,10 @@ import 'engine_07_row.dart';
 import 'engine_08_database_match.dart';
 import 'engine_09_gemini_ocr.dart';
 import '../services/candidate_generator.dart';
+import '../services/parts_master_service.dart';
 import '../data/validation_data.dart';
 import 'dart:math' as math;
+
 class OcrPipelineManager {
   static Future<MemoOcrResult> process(File originalImage, AppDatabase db) async {
     // ENGINE 01
@@ -222,6 +224,25 @@ class OcrPipelineManager {
       
       finalItems.add(item);
       rawOcrDump += 'Row -> SR: ${r.sr} | RAW PREFIX: ${r.partNo} | MRP: ${r.mrp} | QTY: ${r.qty} | LOC: ${r.location}\n';
+    }
+
+    // -------------------------------------------------------------------------
+    // AUTO-LEARN: Upsert every matched item into the local Parts Master DB.
+    // Runs silently in background — does not block the pipeline result.
+    // -------------------------------------------------------------------------
+    final partsMasterService = PartsMasterService(db);
+    for (final item in finalItems) {
+      // Fire-and-forget: errors here should not fail the OCR result
+      partsMasterService.learnFromMemo(
+        rawPartNo:   item.correctedPartNo,
+        description: item.description,
+        location:    item.location,
+        mrp:         item.mrp,
+        packQty:     item.pack,
+        stockQty:    item.stock,
+      ).catchError((e) {
+        if (kDebugMode) debugPrint('[PartsMaster] learnFromMemo error: $e');
+      });
     }
 
     if (finalItems.isEmpty) {
