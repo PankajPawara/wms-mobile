@@ -78,8 +78,8 @@ class OcrPipelineManager {
       debugPrint('[Pipeline] E08 match rate: ${(matchRate * 100).toStringAsFixed(0)}% ($verifiedCount/$totalCount verified)');
     }
 
-    if (matchRate < 0.5) {
-      debugPrint('[Pipeline] Match rate too low — triggering ENGINE 09 Gemini OCR fallback...');
+    if (true) { // ALWAYS use Gemini as requested
+      debugPrint('[Pipeline] ALWAYS triggering ENGINE 09 Gemini OCR fallback for max accuracy...');
       final e09Result = await Engine09GeminiOcr.extractFromImage(
         e02aResult.data!,
         e04Result.data!,
@@ -106,7 +106,7 @@ class OcrPipelineManager {
             ..addAll(e08GeminiResult.data!.rows);
         }
       } else {
-        debugPrint('[Pipeline] Gemini fallback also failed — using ML Kit results.');
+        debugPrint('[Pipeline] Gemini fallback failed — using ML Kit results as fallback.');
       }
     } else {
       if (kDebugMode) {

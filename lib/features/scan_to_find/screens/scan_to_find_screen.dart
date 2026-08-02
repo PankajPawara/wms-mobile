@@ -167,11 +167,14 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   }
 
   Future<bool> _searchProduct(String rawInput, bool isOcr) async {
+    if (_state != _ScanState.scanning) return false; // Prevent concurrent searches
+
     // ── Parse the input using the centralized PartNumberParser ───────────────
     final parsed = PartNumberParser.parse(rawInput);
+    final bestCandidate = parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : parsed.normalized;
 
     setState(() {
-      _scannedBarcode = parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : rawInput;
+      _scannedBarcode = bestCandidate.isNotEmpty ? bestCandidate : rawInput;
       _state = _ScanState.searching;
     });
 
@@ -332,45 +335,52 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       }
 
       // ── Not Found ─────────────────────────────────────────────────────────
-      if (!mounted) return false;
-      if (!isOcr) {
-        // For barcode, go back to scanning silently (barcode might just be for another product)
-        setState(() => _state = _ScanState.scanning);
-        return false;
-      } else {
-        // For OCR, auto-populate manual search with the best candidate we have
-        ScanFeedback.triggerError();
-        final bestCandidate = parsed.ocrCorrected.isNotEmpty
-            ? parsed.ocrCorrected
-            : parsed.normalized;
-        setState(() {
-          _state = _ScanState.scanning;
-          _isManualMode = true;
-          _manualController.text = bestCandidate;
-          _manualSearchQuery = bestCandidate;
-          _searchByField = 'Part No';
-        });
-        _performManualSearch();
-        return false;
-      }
+      if (!mounted) return true;
+      ScanFeedback.triggerError();
+      _showNotFoundDialog(bestCandidate.isNotEmpty ? bestCandidate : rawInput);
+      return true;
     } catch (e) {
-      if (!mounted) return false;
-      if (!isOcr) {
-        setState(() => _state = _ScanState.scanning);
-        return false;
-      } else {
-        ScanFeedback.triggerError();
-        setState(() {
-          _state = _ScanState.scanning;
-          _isManualMode = true;
-          _manualController.text = _scannedBarcode;
-          _manualSearchQuery = _scannedBarcode;
-          _searchByField = 'Part No';
-        });
-        _performManualSearch();
-        return false;
-      }
+      if (!mounted) return true;
+      ScanFeedback.triggerError();
+      _showNotFoundDialog(rawInput);
+      return true;
     }
+  }
+
+  void _showNotFoundDialog(String scannedCode) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Part Not Found'),
+        content: Text('The scanned code "$scannedCode" was not found in the database. What would you like to do?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _scanAnother();
+              _scannerKey.currentState?.restartFeed();
+            },
+            child: const Text('Scan Again'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _state = _ScanState.scanning;
+                _isManualMode = true;
+                _manualController.text = scannedCode;
+                _manualSearchQuery = scannedCode;
+                _searchByField = 'Part No';
+              });
+              _performManualSearch();
+            },
+            child: const Text('Search Manually'),
+          ),
+        ],
+      ),
+    );
   }
   void _setTorch(bool turnOn) {
     try {

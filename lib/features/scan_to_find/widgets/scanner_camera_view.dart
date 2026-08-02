@@ -140,7 +140,8 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
           if (rawVal != null && rawVal.isNotEmpty) {
             final success = await widget.onResult(rawVal, false);
             if (success) {
-              _stopLiveFeed();
+              _isProcessing = true; // Lock it permanently for this session
+              await _stopLiveFeed();
               return;
             }
           }
@@ -169,26 +170,16 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
           if (_isDisposed || !mounted) return;
           final success = await widget.onResult(candidate, true);
           if (success) {
-            _stopLiveFeed();
+            _isProcessing = true; // Lock it permanently for this session
+            await _stopLiveFeed();
             return;
-          }
-        }
-      } else {
-        // No structured part found — pass raw text so the screen can try manual search
-        // Only do this if OCR confidence is high (more than 3 words)
-        final words = fullText.trim().split(RegExp(r'\s+'));
-        if (words.length >= 2) {
-          // Pass the first token that looks like it could be a part number
-          final firstCandidate = PartNumberParser.normalize(words.first);
-          if (firstCandidate.length >= 5) {
-            await widget.onResult(firstCandidate, true);
           }
         }
       }
     } catch (e) {
       if (kDebugMode) print('[Scanner] Error processing frame: $e');
     } finally {
-      if (!_isDisposed) {
+      if (!_isDisposed && _controller != null && _controller!.value.isStreamingImages) {
         _isProcessing = false;
       }
     }

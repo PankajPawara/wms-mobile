@@ -43,6 +43,7 @@ $rawOcrDump
 Rules:
 - Never rewrite correct values.
 - Only modify fields that clearly conflict with the image.
+- Header Cleanup: Remove junk text such as "C#", "order/picking list", "m/s", "M/S", or similar labels from the customer name. Return only the actual customer name.
 - Preserve the JSON schema exactly.
 - If uncertain, keep the original value and mark it as low confidence.
 - Return only the corrected JSON.

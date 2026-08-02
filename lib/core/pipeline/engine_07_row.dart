@@ -1,5 +1,6 @@
 import 'models/pipeline_result.dart';
 import 'models/pipeline_stage.dart';
+import 'models/ocr_word.dart';
 import 'engine_06_cell.dart' show CellAssignmentOutput, CellData;
 import 'engine_04_table_detection.dart' show TableGeometryOutput;
 
@@ -56,12 +57,11 @@ class RowBuilderOutput {
   }
 }
 
-class _ProjectedCell {
-  final String columnKey;
-  final CellData cell;
+class _ProjectedWord {
+  final OcrWord word;
   final double baseY;
 
-  _ProjectedCell(this.columnKey, this.cell, this.baseY);
+  _ProjectedWord(this.word, this.baseY);
 }
 
 class Engine07RowBuilder {
@@ -141,25 +141,31 @@ class Engine07RowBuilder {
       }
 
       // -----------------------------------------------------------------------
-      // STEP 2 — Project all cells to Base Y (X = 0) and Cluster
+      // STEP 2 — Project all words to Base Y (X = 0) and Cluster
       // -----------------------------------------------------------------------
-      // Wrapper to hold cell with its projected base Y
-      final allProjected = <_ProjectedCell>[];
-      for (final entry in input.columns.entries) {
-        final key = entry.key;
-        final centerX = colCenters[key] ?? 0.0;
-        for (final cell in entry.value) {
-          final baseY = cell.topY - (centerX * globalSlope);
-          allProjected.add(_ProjectedCell(key, cell, baseY));
+      final tableWords = input.gridGeometry.tableGeometry.allWords.where((w) {
+        return w.top >= input.gridGeometry.tableGeometry.topY && w.bottom <= input.gridGeometry.tableGeometry.bottomY;
+      }).toList();
+
+      final allProjected = <_ProjectedWord>[];
+      for (final w in tableWords) {
+        // Skip obvious vertical pipes
+        if (w.text == '|' || w.text == 'I' || w.text == 'l' || w.text == '1' || w.text == '!') {
+          if ((w.bottom - w.top) > 1.2 * (w.right - w.left)) {
+            continue;
+          }
         }
+        final cx = (w.left + w.right) / 2.0;
+        final baseY = w.top - (cx * globalSlope);
+        allProjected.add(_ProjectedWord(w, baseY));
       }
 
-      // Sort all cells globally by their flattened baseY
+      // Sort all words globally by their flattened baseY
       allProjected.sort((a, b) => a.baseY.compareTo(b.baseY));
 
       // 1D Clustering
-      final rowClusters = <List<_ProjectedCell>>[];
-      List<_ProjectedCell> currentCluster = [];
+      final rowClusters = <List<_ProjectedWord>>[];
+      List<_ProjectedWord> currentCluster = [];
       
       for (final pc in allProjected) {
         if (currentCluster.isEmpty) {
@@ -179,65 +185,112 @@ class Engine07RowBuilder {
       }
 
       // -----------------------------------------------------------------------
-      // STEP 3 — Assemble Rows
+      // STEP 3 — Assemble Rows using Strict Semantic Rules
       // -----------------------------------------------------------------------
       final rows = <PartRow>[];
 
       for (final cluster in rowClusters) {
-        // Find average BaseY for this cluster to resolve duplicate columns
-        final avgBaseY = cluster.map((c) => c.baseY).reduce((a, b) => a + b) / cluster.length;
+        // Sort words in the cluster left-to-right
+        cluster.sort((a, b) => a.word.left.compareTo(b.word.left));
 
-        // If multiple cells in the cluster belong to the SAME column, pick the one closest to avgBaseY
-        final columnMap = <String, CellData>{};
-        final columnBestDist = <String, double>{};
+        // Combine into full text
+        String fullText = cluster.map((cw) => cw.word.text).join(' ');
 
-        for (final pc in cluster) {
-          final dist = (pc.baseY - avgBaseY).abs();
-          if (!columnMap.containsKey(pc.columnKey) || dist < columnBestDist[pc.columnKey]!) {
-            columnMap[pc.columnKey] = pc.cell;
-            columnBestDist[pc.columnKey] = dist;
+        // Fix common OCR fragmentation (e.g. "51110 - KWP - 900" -> "51110-KWP-900")
+        fullText = fullText.replaceAll(RegExp(r'\s*-\s*'), '-');
+        // Clean up stray pipes
+        fullText = fullText.replaceAll(RegExp(r'[|!]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+        if (fullText.isEmpty) continue;
+        if (_isNoiseLine(fullText, '')) continue;
+
+        String sr = '';
+        String partNo = '';
+        String desc = '';
+        String mrp = '';
+        String qty = '';
+        String loc = '';
+        String pack = '';
+        String stock = '';
+
+        // 1. Try to find the Part Number (Strict anchor)
+        final partMatch = _hondaPartRegex.firstMatch(fullText);
+
+        if (partMatch != null) {
+          partNo = partMatch.group(1)!;
+          
+          final partIndex = partMatch.start;
+          final partEndIndex = partMatch.end;
+          
+          sr = fullText.substring(0, partIndex).replaceAll(RegExp(r'[^0-9]'), '').trim();
+          
+          final afterPart = fullText.substring(partEndIndex).trim();
+          
+          // 2. Find MRP in the text after Part Number
+          final mrpMatch = RegExp(r'\d[\d,]*\.\d{2}').firstMatch(afterPart);
+          
+          if (mrpMatch != null) {
+            mrp = mrpMatch.group(0)!;
+            final mrpIndex = mrpMatch.start;
+            final mrpEndIndex = mrpMatch.end;
+            
+            desc = afterPart.substring(0, mrpIndex).trim();
+            final afterMrp = afterPart.substring(mrpEndIndex).trim();
+            
+            // 3. Find LOC in the text after MRP
+            final locMatch = _locRegex.firstMatch(afterMrp) ?? _locFuzzyRegex.firstMatch(afterMrp);
+            
+            if (locMatch != null) {
+              loc = locMatch.group(1)!;
+              final locIndex = locMatch.start;
+              final locEndIndex = locMatch.end;
+              
+              qty = afterMrp.substring(0, locIndex).replaceAll(RegExp(r'[^0-9]'), '').trim();
+              
+              final afterLoc = afterMrp.substring(locEndIndex).trim();
+              final stockTokens = afterLoc.split(' ').where((t) => RegExp(r'\d').hasMatch(t)).toList();
+              
+              if (stockTokens.isNotEmpty) {
+                if (stockTokens.length >= 2) {
+                  pack = stockTokens[0].replaceAll(RegExp(r'[^0-9]'), '');
+                  stock = stockTokens[1].replaceAll(RegExp(r'[^0-9]'), '');
+                } else {
+                  stock = stockTokens[0].replaceAll(RegExp(r'[^0-9]'), '');
+                }
+              }
+            } else {
+              // No LOC, just check for QTY
+              final qtyMatch = RegExp(r'\b([1-9]\d?)\b').firstMatch(afterMrp);
+              if (qtyMatch != null) {
+                qty = qtyMatch.group(1)!;
+              }
+            }
+          } else {
+            // No MRP, everything after part is description
+            desc = afterPart;
+          }
+        } else {
+          // No Strict Part Number. Check if there's an MRP, which implies it's a sub-row or description row
+          final mrpMatch = RegExp(r'\d[\d,]*\.\d{2}').firstMatch(fullText);
+          if (mrpMatch != null) {
+             mrp = mrpMatch.group(0)!;
+             desc = fullText.substring(0, mrpMatch.start).trim();
+             // Just ignore QTY/LOC for sub-rows unless we need them
+          } else {
+             // Treat the entire row as description (e.g. multi-line desc)
+             desc = fullText;
           }
         }
 
-        final rawSr    = columnMap['SR']?.text ?? '';
-        final rawPart  = columnMap['PART']?.text ?? '';
-        final rawDesc  = columnMap['DESC']?.text ?? '';
-        final rawMrp   = columnMap['MRP']?.text ?? '';
-        final rawQty   = columnMap['QTY']?.text ?? '';
-        final rawLoc   = columnMap['LOC']?.text ?? '';
-        final rawPack  = columnMap['PACK']?.text ?? '';
-        final rawStock = columnMap['STOCK']?.text ?? '';
-
-        // Clean SR — digits only
-        final sr = rawSr.replaceAll(RegExp(r'[^0-9]'), '').trim();
-
-        // Extract part number and recover leaked description prefix words
-        final partResult = _processPartAndDesc(rawPart, rawDesc);
-        final partNo = partResult['part']!;
-        final desc   = partResult['desc']!;
-
-        // Extract QTY, MRP, and LOC together from right-side columns
-        final rightSideData = _extractMrpQtyLoc(rawMrp, rawQty, rawLoc);
-        final mrp = rightSideData['mrp']!;
-        final qty = rightSideData['qty']!;
-        final loc = rightSideData['loc']!;
-
-        // Extract PACK and STOCK, handling cases where they merge into the STOCK column
-        final packStockData = _extractPackStock(rawPack, rawStock);
-        final pack = packStockData['pack']!;
-        final stock = packStockData['stock']!;
-
+        // Clean description
+        desc = _cleanDescription(desc);
 
         if (partNo.isEmpty && desc.isEmpty && mrp.isEmpty) continue;
-        if (_isNoiseLine(partNo, desc)) continue;
-
-        // Clean description: remove leading/trailing pipes, star patterns
-        final cleanDesc = _cleanDescription(desc);
 
         rows.add(PartRow(
           sr: sr,
           partNo: partNo,
-          description: cleanDesc,
+          description: desc,
           mrp: mrp,
           qty: qty,
           location: loc,
@@ -267,224 +320,7 @@ class Engine07RowBuilder {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Extract Honda part number from raw PART-column text, and recover any
-  // description words that leaked across the column boundary.
-  //
-  // Common OCR patterns that must be handled:
-  //   "|61102-KTE-910 |STAY"  → pipe + part + pipe + leaked desc word
-  //   "1STAY"                 → pipe read as "1" glued to desc word
-  //   "I02380-KTE-P12 |KIT"  → pipe read as "I" glued to part number digits
-  //   "135010-KWP-H10 KEY"   → pipe read as "1" prepended to 5-digit part number
-  //
-  // Strategy:
-  //   1. Replace explicit pipes with spaces.
-  //   2. Remove standalone "I" (pipe read as letter with spaces around it).
-  //   3. Remove leading "I"/"l" directly touching a digit (pipe touching part).
-  //   4. Remove leading single digit directly touching a letter ("1STAY"→"STAY").
-  //   5. Try to match exactly-5-digit Honda part number with (?<!\d) lookbehind.
-  //   6. If no match, strip the first character and retry up to 3 times.
-  //      This handles "135010..." → strip "1" → "35010..." which now matches.
-  //   7. Any remaining alphabetic words = leaked description prefix.
-  // ---------------------------------------------------------------------------
-  static Map<String, String> _processPartAndDesc(
-      String rawPart, String rawDesc) {
-    // Step 1-4: clean up
-    String cleaned = rawPart.replaceAll('|', ' ').trim();
-    cleaned = cleaned.replaceAll(RegExp(r'\bI\b'), ' ').trim(); // standalone I
-    cleaned = cleaned.replaceAll(RegExp(r'^[Il](?=\d)'), '').trim(); // I/l before digit
-    cleaned = cleaned.replaceAll(RegExp(r'^\d(?=[A-Z])'), '').trim(); // digit before letter
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
 
-    // Step 5-6: progressive match for Honda part number
-    String partNo = '';
-    String workStr = cleaned;
-    for (int attempt = 0; attempt <= 2 && workStr.isNotEmpty; attempt++) {
-      final m = _hondaPartRegex.firstMatch(workStr);
-      if (m != null) {
-        partNo = m.group(1)!;
-        break;
-      }
-      workStr = workStr.substring(1).trim(); // strip one leading char and retry
-    }
-
-    // Step 7: recover leaked description words from PART text
-    String scanStr = partNo.isNotEmpty
-        ? cleaned.replaceAll(partNo, '').trim()
-        : cleaned;
-
-    final descPrefixWords = scanStr
-        .split(RegExp(r'\s+'))
-        .where((w) =>
-            RegExp(r'[A-Z]{2,}').hasMatch(w) && !RegExp(r'^\d+$').hasMatch(w))
-        .map((w) => w.replaceAll(RegExp(r'^\d+'), '').trim()) // strip leading artefact digits
-        .where((w) => w.length >= 2)
-        .toList();
-
-    final descPrefix = descPrefixWords.join(' ');
-    final fullDesc = descPrefix.isNotEmpty
-        ? '$descPrefix $rawDesc'.trim()
-        : rawDesc.trim();
-
-    return {'part': partNo, 'desc': fullDesc};
-  }
-
-  // ---------------------------------------------------------------------------
-  // Unified extraction of QTY, MRP, and LOC from the right-side columns.
-  //
-  // Root cause: E05 grid detection often merges MRP, QTY, and LOC into just
-  // one or two columns.
-  //   e.g. "20 6.00|" (QTY 20, MRP 6.00) in MRP column
-  //   e.g. "92-001 5" (MRP 92.00, QTY 5) in MRP column
-  //
-  // LOCATION STRATEGY (critical):
-  //   First, we attempt to parse the location DIRECTLY from rawLoc before
-  //   combining all right-side text. This avoids OCR letter substitutions
-  //   (e.g. "007U" → "007 1") causing "007" to fall into the QTY field.
-  //   Only fall back to combined-string extraction if rawLoc parsing fails.
-  // ---------------------------------------------------------------------------
-  static Map<String, String> _extractMrpQtyLoc(String rawMrp, String rawQty, String rawLoc) {
-    // -------------------------------------------------------------------------
-    // STEP 0 — Pre-extract location from the dedicated LOC column text.
-    // Strip all spaces, pipes, and letter-noise then try strict then fuzzy match.
-    // -------------------------------------------------------------------------
-    String loc = _parseLocCode(rawLoc);
-
-    // Combine everything on the right side
-    String rawRightSide = '$rawMrp $rawQty $rawLoc'
-        .replaceAll(RegExp(r'[|!\}]'), ' ')
-        .replaceAll(RegExp(r'\b[Il](?=\d)'), ' ') // strip I/l attached to start of digits (e.g. I035X)
-        .replaceAll(RegExp(r'\bI\b'), ' ')
-        .replaceAll('O', '0')
-        .replaceAll('o', '0')
-        .replaceAll('d', '0')
-        .replaceAll('l', '1')
-        .trim();
-
-    // Fix colon in decimals (e.g. "92:00" -> "92.00")
-    rawRightSide = rawRightSide.replaceAllMapped(RegExp(r':(\d{2})\b'), (m) => '.${m.group(1)}');
-
-    // Fix hyphenated decimals (e.g. "92-00" -> "92.00")
-    rawRightSide = rawRightSide.replaceAllMapped(RegExp(r'(\d+)-(\d{2})\b'), (m) => '${m.group(1)}.${m.group(2)}');
-    // Fix OCR pipe attached to decimal (e.g. "0.001" -> "0.00")
-    rawRightSide = rawRightSide.replaceAllMapped(RegExp(r'(\.\d{2})1\b'), (m) => m.group(1)!);
-
-    // Extract location from combined string only if pre-pass failed.
-    if (loc.isEmpty) {
-      final locMatch = _locRegex.firstMatch(rawRightSide);
-      if (locMatch != null) {
-        loc = locMatch.group(1)!;
-        rawRightSide = rawRightSide.replaceAll(locMatch.group(0)!, ' ');
-      } else {
-        // Last resort fuzzy match (catches letter-as-digit substitutions)
-        final locFuzzy = _locFuzzyRegex.firstMatch(rawRightSide);
-        if (locFuzzy != null) {
-          loc = locFuzzy.group(1)!;
-          rawRightSide = rawRightSide.replaceAll(locFuzzy.group(0)!, ' ');
-        }
-      }
-    } else {
-      // We already have loc — remove the raw loc digits from combined string
-      // so they don't accidentally get picked up as QTY.
-      if (loc.length >= 3) {
-        rawRightSide = rawRightSide.replaceAll(
-          RegExp(r'\b' + RegExp.escape(loc.substring(0, 3)) + r'\b'), ' ');
-      }
-    }
-
-    String mrp = '';
-    final mrpMatch = RegExp(r'\d[\d,]*\.\d{2}').firstMatch(rawRightSide);
-    if (mrpMatch != null) {
-      mrp = mrpMatch.group(0)!;
-      rawRightSide = rawRightSide.replaceAll(mrpMatch.group(0)!, ' ');
-    }
-
-    // QTY: only accept 1-2 digit numbers (Honda picking qty is typically 1-20).
-    // Any 3+ digit number here is almost certainly a location code fragment.
-    String qty = '';
-    final qtyMatch = RegExp(r'\b([1-9]\d?)\b').firstMatch(rawRightSide);
-    if (qtyMatch != null) {
-      qty = qtyMatch.group(1)!;
-    }
-
-    return {'qty': qty, 'mrp': mrp, 'loc': loc};
-  }
-
-  // ---------------------------------------------------------------------------
-  // Extract PACK and STOCK from their respective columns.
-  // Because they are so close in dot-matrix, they frequently merge into STOCK.
-  //   e.g. rawPack="" and rawStock="1| 92" -> Pack: 1, Stock: 92
-  // ---------------------------------------------------------------------------
-  static Map<String, String> _extractPackStock(String rawPack, String rawStock) {
-    String p = rawPack.replaceAll(RegExp(r'[|!]'), ' ').trim();
-    String s = rawStock.replaceAll(RegExp(r'[|!]'), ' ').trim();
-
-    // If pack is empty and stock has multiple numeric tokens, split them
-    if (p.isEmpty && s.isNotEmpty) {
-      final tokens = s.split(RegExp(r'\s+')).where((t) => RegExp(r'\d').hasMatch(t)).toList();
-      if (tokens.length >= 2) {
-        p = tokens[0];
-        s = tokens[1];
-      }
-    }
-
-    return {
-      'pack': _cleanCount(p),
-      'stock': _cleanCount(s),
-    };
-  }
-
-  // ---------------------------------------------------------------------------
-  // Parse a Honda warehouse location code from raw LOC column text.
-  // Handles OCR substitutions:
-  //   "007U"  → scanned correctly → "007U"
-  //   "007 1" → "U" misread as space+"1" → compresses to "0071" (fuzzy)
-  //   "073J"  → misread as "0733" → captured as 4-digit fuzzy → "0733"
-  //   "I 182E" → leading pipe/I stripped → "182E"
-  // ---------------------------------------------------------------------------
-  static String _parseLocCode(String rawLoc) {
-    if (rawLoc.trim().isEmpty) return '';
-
-    // Step 1: strip common OCR noise characters and collapse spaces
-    final cleaned = rawLoc
-        .replaceAll(RegExp(r'[|!]'), '')
-        .toUpperCase()
-        .trim();
-
-    // Step 2: remove any leading non-digit characters (I, spaces, etc.)
-    final stripped = cleaned.replaceAll(RegExp(r'^[^0-9]+'), '');
-
-    // Step 3: try strict match — 3 digits + uppercase letter
-    final strict = RegExp(r'^([0-9]{3}[A-Z])').firstMatch(stripped);
-    if (strict != null) return strict.group(1)!;
-
-    // Step 4: try with space removal — handles "007 1" ("007U" misread)
-    final compact = stripped.replaceAll(' ', '');
-    final strictCompact = RegExp(r'^([0-9]{3}[A-Z])').firstMatch(compact);
-    if (strictCompact != null) return strictCompact.group(1)!;
-
-    // Step 5: fuzzy — 4 all-digit sequence (letter was misread as digit)
-    final fuzzy = RegExp(r'^([0-9]{4})').firstMatch(compact);
-    if (fuzzy != null) return fuzzy.group(1)!;
-
-    // Step 6: partial — just 3 digits (trailing letter completely lost)
-    final partial = RegExp(r'^([0-9]{3})').firstMatch(compact);
-    if (partial != null) return partial.group(1)!;
-
-    return '';
-  }
-
-  // ---------------------------------------------------------------------------
-  // Clean a count column (PACK, STOCK): strip pipe/letter noise, return first number.
-  // "6 I" → "6",  "6 !" → "6",  "I 21" → "21", "S3" → "53", "1" → "1"
-  // ---------------------------------------------------------------------------
-  static String _cleanCount(String raw) {
-    final s = raw.replaceAll(RegExp(r'[|!]'), ' ').trim();
-    // Strip leading non-digit characters (I, S, l, etc. that are OCR noise)
-    final stripped = s.replaceAll(RegExp(r'^[^0-9]+'), '').trim();
-    final m = RegExp(r'^\d+').firstMatch(stripped);
-    return m != null ? m.group(0)! : stripped.replaceAll(RegExp(r'[^0-9]'), '').trim();
-  }
 
   // ---------------------------------------------------------------------------
   // Clean description: remove leading/trailing pipes, star-wrapped words,
