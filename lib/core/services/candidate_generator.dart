@@ -258,7 +258,7 @@ class CandidateGenerator {
         : ocrDesc;
     final resolvedLocation = (master.location?.isNotEmpty == true)
         ? master.location!
-        : (ocrLocation.isNotEmpty ? ocrLocation : 'LOCATION NOT DEFINED');
+        : (ocrLocation.isNotEmpty ? ocrLocation : 'NO LOCATION');
 
     return ExtractedMemoItem(
       rawOcrPartNo:    rawOcr,
@@ -295,7 +295,7 @@ class CandidateGenerator {
       description: resolvedDesc,
       mrp: ocrMrp > 0 ? ocrMrp : dbItem.price,
       qty: qty,
-      location: dbItem.location.isNotEmpty ? dbItem.location : 'LOCATION NOT DEFINED',
+      location: dbItem.location.isNotEmpty ? dbItem.location : 'NO LOCATION',
       pack: pack,
       stock: dbItem.stock,
     );

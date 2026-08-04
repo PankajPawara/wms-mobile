@@ -91,20 +91,21 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     }
   }
 
-  Future<void> _stopLiveFeed() async {
+  Future<void> _pauseFeed() async {
     if (_controller != null && _controller!.value.isStreamingImages) {
       await _controller?.stopImageStream();
     }
-    await _controller?.dispose();
-    _controller = null;
-    if (mounted) setState(() {});
+    // Do not dispose the controller so it can be resumed quickly
   }
 
   @override
   void dispose() {
     _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
-    _stopLiveFeed();
+    if (_controller != null && _controller!.value.isStreamingImages) {
+      _controller?.stopImageStream();
+    }
+    _controller?.dispose();
     _barcodeScanner.close();
     _textRecognizer.close();
     super.dispose();
@@ -115,9 +116,9 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
     if (_controller == null || !_controller!.value.isInitialized) return;
 
     if (state == AppLifecycleState.inactive) {
-      _stopLiveFeed();
+      _pauseFeed();
     } else if (state == AppLifecycleState.resumed) {
-      _startLiveFeed();
+      restartFeed();
     }
   }
 
@@ -141,7 +142,7 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
             final success = await widget.onResult(rawVal, false);
             if (success) {
               _isProcessing = true; // Lock it permanently for this session
-              await _stopLiveFeed();
+              await _pauseFeed();
               return;
             }
           }
@@ -171,7 +172,7 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
           final success = await widget.onResult(candidate, true);
           if (success) {
             _isProcessing = true; // Lock it permanently for this session
-            await _stopLiveFeed();
+            await _pauseFeed();
             return;
           }
         }
@@ -260,8 +261,10 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
   FlashMode get flashMode => _controller?.value.flashMode ?? FlashMode.off;
 
   Future<void> restartFeed() async {
-    if (_controller != null && !_controller!.value.isStreamingImages) {
-      _isProcessing = false;
+    _isProcessing = false;
+    if (_controller == null) {
+      await _startLiveFeed();
+    } else if (!_controller!.value.isStreamingImages) {
       await _controller?.startImageStream(_processCameraImage);
     }
   }

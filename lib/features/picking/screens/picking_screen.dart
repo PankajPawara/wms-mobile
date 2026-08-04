@@ -114,29 +114,6 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
-      appBar: AppBar(
-        title: Text('Picking — ${widget.orderId}'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 17,
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppDimensions.md),
-            child: Center(
-              child: Text(
-                '${_items.where((i) => i.status == 'picked').length}/${_items.length}',
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, color: Colors.white70),
-              ),
-            ),
-          ),
-        ],
-      ),
       body: Column(
         children: [
           // Current item card

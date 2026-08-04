@@ -372,53 +372,55 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F14),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F0F14),
-        foregroundColor: Colors.white,
-        title: const Text(
-          'Pipeline Sandbox',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.copy_all),
-            tooltip: 'Copy Full Combined JSON',
-            onPressed: () {
-              final allData = {
-                'E01': _acquisitionOutput?.toJson(),
-                'E02': _processingOutput?.toJson(),
-                'E02A': _optimizationOutput?.toJson(),
-                'E03': _headerOutput?.toJson(),
-                'E04': _tableGeometryOutput?.toJson(),
-                'E05': _gridOutput?.toJson(),
-                'E06B': _cellOutput?.toJson(),
-                'E07': _rowOutput?.toJson(),
-                'E08': _validatedOutput?.toJson(),
-              };
-              _copyJson(allData);
-            },
+      body: Column(
+        children: [
+          Container(
+            color: const Color(0xFF1C1C24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.copy_all, color: Colors.white),
+                  tooltip: 'Copy Full Combined JSON',
+                  onPressed: () {
+                    final allData = {
+                      'E01': _acquisitionOutput?.toJson(),
+                      'E02': _processingOutput?.toJson(),
+                      'E02A': _optimizationOutput?.toJson(),
+                      'E03': _headerOutput?.toJson(),
+                      'E04': _tableGeometryOutput?.toJson(),
+                      'E05': _gridOutput?.toJson(),
+                      'E06B': _cellOutput?.toJson(),
+                      'E07': _rowOutput?.toJson(),
+                      'E08': _validatedOutput?.toJson(),
+                    };
+                    _copyJson(allData);
+                  },
+                ),
+              ],
+            ),
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: Colors.white54,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: 'E01\nAcquisition', height: 48),
-            Tab(text: 'E02\nProcessing', height: 48),
-            Tab(text: 'E02A\nOptimization', height: 48),
-            Tab(text: 'E03\nHeader', height: 48),
-            Tab(text: 'E04\nTable', height: 48),
-            Tab(text: 'E05\nGrid', height: 48),
-            Tab(text: 'E06B\nZone OCR', height: 48),
-            Tab(text: 'E07\nRows', height: 48),
-            Tab(text: 'E08\nValidate', height: 48),
-          ],
-        ),
-      ),
-      body: TabBarView(
+          TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: Colors.white54,
+            indicatorColor: AppColors.primary,
+            tabs: const [
+              Tab(text: 'E01\nAcquisition', height: 48),
+              Tab(text: 'E02\nProcessing', height: 48),
+              Tab(text: 'E02A\nOptimization', height: 48),
+              Tab(text: 'E03\nHeader', height: 48),
+              Tab(text: 'E04\nTable', height: 48),
+              Tab(text: 'E05\nGrid', height: 48),
+              Tab(text: 'E06B\nZone OCR', height: 48),
+              Tab(text: 'E07\nRows', height: 48),
+              Tab(text: 'E08\nValidate', height: 48),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
         controller: _tabController,
         children: [
           _Engine01Tab(
@@ -520,8 +522,11 @@ class _PipelineSandboxScreenState extends State<PipelineSandboxScreen>
                 : null,
           ),
         ],
-      ),
-    );
+      ), // closes TabBarView
+    ), // closes Expanded
+    ], // closes children of Column
+    ), // closes Column
+    ); // closes Scaffold
   }
 }
 

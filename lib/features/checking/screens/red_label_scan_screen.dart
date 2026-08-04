@@ -157,21 +157,6 @@ class _RedLabelScanScreenState extends ConsumerState<RedLabelScanScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
-        title: const Text(
-          'Scan Red Label',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.flash_on_rounded),
-            tooltip: 'Toggle Flash',
-            onPressed: () => _scanner.toggleTorch(),
-          ),
-        ],
-      ),
       body: _parsedData == null
           ? _buildScannerView()
           : _buildConfirmationView(),

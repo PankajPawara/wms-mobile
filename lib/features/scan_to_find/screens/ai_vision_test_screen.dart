@@ -424,18 +424,22 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
     final theme = Theme.of(context);
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI Vision Sandbox'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.key),
-            tooltip: 'Set Gemini API Key',
-            onPressed: () => _showApiKeyDialog(context),
-          ),
-        ],
-      ),
       body: Column(
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: theme.colorScheme.surface,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.key),
+                  tooltip: 'Set Gemini API Key',
+                  onPressed: () => _showApiKeyDialog(context),
+                ),
+              ],
+            ),
+          ),
           // Controls Area
           AnimatedSize(
             duration: const Duration(milliseconds: 300),

@@ -19,25 +19,9 @@ class ProfileScreen extends ConsumerWidget {
     final mobile = user?.mobile ?? 'Not Provided';
     final status = user?.status ?? 'active';
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        context.go('/settings');
-      },
-      child: Scaffold(
-        backgroundColor: colorScheme.surfaceContainerLowest,
-        appBar: AppBar(
-          title: Text('My Profile', style: TextStyle(color: colorScheme.onSurface)),
-          backgroundColor: colorScheme.surface,
-          foregroundColor: colorScheme.onSurface,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-            onPressed: () => context.go('/settings'),
-          ),
-        ),
-        body: ListView(
+    return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      body: ListView(
           padding: const EdgeInsets.all(AppDimensions.md),
           children: [
             // Avatar Header card
@@ -133,8 +117,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildSectionLabel(BuildContext context, String label) {

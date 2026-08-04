@@ -83,170 +83,143 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        context.go('/home');
-      },
-      child: Scaffold(
-        backgroundColor: colorScheme.surfaceContainerLowest,
-        body: Column(
-          children: [
-            // Purple App Bar
-            Container(
-              color: AppColors.primary,
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                                color: Colors.white, size: 20),
-                            onPressed: () => context.go('/home'),
-                          ),
-                          const Expanded(
-                            child: Text(
-                              'Orders',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.refresh_rounded,
-                                color: Colors.white),
-                            onPressed: _loadOrdersAndSync,
-                          ),
-                        ],
+    return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      // The search bar and tab bar live in the appBar's bottom slot
+      // so they stay pinned below the shell's AppBar.
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(112),
+        child: Container(
+          color: AppColors.primary,
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: Column(
+              children: [
+                // Search bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (_) => _refreshLocalOrders(),
+                    style: TextStyle(
+                        fontSize: 14, color: colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      hintText: 'Search customer name or memo...',
+                      hintStyle:
+                          TextStyle(color: colorScheme.onSurfaceVariant),
+                      prefixIcon: Icon(Icons.search_rounded,
+                          color: colorScheme.onSurfaceVariant, size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                _refreshLocalOrders();
+                              },
+                            )
+                          : null,
+                      fillColor: colorScheme.surface,
+                      filled: true,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.all(10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
                       ),
                     ),
-
-                    // Search bar
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (_) => _refreshLocalOrders(),
-                        style: TextStyle(
-                            fontSize: 14, color: colorScheme.onSurface),
-                        decoration: InputDecoration(
-                          hintText: 'Search customer name or memo...',
-                          hintStyle:
-                              TextStyle(color: colorScheme.onSurfaceVariant),
-                          prefixIcon: Icon(Icons.search_rounded,
-                              color: colorScheme.onSurfaceVariant, size: 20),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _refreshLocalOrders();
-                                  },
-                                )
-                              : null,
-                          fillColor: colorScheme.surface,
-                          filled: true,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.all(10),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Tabs
-                    TabBar(
-                      controller: _tabController,
-                      indicatorColor: Colors.white,
-                      indicatorWeight: 3,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white70,
-                      labelStyle: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.bold),
-                      tabs: const [
-                        Tab(text: 'All Orders'),
-                        Tab(text: 'In Progress'),
-                        Tab(text: 'Completed'),
-                      ],
-                    ),
+                  ),
+                ),
+                // Tabs
+                TabBar(
+                  controller: _tabController,
+                  indicatorColor: Colors.white,
+                  indicatorWeight: 3,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  labelStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.bold),
+                  tabs: const [
+                    Tab(text: 'All Orders'),
+                    Tab(text: 'In Progress'),
+                    Tab(text: 'Completed'),
                   ],
                 ),
-              ),
+              ],
             ),
-
-            // Sort chips area
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: colorScheme.surface,
-              child: Row(
-                children: [
-                  _SortChip(
-                    prefix: 'Sort by:',
-                    value: _sortBy,
-                    icon: Icons.sort_rounded,
-                    onTap: () {
-                      setState(() {
-                        _sortBy = _sortBy == 'Date' ? 'Customer' : 'Date';
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  _SortChip(
-                    prefix: '',
-                    value: _sortDir,
-                    icon: Icons.swap_vert_rounded,
-                    onTap: () {
-                      setState(() {
-                        _sortDir = _sortDir == 'Descending'
-                            ? 'Ascending'
-                            : 'Descending';
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Orders List
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _filtered.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No orders found',
-                            style: TextStyle(
-                                color: colorScheme.onSurfaceVariant),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                          itemCount: _filtered.length,
-                          itemBuilder: (context, index) {
-                            final order = _filtered[index];
-                            return _OrderCard(
-                              order: order,
-                              onTap: () async {
-                                await context.push('/order/${order.id}');
-                                if (mounted) _refreshLocalOrders();
-                              },
-                            );
-                          },
-                        ),
-            ),
-          ],
+          ),
         ),
+      ),
+      body: Column(
+        children: [
+          // Sort chips area
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: colorScheme.surface,
+            child: Row(
+              children: [
+                _SortChip(
+                  prefix: 'Sort by:',
+                  value: _sortBy,
+                  icon: Icons.sort_rounded,
+                  onTap: () {
+                    setState(() {
+                      _sortBy = _sortBy == 'Date' ? 'Customer' : 'Date';
+                    });
+                  },
+                ),
+                const SizedBox(width: 8),
+                _SortChip(
+                  prefix: '',
+                  value: _sortDir,
+                  icon: Icons.swap_vert_rounded,
+                  onTap: () {
+                    setState(() {
+                      _sortDir = _sortDir == 'Descending'
+                          ? 'Ascending'
+                          : 'Descending';
+                    });
+                  },
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
+                  tooltip: 'Refresh',
+                  onPressed: _loadOrdersAndSync,
+                ),
+              ],
+            ),
+          ),
+
+          // Orders List
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filtered.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No orders found',
+                          style: TextStyle(
+                              color: colorScheme.onSurfaceVariant),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                        itemCount: _filtered.length,
+                        itemBuilder: (context, index) {
+                          final order = _filtered[index];
+                          return _OrderCard(
+                            order: order,
+                            onTap: () async {
+                              await context.push('/order/${order.id}');
+                              if (mounted) _refreshLocalOrders();
+                            },
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }

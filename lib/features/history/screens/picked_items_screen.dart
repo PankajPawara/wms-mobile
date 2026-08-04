@@ -46,24 +46,14 @@ class _PickedItemsScreenState extends ConsumerState<PickedItemsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Picked Items', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          backgroundColor: AppColors.primary,
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_order == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Picked Items', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          backgroundColor: AppColors.primary,
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: const Center(child: Text('Order not found')),
+      return const Scaffold(
+        body: Center(child: Text('Order not found')),
       );
     }
 
@@ -74,18 +64,6 @@ class _PickedItemsScreenState extends ConsumerState<PickedItemsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text('Picked Items',
-            style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
       body: Column(
         children: [
           // Summary header

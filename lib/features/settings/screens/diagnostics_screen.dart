@@ -168,24 +168,8 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
         : (_syncStatus == 'failed' ? AppColors.danger : AppColors.textSecondary);
     final statusLabel = _syncStatus.toUpperCase();
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        context.go('/settings');
-      },
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: const Color(0xFFF3F4F6),
-        appBar: AppBar(
-          title: const Text('Database & Sync Diagnostics'),
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.textPrimary,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-            onPressed: () => context.go('/settings'),
-          ),
-        ),
         body: ListView(
           padding: const EdgeInsets.all(AppDimensions.md),
           children: [
@@ -525,8 +509,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 

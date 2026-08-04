@@ -6,27 +6,91 @@ import '../../core/constants/app_colors.dart';
 import '../../features/notifications/providers/notification_provider.dart';
 import '../utils/notifications_helper.dart';
 
+/// Canonical page-title map. Sub-pages not in the shell tabs
+/// declare their title here; shell tabs also live here for the
+/// notification-bell action in [MainLayout].
+const _pageTitles = {
+  '/home': 'WMS Dashboard',
+  '/memo-capture': 'Capture Memo',
+  '/scan-to-find': 'Scan to Find',
+  '/checking-list': 'Checking List',
+  '/settings': 'Settings',
+  '/history': 'Orders',
+  '/profile': 'My Profile',
+  '/parts-master': 'Parts Master',
+  '/red-label-scan': 'Red Label Scan',
+  '/diagnostics': 'Database & Sync Diagnostics',
+  '/settings/ocr-sandbox': 'OCR Sandbox Laboratory',
+  '/settings/pipeline-sandbox': 'Pipeline Sandbox',
+  '/ai-vision-test': 'AI Vision Sandbox',
+};
+
+/// Shell-tab routes that have a dedicated bottom-nav item.
+const _shellTabs = [
+  '/home',
+  '/memo-capture',
+  '/scan-to-find',
+  '/checking-list',
+  '/settings',
+];
+
+/// Returns the bottom-nav index for [path], or -1 if it is a sub-page.
+int _tabIndexFor(String path) {
+  for (int i = 0; i < _shellTabs.length; i++) {
+    if (path.startsWith(_shellTabs[i])) return i;
+  }
+  return -1;
+}
+
+/// Resolves a human-readable page title for any route path.
+String _titleFor(String path) {
+  // Exact map look-up first
+  if (_pageTitles.containsKey(path)) return _pageTitles[path]!;
+
+  // Parameterised routes
+  if (path.startsWith('/picking-summary/')) return 'Picking Summary';
+  if (path.startsWith('/picking/')) return 'Picking';
+  if (path.startsWith('/checking/')) return 'Checking';
+  if (path.startsWith('/order/') && path.endsWith('/items')) return 'Picked Items';
+  if (path.startsWith('/order/')) return 'Order Details';
+  if (path.startsWith('/ocr-review')) return 'Review Pickup List';
+
+  return 'WMS';
+}
+
+/// The global app shell. All routes inside the ShellRoute are
+/// rendered here — both top-level tabs and contextual sub-pages.
 class MainLayout extends ConsumerWidget {
   final Widget child;
-  final int currentIndex;
+  final String currentPath;
 
-  const MainLayout({super.key, required this.child, required this.currentIndex});
-
-  static const _titles = [
-    'WMS Dashboard',
-    'Capture Memo',
-    'Scan to Find',
-    'Checking List',
-    'Settings',
-  ];
+  const MainLayout({
+    super.key,
+    required this.child,
+    required this.currentPath,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tabIndex = _tabIndexFor(currentPath);
+    final isShellTab = tabIndex != -1;
+    final title = _titleFor(currentPath);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (currentIndex == 0) {
+        if (!isShellTab) {
+          // Sub-pages: go back
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/home');
+          }
+          return;
+        }
+        // Shell tab: only home shows exit dialog
+        if (tabIndex == 0) {
           final shouldExit = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
@@ -45,43 +109,59 @@ class MainLayout extends ConsumerWidget {
               ],
             ),
           );
-          if (shouldExit == true) {
-            SystemNavigator.pop();
-          }
+          if (shouldExit == true) SystemNavigator.pop();
         } else {
           context.go('/home');
         }
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _titles[currentIndex],
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        backgroundColor: AppColors.primary,
-        elevation: 6,
-        shadowColor: Colors.black.withValues(alpha: 0.15),
-        centerTitle: false,
-        leading: currentIndex == 0
-            ? null
-            : IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                onPressed: () => context.go('/home'),
-              ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 24),
-            onPressed: () => context.push('/history'),
-            tooltip: 'Orders',
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 6,
+          shadowColor: Colors.black.withValues(alpha: 0.15),
+          centerTitle: false,
+          // Show back arrow on sub-pages; show nothing on home; show home icon on other tabs
+          leading: !isShellTab
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/home');
+                    }
+                  },
+                )
+              : tabIndex == 0
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                      onPressed: () => context.go('/home'),
+                    ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
           ),
-          const NotificationBell(),
-        ],
+          actions: [
+            // Orders history icon (shown on all pages except history itself)
+            if (!currentPath.startsWith('/history'))
+              IconButton(
+                icon: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 24),
+                onPressed: () => context.push('/history'),
+                tooltip: 'Orders',
+              ),
+            const NotificationBell(),
+          ],
+        ),
+        body: child,
+        bottomNavigationBar: AppBottomNav(currentIndex: tabIndex < 0 ? 0 : tabIndex),
       ),
-      body: child, // Screens will have their own safeareas if needed
-      bottomNavigationBar: AppBottomNav(currentIndex: currentIndex),
-    ),
-  );
-}
+    );
+  }
 }
 
 class NotificationBell extends ConsumerWidget {
@@ -100,20 +180,27 @@ class NotificationBell extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
               onPressed: () => showNotificationsDialog(context, ref),
+              tooltip: 'Notifications',
             ),
             if (unreadCount > 0)
               Positioned(
-                top: 10,
-                right: 10,
+                top: 8,
+                right: 8,
                 child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.error,
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEF4444),
                     shape: BoxShape.circle,
                   ),
-                  constraints: const BoxConstraints(
-                    minWidth: 8,
-                    minHeight: 8,
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -123,6 +210,7 @@ class NotificationBell extends ConsumerWidget {
       orElse: () => IconButton(
         icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
         onPressed: () => showNotificationsDialog(context, ref),
+        tooltip: 'Notifications',
       ),
     );
   }
@@ -145,7 +233,7 @@ class AppBottomNav extends StatelessWidget {
     return Container(
       height: 64,
       decoration: BoxDecoration(
-        color: AppColors.primary, // Purple background
+        color: AppColors.primary,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -236,7 +324,6 @@ class _NavItem extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
-            // White underline indicator for active tab
             Container(
               height: 2,
               width: 20,

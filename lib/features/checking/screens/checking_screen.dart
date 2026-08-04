@@ -74,24 +74,6 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Checking — ${widget.orderId}'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 17,
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-            tooltip: 'Scan Red Label',
-            onPressed: () => context.push('/red-label-scan'),
-          ),
-        ],
-      ),
       body: Column(
         children: [
           Expanded(

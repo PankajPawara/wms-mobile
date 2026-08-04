@@ -15,31 +15,7 @@ import '../../../shared/widgets/empty_state_placeholder.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 
-/// Pipeline step labels shown in the progress UI.
-enum _PipelineStep {
-  idle,
-  checkingQuality,
-  enhancing,
-  runningOcr,
-  reconstructingRows,
-  validatingDb,
-  done,
-}
 
-extension _PipelineStepExt on _PipelineStep {
-  String get label => switch (this) {
-    _PipelineStep.idle              => '',
-    _PipelineStep.checkingQuality   => 'Checking image quality...',
-    _PipelineStep.enhancing         => 'Enhancing brightness & contrast...',
-    _PipelineStep.runningOcr        => 'Reading text from memo...',
-    _PipelineStep.reconstructingRows => 'Reconstructing table rows...',
-    _PipelineStep.validatingDb      => 'Validating parts against database...',
-    _PipelineStep.done              => 'Done!',
-  };
-
-  int get stepIndex => index;
-  static const int totalSteps = 5; // excludes idle and done
-}
 
 class MemoCaptureScreen extends ConsumerStatefulWidget {
   const MemoCaptureScreen({super.key});
@@ -50,13 +26,13 @@ class MemoCaptureScreen extends ConsumerStatefulWidget {
 
 class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
   List<File> _imageFiles = [];
-  _PipelineStep _currentStep = _PipelineStep.idle;
-  bool get _isProcessing => _currentStep != _PipelineStep.idle && _currentStep != _PipelineStep.done;
+  String _currentStepLabel = '';
+  bool get _isProcessing => _currentStepLabel.isNotEmpty && _currentStepLabel != 'Done!';
   List<ImageQualityIssue> _qualityWarnings = [];
   String? _error;
 
-  void _setStep(_PipelineStep step) {
-    if (mounted) setState(() => _currentStep = step);
+  void _setStep(String label) {
+    if (mounted) setState(() => _currentStepLabel = label);
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -89,7 +65,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
       _imageFiles.addAll(paths.map((p) => File(p)));
       _error = null;
       _qualityWarnings = [];
-      _currentStep = _PipelineStep.idle;
+      _currentStepLabel = '';
     });
   }
 
@@ -115,7 +91,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
     for (int i = 0; i < _imageFiles.length; i++) {
       File workingFile = _imageFiles[i];
 
-      _setStep(_PipelineStep.checkingQuality);
+      _setStep('Checking image quality...');
       final quality = await ImageProcessor.checkQuality(workingFile);
 
       if (quality.hasIssues) {
@@ -123,22 +99,22 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
         final shouldContinue = await _showQualityWarningDialog(quality);
         if (!mounted) return;
         if (!shouldContinue) {
-          setState(() => _currentStep = _PipelineStep.idle);
+          setState(() => _currentStepLabel = '');
           return;
         }
       }
 
       if (quality.canEnhance) {
-        _setStep(_PipelineStep.enhancing);
+        _setStep('Enhancing brightness & contrast...');
         workingFile = await ImageProcessor.enhanceIfNeeded(workingFile, quality);
       }
 
-      _setStep(_PipelineStep.runningOcr);
       try {
-        _setStep(_PipelineStep.reconstructingRows);
-        _setStep(_PipelineStep.validatingDb);
-        
-        final result = await OcrPipelineManager.process(workingFile, db);
+        final result = await OcrPipelineManager.process(
+          workingFile, 
+          db,
+          onProgress: (status) => _setStep(status),
+        );
         
         // Merge results
         allItems.addAll(result.items);
@@ -153,7 +129,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
            if (mounted) {
              setState(() {
                _error = 'No table header detected on Image ${i+1}. Please retake the photo clearly.';
-               _currentStep = _PipelineStep.idle;
+               _currentStepLabel = '';
                _imageFiles.removeAt(i);
              });
              if (_imageFiles.isEmpty) {
@@ -166,7 +142,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
         if (mounted) {
           setState(() {
             _error = 'OCR failed on Image ${i+1}: ${e.toString()}';
-            _currentStep = _PipelineStep.idle;
+            _currentStepLabel = '';
           });
         }
         return;
@@ -177,7 +153,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
       if (mounted) {
         setState(() {
           _error = 'No Honda part numbers found across ${_imageFiles.length} images. Try clearer photos.';
-          _currentStep = _PipelineStep.idle;
+          _currentStepLabel = '';
         });
       }
       return;
@@ -187,7 +163,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
     final seen = <String>{};
     final deduped = allItems.where((i) => seen.add(i.correctedPartNo)).toList();
 
-    _setStep(_PipelineStep.done);
+    _setStep('Done!');
 
     final mergedResult = MemoOcrResult(
       header: finalHeader ?? ExtractedMemoHeader(
@@ -209,7 +185,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
       // Clear images after successful parsing so user starts fresh next time
       setState(() {
         _imageFiles.clear();
-        _currentStep = _PipelineStep.idle;
+        _currentStepLabel = '';
       });
     }
   }
@@ -370,7 +346,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
                 // Pipeline progress indicator
                 if (_isProcessing) ...[
                   const SizedBox(height: AppDimensions.md),
-                  _PipelineProgressIndicator(step: _currentStep),
+                  _PipelineProgressIndicator(stepLabel: _currentStepLabel),
                 ],
 
                 // Quality warnings (shown under the image)
@@ -435,7 +411,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
                   padding: const EdgeInsets.only(bottom: 84),
                   child: AppButton(
                     label: _isProcessing
-                        ? _currentStep.label
+                        ? _currentStepLabel
                         : AppStrings.generatePickupList,
                     icon: Icons.document_scanner_outlined,
                     onPressed: _imageFiles.isEmpty || _isProcessing
@@ -455,12 +431,11 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
 
 /// Shows a step-by-step pipeline progress bar.
 class _PipelineProgressIndicator extends StatelessWidget {
-  final _PipelineStep step;
-  const _PipelineProgressIndicator({required this.step});
+  final String stepLabel;
+  const _PipelineProgressIndicator({required this.stepLabel});
 
   @override
   Widget build(BuildContext context) {
-    final progress = step.stepIndex / _PipelineStepExt.totalSteps;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -473,18 +448,20 @@ class _PipelineProgressIndicator extends StatelessWidget {
                   strokeWidth: 2, color: AppColors.primary),
             ),
             const SizedBox(width: 8),
-            Text(
-              step.label,
-              style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600),
+            Expanded(
+              child: Text(
+                stepLabel,
+                style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 6),
         LinearProgressIndicator(
-          value: progress.clamp(0.0, 1.0),
           backgroundColor: AppColors.primaryLight,
           valueColor:
               const AlwaysStoppedAnimation<Color>(AppColors.primary),

@@ -307,7 +307,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       try {
         final api = ref.read(apiClientProvider);
         final queryForApi = parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : rawInput;
-        final response = await api.get(ApiEndpoints.inventoryBarcode(queryForApi));
+        final response = await api.get(ApiEndpoints.inventoryBarcode(queryForApi))
+            .timeout(const Duration(seconds: 5));
         final data = response['data'] as Map<String, dynamic>?;
         final product = data?['product'] as Map<String, dynamic>?;
 
@@ -357,7 +358,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(ctx);
+              Navigator.of(context, rootNavigator: true).pop();
               _scanAnother();
               _scannerKey.currentState?.restartFeed();
             },
@@ -366,7 +367,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
             onPressed: () {
-              Navigator.pop(ctx);
+              Navigator.of(context, rootNavigator: true).pop();
               setState(() {
                 _state = _ScanState.scanning;
                 _isManualMode = true;

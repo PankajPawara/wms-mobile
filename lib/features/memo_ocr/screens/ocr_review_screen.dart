@@ -217,58 +217,61 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
     final unmatchedCount = _items.length - verifiedCount;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Review Pickup List',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Text(
-              '${_items.length} items · $verifiedCount verified · $unmatchedCount unmatched',
-              style:
-                  const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.data_object),
-            tooltip: 'Export JSON',
-            onPressed: () {
-              final jsonStr = const JsonEncoder.withIndent('  ').convert(widget.ocrResult.toJson());
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('AI Extracted JSON'),
-                  content: SingleChildScrollView(
-                    child: SelectableText(jsonStr, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: jsonStr));
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
-                      },
-                      child: const Text('Copy'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.bug_report_outlined),
-            tooltip: 'Debug Panel',
-            onPressed: _showDebugDrawer,
-          ),
-        ],
-      ),
       body: Column(
         children: [
+          // Stats + action row pinned at top
+          Container(
+            color: AppColors.primaryLight,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${_items.length} items · $verifiedCount verified · $unmatchedCount unmatched',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.data_object, color: AppColors.primary, size: 20),
+                  tooltip: 'Export JSON',
+                  onPressed: () {
+                    final jsonStr = const JsonEncoder.withIndent('  ').convert(widget.ocrResult.toJson());
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('AI Extracted JSON'),
+                        content: SingleChildScrollView(
+                          child: SelectableText(jsonStr, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: jsonStr));
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
+                            },
+                            child: const Text('Copy'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.bug_report_outlined, color: AppColors.primary, size: 20),
+                  tooltip: 'Debug Panel',
+                  onPressed: _showDebugDrawer,
+                ),
+              ],
+            ),
+          ),
           // Gemini verification status banner (inline, not the global one)
           if (geminiState.isRunning)
             _GeminiStatusBar(

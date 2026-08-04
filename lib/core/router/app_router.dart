@@ -57,63 +57,71 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/change-password', builder: (_, __) => const ChangePasswordScreen()),
-      
+
+      // All authenticated routes live inside the ShellRoute so they always
+      // have the shared AppBar + BottomNav.
       ShellRoute(
         builder: (context, state, child) {
-          int index = 0;
-          final path = state.matchedLocation;
-          if (path.startsWith('/memo-capture')) index = 1;
-          else if (path.startsWith('/scan-to-find')) index = 2;
-          else if (path.startsWith('/checking-list')) index = 3;
-          else if (path.startsWith('/settings')) index = 4;
-          return MainLayout(currentIndex: index, child: child);
-        },
-        routes: [
-          GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
-          GoRoute(path: '/scan-to-find', builder: (_, __) => const ScanToFindScreen()),
-          GoRoute(path: '/memo-capture', builder: (_, __) => const MemoCaptureScreen()),
-          GoRoute(path: '/checking-list', builder: (_, __) => const CheckingListScreen()),
-          GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
-        ],
-      ),
-
-      GoRoute(
-        path: '/ocr-review',
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          return OcrReviewScreen(
-            ocrResult: extra?['ocrResult'] as MemoOcrResult,
+          return MainLayout(
+            currentPath: state.matchedLocation,
+            child: child,
           );
         },
+        routes: [
+          // ── Shell Tabs ──────────────────────────────────────────────────
+          GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+          GoRoute(path: '/memo-capture', builder: (_, __) => const MemoCaptureScreen()),
+          GoRoute(path: '/scan-to-find', builder: (_, __) => const ScanToFindScreen()),
+          GoRoute(path: '/checking-list', builder: (_, __) => const CheckingListScreen()),
+          GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+
+          // ── Sub-pages (now inside shell for consistent nav) ─────────────
+          GoRoute(
+            path: '/ocr-review',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return OcrReviewScreen(
+                ocrResult: extra?['ocrResult'] as MemoOcrResult,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/picking/:orderId',
+            builder: (context, state) =>
+                PickingScreen(orderId: state.pathParameters['orderId']!),
+          ),
+          GoRoute(
+            path: '/picking-summary/:orderId',
+            builder: (context, state) =>
+                PickingSummaryScreen(orderId: state.pathParameters['orderId']!),
+          ),
+          GoRoute(
+            path: '/checking/:orderId',
+            builder: (context, state) =>
+                CheckingScreen(orderId: state.pathParameters['orderId']!),
+          ),
+          GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
+          GoRoute(
+            path: '/order/:orderId',
+            builder: (context, state) =>
+                OrderDetailsScreen(orderId: state.pathParameters['orderId']!),
+          ),
+          GoRoute(
+            path: '/order/:orderId/items',
+            builder: (context, state) =>
+                PickedItemsScreen(orderId: state.pathParameters['orderId']!),
+          ),
+          GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+          GoRoute(path: '/parts-master', builder: (_, __) => const PartsMasterScreen()),
+          GoRoute(path: '/red-label-scan', builder: (_, __) => const RedLabelScanScreen()),
+
+          // ── Dev / Diagnostic routes (kept in shell for nav consistency) ─
+          GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
+          GoRoute(path: '/settings/ocr-sandbox', builder: (_, __) => const OcrSandboxScreen()),
+          GoRoute(path: '/settings/pipeline-sandbox', builder: (_, __) => const PipelineSandboxScreen()),
+          GoRoute(path: '/ai-vision-test', builder: (_, __) => const AIVisionTestScreen()),
+        ],
       ),
-      GoRoute(
-        path: '/picking/:orderId',
-        builder: (context, state) => PickingScreen(orderId: state.pathParameters['orderId']!),
-      ),
-      GoRoute(
-        path: '/picking-summary/:orderId',
-        builder: (context, state) => PickingSummaryScreen(orderId: state.pathParameters['orderId']!),
-      ),
-      GoRoute(
-        path: '/checking/:orderId',
-        builder: (context, state) => CheckingScreen(orderId: state.pathParameters['orderId']!),
-      ),
-      GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
-      GoRoute(
-        path: '/order/:orderId',
-        builder: (context, state) => OrderDetailsScreen(orderId: state.pathParameters['orderId']!),
-      ),
-      GoRoute(
-        path: '/order/:orderId/items',
-        builder: (context, state) => PickedItemsScreen(orderId: state.pathParameters['orderId']!),
-      ),
-      GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
-      GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
-      GoRoute(path: '/settings/ocr-sandbox', builder: (_, __) => const OcrSandboxScreen()),
-      GoRoute(path: '/settings/pipeline-sandbox', builder: (_, __) => const PipelineSandboxScreen()),
-      GoRoute(path: '/ai-vision-test', builder: (_, __) => const AIVisionTestScreen()),
-      GoRoute(path: '/red-label-scan', builder: (_, __) => const RedLabelScanScreen()),
-      GoRoute(path: '/parts-master', builder: (_, __) => const PartsMasterScreen()),
     ],
   );
 }

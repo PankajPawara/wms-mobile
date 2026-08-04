@@ -113,64 +113,70 @@ class _OcrSandboxScreenState extends ConsumerState<OcrSandboxScreen> {
     
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
-      appBar: AppBar(
-        title: const Text('OCR Sandbox Laboratory'),
-        backgroundColor: colorScheme.surface,
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.image),
-            tooltip: 'Select Input Image',
-            onSelected: (value) {
-              if (value == 'camera') {
-                _pickImage(ImageSource.camera);
-              } else if (value == 'gallery') {
-                _pickImage(ImageSource.gallery);
-              } else if (value == 'scan') {
-                _scanDocument();
-              } else {
-                _loadTestAsset(value);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'camera', child: Text('📸 Camera')),
-              const PopupMenuItem(value: 'gallery', child: Text('🖼️ Gallery')),
-              const PopupMenuItem(value: 'scan', child: Text('📄 Scan Document')),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 'test1.jpg', child: Text('Test Image 1 (Perfect)')),
-              const PopupMenuItem(value: 'test2.jpg', child: Text('Test Image 2 (Low Light)')),
-              const PopupMenuItem(value: 'test3.jpg', child: Text('Test Image 3 (Skewed)')),
-              const PopupMenuItem(value: 'test4.jpg', child: Text('Test Image 4 (Dense)')),
-              const PopupMenuItem(value: 'test5.jpg', child: Text('Test Image 5 (Rotated)')),
-            ],
-          ),
-          if (_ocrResult != null)
-            IconButton(
-              icon: const Icon(Icons.copy_all),
-              tooltip: 'Copy Full Combined JSON',
-              onPressed: () {
-                final allData = {
-                  'geometry': _ocrResult!.geometry?.toJson(),
-                  'header': _ocrResult!.headerJson,
-                  'matrix': _ocrResult!.tableMatrixJson,
-                  'pickup': _ocrResult!.pickupJson,
-                  'gemini': _geminiResult,
-                };
-                Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(allData)));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Combined JSON copied to clipboard')));
-              },
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: colorScheme.surface,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.image),
+                  tooltip: 'Select Input Image',
+                  onSelected: (value) {
+                    if (value == 'camera') {
+                      _pickImage(ImageSource.camera);
+                    } else if (value == 'gallery') {
+                      _pickImage(ImageSource.gallery);
+                    } else if (value == 'scan') {
+                      _scanDocument();
+                    } else {
+                      _loadTestAsset(value);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'camera', child: Text('📸 Camera')),
+                    const PopupMenuItem(value: 'gallery', child: Text('🖼️ Gallery')),
+                    const PopupMenuItem(value: 'scan', child: Text('📄 Scan Document')),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(value: 'test1.jpg', child: Text('Test Image 1 (Perfect)')),
+                    const PopupMenuItem(value: 'test2.jpg', child: Text('Test Image 2 (Low Light)')),
+                    const PopupMenuItem(value: 'test3.jpg', child: Text('Test Image 3 (Skewed)')),
+                    const PopupMenuItem(value: 'test4.jpg', child: Text('Test Image 4 (Dense)')),
+                    const PopupMenuItem(value: 'test5.jpg', child: Text('Test Image 5 (Rotated)')),
+                  ],
+                ),
+                if (_ocrResult != null)
+                  IconButton(
+                    icon: const Icon(Icons.copy_all),
+                    tooltip: 'Copy Full Combined JSON',
+                    onPressed: () {
+                      final allData = {
+                        'geometry': _ocrResult!.geometry?.toJson(),
+                        'header': _ocrResult!.headerJson,
+                        'matrix': _ocrResult!.tableMatrixJson,
+                        'pickup': _ocrResult!.pickupJson,
+                        'gemini': _geminiResult,
+                      };
+                      Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(allData)));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Combined JSON copied to clipboard')));
+                    },
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Run Pipeline',
+                  onPressed: _imageFile != null ? _runPipeline : null,
+                ),
+              ],
             ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Run Pipeline',
-            onPressed: _imageFile != null ? _runPipeline : null,
           ),
-        ],
-      ),
-      body: _imageFile == null
-          ? const Center(child: Text('Select an image from the top right menu to begin.'))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+          Expanded(
+            child: _imageFile == null
+                ? const Center(child: Text('Select an image from the menu to begin.'))
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildSectionCard('Original Image', Image.file(_imageFile!, height: 300, fit: BoxFit.contain)),
@@ -240,6 +246,9 @@ class _OcrSandboxScreenState extends ConsumerState<OcrSandboxScreen> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
     );
   }
   

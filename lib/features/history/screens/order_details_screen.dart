@@ -49,26 +49,14 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Order Details'),
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_order == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Order Details'),
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: const Center(child: Text('Order not found')),
+      return const Scaffold(
+        body: Center(child: Text('Order not found')),
       );
     }
 
@@ -92,23 +80,6 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.white, size: 20),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text('Order Details',
-            style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

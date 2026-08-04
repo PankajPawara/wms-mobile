@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/network/api_client.dart';
 import '../models/notification_model.dart';
@@ -6,9 +7,30 @@ part 'notification_provider.g.dart';
 
 @riverpod
 class NotificationNotifier extends _$NotificationNotifier {
+  Timer? _pollingTimer;
+
   @override
   Future<List<NotificationModel>> build() async {
+    // Start a 60-second background polling timer
+    _startPolling();
+    // Cancel timer when provider is disposed
+    ref.onDispose(() {
+      _pollingTimer?.cancel();
+    });
     return _fetchNotifications();
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
+      // Silent refresh — don't show loading indicator
+      try {
+        final items = await _fetchNotifications();
+        state = AsyncValue.data(items);
+      } catch (_) {
+        // Swallow polling errors silently
+      }
+    });
   }
 
   Future<List<NotificationModel>> _fetchNotifications() async {

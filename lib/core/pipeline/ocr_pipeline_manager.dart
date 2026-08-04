@@ -21,8 +21,13 @@ import '../data/validation_data.dart';
 import 'dart:math' as math;
 
 class OcrPipelineManager {
-  static Future<MemoOcrResult> process(File originalImage, AppDatabase db) async {
+  static Future<MemoOcrResult> process(
+    File originalImage, 
+    AppDatabase db, {
+    void Function(String message)? onProgress,
+  }) async {
     // ENGINE 01
+    onProgress?.call('Initializing image acquisition...');
     final acqOutput = AcquisitionOutput(
       originalImage: originalImage,
       widthPx: 0,
@@ -32,37 +37,42 @@ class OcrPipelineManager {
     );
 
     // ENGINE 02
+    onProgress?.call('Processing image (Binarization & deskewing)...');
     final e02Result = await Engine02Processing.processRaw(acqOutput);
     if (!e02Result.isSuccess) throw Exception('Engine 02 Failed: ${e02Result.errors}');
 
     // ENGINE 02A
+    onProgress?.call('Optimizing image blocks (Cropping)...');
     final e02aResult = await Engine02aOptimization.optimize(e02Result.data!);
     if (!e02aResult.isSuccess) throw Exception('Engine 02A Failed: ${e02aResult.errors}');
 
     // ENGINE 03
+    onProgress?.call('Extracting header and customer information...');
     final e03Result = await Engine03Header.extract(e02aResult.data!);
     if (!e03Result.isSuccess) throw Exception('Engine 03 Failed: ${e03Result.errors}');
     
     // ENGINE 04
+    onProgress?.call('Detecting table boundaries...');
     final e04Result = await Engine04TableDetection.detect(e02aResult.data!);
     if (!e04Result.isSuccess) throw Exception('Engine 04 Failed: ${e04Result.errors}');
 
     // ENGINE 05
+    onProgress?.call('Generating column grid system...');
     final e05Result = await Engine05GridSystem.generate(e04Result.data!);
     if (!e05Result.isSuccess) throw Exception('Engine 05 Failed: ${e05Result.errors}');
 
     // ENGINE 06: Map cells to Grid
-    
+    onProgress?.call('Assigning text blocks to table cells...');
     final e06Result = await Engine06CellAssignment.assign(e05Result.data!);
     if (!e06Result.isSuccess) throw Exception('Engine 06 Failed: ${e06Result.errors}');
 
     // ENGINE 07
-    
+    onProgress?.call('Reconstructing table rows...');
     final e07Result = await Engine07RowBuilder.build(e06Result.data!);
     if (!e07Result.isSuccess) throw Exception('Engine 07 Failed: ${e07Result.errors}');
 
     // ENGINE 08 (Database Validation)
-    
+    onProgress?.call('Validating extracted parts against local database...');
     final e08Result = await Engine08DatabaseMatch.validateAndCorrect(e07Result.data!);
     if (!e08Result.isSuccess) throw Exception('Engine 08 Failed: ${e08Result.errors}');
 
@@ -78,8 +88,11 @@ class OcrPipelineManager {
       debugPrint('[Pipeline] E08 match rate: ${(matchRate * 100).toStringAsFixed(0)}% ($verifiedCount/$totalCount verified)');
     }
 
+    bool isGeminiValidated = false;
+
     if (true) { // ALWAYS use Gemini as requested
       debugPrint('[Pipeline] ALWAYS triggering ENGINE 09 Gemini OCR fallback for max accuracy...');
+      onProgress?.call('Refining data using Gemini AI...');
       final e09Result = await Engine09GeminiOcr.extractFromImage(
         e02aResult.data!,
         e04Result.data!,
@@ -104,6 +117,7 @@ class OcrPipelineManager {
           e08Result.data!.rows
             ..clear()
             ..addAll(e08GeminiResult.data!.rows);
+          isGeminiValidated = true;
         }
       } else {
         debugPrint('[Pipeline] Gemini fallback failed — using ML Kit results as fallback.');
@@ -230,19 +244,23 @@ class OcrPipelineManager {
     // AUTO-LEARN: Upsert every matched item into the local Parts Master DB.
     // Runs silently in background — does not block the pipeline result.
     // -------------------------------------------------------------------------
-    final partsMasterService = PartsMasterService(db);
-    for (final item in finalItems) {
-      // Fire-and-forget: errors here should not fail the OCR result
-      partsMasterService.learnFromMemo(
-        rawPartNo:   item.correctedPartNo,
-        description: item.description,
-        location:    item.location,
-        mrp:         item.mrp,
-        packQty:     item.pack,
-        stockQty:    item.stock,
-      ).catchError((e) {
-        if (kDebugMode) debugPrint('[PartsMaster] learnFromMemo error: $e');
-      });
+    if (isGeminiValidated) {
+      final partsMasterService = PartsMasterService(db);
+      for (final item in finalItems) {
+        // Fire-and-forget: errors here should not fail the OCR result
+        partsMasterService.learnFromMemo(
+          rawPartNo:   item.correctedPartNo,
+          description: item.description,
+          location:    item.location,
+          mrp:         item.mrp,
+          packQty:     item.pack,
+          stockQty:    item.stock,
+        ).catchError((e) {
+          if (kDebugMode) debugPrint('[PartsMaster] learnFromMemo error: $e');
+        });
+      }
+    } else {
+      if (kDebugMode) debugPrint('[PartsMaster] Skipping auto-learn: Data was not validated by Gemini.');
     }
 
     if (finalItems.isEmpty) {
