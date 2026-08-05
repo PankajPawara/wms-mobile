@@ -18,7 +18,6 @@ import '../../../core/database/app_database.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/utils/barcode_util.dart';
-import '../../../shared/widgets/empty_state_placeholder.dart';
 import '../../../core/utils/scan_feedback.dart';
 
 
@@ -55,6 +54,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
   bool _isDetecting = false;
   Timer? _detectionTimer;
+  Timer? _notFoundTimer;
 
   // Flash and HDR toggles
   FlashMode _flashMode = FlashMode.off;
@@ -157,7 +157,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   @override
   void dispose() {
     _lightSensorSubscription?.cancel();
-    
+    _notFoundTimer?.cancel();
     _pulseController.dispose();
     _scanLineController.dispose();
     _manualController.dispose();
@@ -167,7 +167,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   }
 
   Future<bool> _searchProduct(String rawInput, bool isOcr) async {
-    if (_state != _ScanState.scanning) return false; // Prevent concurrent searches
+    // Prevent concurrent searches - block during searching OR a notFound cooldown
+    if (_state == _ScanState.searching) return false;
+    if (_state == _ScanState.notFound) return false;
 
     // ── Parse the input using the centralized PartNumberParser ───────────────
     final parsed = PartNumberParser.parse(rawInput);
@@ -338,50 +340,30 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       // ── Not Found ─────────────────────────────────────────────────────────
       if (!mounted) return true;
       ScanFeedback.triggerError();
-      _showNotFoundDialog(bestCandidate.isNotEmpty ? bestCandidate : rawInput);
+      _showNotFoundInline(bestCandidate.isNotEmpty ? bestCandidate : rawInput);
       return true;
     } catch (e) {
       if (!mounted) return true;
       ScanFeedback.triggerError();
-      _showNotFoundDialog(rawInput);
+      _showNotFoundInline(rawInput);
       return true;
     }
   }
 
-  void _showNotFoundDialog(String scannedCode) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Part Not Found'),
-        content: Text('The scanned code "$scannedCode" was not found in the database. What would you like to do?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context, rootNavigator: true).pop();
-              _scanAnother();
-              _scannerKey.currentState?.restartFeed();
-            },
-            child: const Text('Scan Again'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-            onPressed: () {
-              Navigator.of(context, rootNavigator: true).pop();
-              setState(() {
-                _state = _ScanState.scanning;
-                _isManualMode = true;
-                _manualController.text = scannedCode;
-                _manualSearchQuery = scannedCode;
-                _searchByField = 'Part No';
-              });
-              _performManualSearch();
-            },
-            child: const Text('Search Manually'),
-          ),
-        ],
-      ),
-    );
+  /// Show "not found" inline (no dialog) and auto-reset after 3 seconds.
+  void _showNotFoundInline(String scannedCode) {
+    _notFoundTimer?.cancel();
+    setState(() {
+      _scannedBarcode = scannedCode;
+      _state = _ScanState.notFound;
+    });
+    // Auto-reset to scanning after 3 seconds so the user can scan again
+    _notFoundTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _state == _ScanState.notFound) {
+        _scanAnother();
+        _scannerKey.currentState?.restartFeed();
+      }
+    });
   }
   void _setTorch(bool turnOn) {
     try {
@@ -1004,7 +986,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       key: const ValueKey('notFound'),
       children: [
         Container(
-          color: AppColors.primary,
+          color: AppColors.danger,
           child: SafeArea(
             bottom: false,
             child: Padding(
@@ -1014,7 +996,11 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios_new_rounded,
                         color: Colors.white),
-                    onPressed: _scanAnother,
+                    onPressed: () {
+                      _notFoundTimer?.cancel();
+                      _scanAnother();
+                      _scannerKey.currentState?.restartFeed();
+                    },
                   ),
                   const Text('Scan To Find',
                       style: TextStyle(
@@ -1027,21 +1013,68 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           ),
         ),
         Expanded(
-          child: EmptyStatePlaceholder(
-            icon: Icons.search_off_rounded,
-            title: 'Product Not Found',
-            subtitle: 'Part number "$_scannedBarcode" could not be found in active inventory master records. Double check the label or try manual search.',
-            action: ElevatedButton.icon(
-              onPressed: _scanAnother,
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Try Scanning Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.search_off_rounded, size: 72, color: AppColors.danger),
+              const SizedBox(height: 16),
+              const Text(
+                'Product Not Found',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
-            ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  '"$_scannedBarcode" was not found.\nReturning to scanner in 3 seconds…',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
+                ),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _notFoundTimer?.cancel();
+                      _scanAnother();
+                      _scannerKey.currentState?.restartFeed();
+                    },
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    label: const Text('Scan Again'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      _notFoundTimer?.cancel();
+                      setState(() {
+                        _state = _ScanState.scanning;
+                        _isManualMode = true;
+                        _manualController.text = _scannedBarcode;
+                        _manualSearchQuery = _scannedBarcode;
+                        _searchByField = 'Part No';
+                      });
+                      _performManualSearch();
+                    },
+                    icon: const Icon(Icons.keyboard_rounded),
+                    label: const Text('Search Manually'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],
