@@ -193,6 +193,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _ActionCard(
+                icon: Icons.search_rounded,
+                iconColor: AppColors.cardPurpleDark,
+                title: 'Manual Search',
+                subtitle: 'Search parts by part number,\nlocation or description',
+                onTap: () => context.push('/scan-to-find', extra: {'manualMode': true}),
+                isWide: true,
+              ),
+            ),
+            const SizedBox(height: 20),
 
             // Order Status Summary (Total, Completed, In Progress)
             Padding(
@@ -281,18 +294,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _ActionCard(
-                icon: Icons.search_rounded,
-                iconColor: AppColors.cardPurpleDark,
-                title: 'Manual Search',
-                subtitle: 'Search parts by part number,\nlocation or description',
-                onTap: () => context.push('/scan-to-find'),
-                isWide: true,
               ),
             ),
             const SizedBox(height: 20),

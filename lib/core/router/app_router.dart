@@ -71,7 +71,15 @@ GoRouter appRouter(AppRouterRef ref) {
           // ── Shell Tabs ──────────────────────────────────────────────────
           GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
           GoRoute(path: '/memo-capture', builder: (_, __) => const MemoCaptureScreen()),
-          GoRoute(path: '/scan-to-find', builder: (_, __) => const ScanToFindScreen()),
+          GoRoute(
+            path: '/scan-to-find',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return ScanToFindScreen(
+                initialManualMode: extra?['manualMode'] == true,
+              );
+            },
+          ),
           GoRoute(path: '/checking-list', builder: (_, __) => const CheckingListScreen()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
 

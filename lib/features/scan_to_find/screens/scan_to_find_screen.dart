@@ -24,7 +24,12 @@ import '../../../core/utils/scan_feedback.dart';
 enum _ScanState { scanning, searching, found, notFound, multipleLocations }
 
 class ScanToFindScreen extends ConsumerStatefulWidget {
-  const ScanToFindScreen({super.key});
+  final bool initialManualMode;
+
+  const ScanToFindScreen({
+    super.key,
+    this.initialManualMode = false,
+  });
 
   @override
   ConsumerState<ScanToFindScreen> createState() => _ScanToFindScreenState();
@@ -121,6 +126,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   @override
   void initState() {
     super.initState();
+    _isManualMode = widget.initialManualMode;
     _loadRecentQueries();
     
     _pulseController = AnimationController(
