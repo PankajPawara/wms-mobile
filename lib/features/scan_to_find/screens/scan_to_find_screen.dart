@@ -20,7 +20,6 @@ import '../../../core/network/api_endpoints.dart';
 import '../../../core/utils/barcode_util.dart';
 import '../../../core/utils/scan_feedback.dart';
 
-
 enum _ScanState { scanning, searching, found, notFound, multipleLocations }
 
 class ScanToFindScreen extends ConsumerStatefulWidget {
@@ -65,7 +64,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   FlashMode _flashMode = FlashMode.off;
 
   // Event channel for light sensor
-  static const EventChannel _lightSensorChannel = EventChannel('com.example.wms_mobile/light_sensor');
+  static const EventChannel _lightSensorChannel =
+      EventChannel('com.example.wms_mobile/light_sensor');
   StreamSubscription<double>? _lightSensorSubscription;
 
   // Recent searches history
@@ -105,7 +105,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       const storage = FlutterSecureStorage(
         aOptions: AndroidOptions(encryptedSharedPreferences: true),
       );
-      await storage.write(key: 'wms_search_history', value: json.encode(_recentQueries));
+      await storage.write(
+          key: 'wms_search_history', value: json.encode(_recentQueries));
     } catch (_) {}
   }
 
@@ -128,7 +129,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     super.initState();
     _isManualMode = widget.initialManualMode;
     _loadRecentQueries();
-    
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -147,7 +148,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           .receiveBroadcastStream()
           .map((event) => (event as num).toDouble())
           .listen((lux) {
-        if (_flashMode == FlashMode.auto && _state == _ScanState.scanning && !_isManualMode) {
+        if (_flashMode == FlashMode.auto &&
+            _state == _ScanState.scanning &&
+            !_isManualMode) {
           if (lux < 15.0) {
             _setTorch(true);
           } else if (lux > 30.0) {
@@ -179,7 +182,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
     // ── Parse the input using the centralized PartNumberParser ───────────────
     final parsed = PartNumberParser.parse(rawInput);
-    final bestCandidate = parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : parsed.normalized;
+    final bestCandidate = parsed.ocrCorrected.isNotEmpty
+        ? parsed.ocrCorrected
+        : parsed.normalized;
 
     setState(() {
       _scannedBarcode = bestCandidate.isNotEmpty ? bestCandidate : rawInput;
@@ -196,10 +201,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       for (final candidate in parsed.candidates) {
         if (candidate.isEmpty) continue;
         final results = await (db.select(db.inventory)
-              ..where((t) =>
-                  CustomExpression<bool>(
-                    "UPPER(part_no) = '${candidate.replaceAll("'", "''")}' OR UPPER(barcode) = '${candidate.replaceAll("'", "''")}'"
-                  )))
+              ..where((t) => CustomExpression<bool>(
+                  "UPPER(part_no) = '${candidate.replaceAll("'", "''")}' OR UPPER(barcode) = '${candidate.replaceAll("'", "''")}'")))
             .get();
         if (results.isNotEmpty) {
           matches = results;
@@ -222,7 +225,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           if (results.isNotEmpty) {
             // Prefer exact stripped match over LIKE
             final exactStripped = results.where((r) {
-              final pn = r.partNo.toUpperCase().replaceAll(RegExp(r'[-.\s]'), '');
+              final pn =
+                  r.partNo.toUpperCase().replaceAll(RegExp(r'[-.\s]'), '');
               return pn == stripped;
             }).toList();
             matches = exactStripped.isNotEmpty ? exactStripped : results;
@@ -256,7 +260,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         final allParts = await db.select(db.inventory).get();
         final partNumbersList = allParts.map((e) => e.partNo).toList();
         for (final candidate in parsed.candidates) {
-          final bestMatch = BarcodeUtil.findBestMatch(candidate, partNumbersList);
+          final bestMatch =
+              BarcodeUtil.findBestMatch(candidate, partNumbersList);
           if (bestMatch != null) {
             final results = await (db.select(db.inventory)
                   ..where((t) => t.partNo.equals(bestMatch)))
@@ -314,8 +319,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       // ── API Fallback ──────────────────────────────────────────────────────
       try {
         final api = ref.read(apiClientProvider);
-        final queryForApi = parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : rawInput;
-        final response = await api.get(ApiEndpoints.inventoryBarcode(queryForApi))
+        final queryForApi =
+            parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : rawInput;
+        final response = await api
+            .get(ApiEndpoints.inventoryBarcode(queryForApi))
             .timeout(const Duration(seconds: 5));
         final data = response['data'] as Map<String, dynamic>?;
         final product = data?['product'] as Map<String, dynamic>?;
@@ -371,6 +378,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       }
     });
   }
+
   void _setTorch(bool turnOn) {
     try {
       _scannerKey.currentState?.setTorch(turnOn);
@@ -390,6 +398,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       }
     });
   }
+
   void _scanAnother() {
     setState(() {
       _state = _ScanState.scanning;
@@ -402,7 +411,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     if (location != '/scan-to-find') {
-      if (_manualController.text.isNotEmpty || _manualSearchQuery.isNotEmpty || _isManualMode) {
+      if (_manualController.text.isNotEmpty ||
+          _manualSearchQuery.isNotEmpty ||
+          _isManualMode) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _manualController.clear();
           _manualSearchQuery = '';
@@ -433,9 +444,11 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         }
       },
       child: Scaffold(
-        backgroundColor: (_state == _ScanState.scanning || _state == _ScanState.searching) && !_isManualMode
-            ? Colors.black
-            : Theme.of(context).colorScheme.surface,
+        backgroundColor:
+            (_state == _ScanState.scanning || _state == _ScanState.searching) &&
+                    !_isManualMode
+                ? Colors.black
+                : Theme.of(context).colorScheme.surface,
         body: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: _isManualMode && _state == _ScanState.scanning
@@ -452,7 +465,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     );
   }
 
-    Widget _buildScanning() {
+  Widget _buildScanning() {
     return Stack(
       key: const ValueKey('scanning'),
       children: [
@@ -465,7 +478,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
             return CameraPreview(controller);
           },
         ),
-
         ColorFiltered(
           colorFilter: ColorFilter.mode(
               Colors.black.withValues(alpha: 0.6), BlendMode.srcOut),
@@ -489,7 +501,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
             ],
           ),
         ),
-
         Center(
           child: SizedBox(
             width: AppDimensions.scannerViewfinderSize,
@@ -500,7 +511,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 1500),
                   curve: Curves.easeInOut,
-                  top: _isDetecting ? AppDimensions.scannerViewfinderSize - 4 : 0,
+                  top: _isDetecting
+                      ? AppDimensions.scannerViewfinderSize - 4
+                      : 0,
                   left: 0,
                   right: 0,
                   child: Container(
@@ -521,7 +534,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
             ),
           ),
         ),
-        
         Positioned(
           top: 16,
           left: 0,
@@ -551,10 +563,13 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                       ),
                       Container(width: 1, height: 24, color: Colors.white24),
                       IconButton(
-                        icon: const Icon(Icons.hdr_on_rounded, color: Colors.white),
+                        icon: const Icon(Icons.hdr_on_rounded,
+                            color: Colors.white),
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('HDR Auto-enabled'), duration: Duration(seconds: 1)),
+                            const SnackBar(
+                                content: Text('HDR Auto-enabled'),
+                                duration: Duration(seconds: 1)),
                           );
                         },
                       ),
@@ -565,7 +580,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
             ),
           ),
         ),
-
         Align(
           alignment: Alignment.bottomCenter,
           child: Container(
@@ -581,7 +595,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     label: 'Gallery',
                     onTap: _scanFromGallery,
                   ),
-
                   GestureDetector(
                     onTap: _triggerCameraScan,
                     child: Column(
@@ -590,7 +603,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: _isDetecting ? Colors.grey : AppColors.primary,
+                            color:
+                                _isDetecting ? Colors.grey : AppColors.primary,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                             boxShadow: [
@@ -605,19 +619,23 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                               ? const SizedBox(
                                   width: 22,
                                   height: 22,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2),
                                 )
-                              : const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 22),
+                              : const Icon(Icons.qr_code_scanner_rounded,
+                                  color: Colors.white, size: 22),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           _isDetecting ? 'Scanning' : 'Scan',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
-
                   _BottomActionBtn(
                     icon: Icons.keyboard_rounded,
                     label: 'Manual',
@@ -644,59 +662,35 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       Positioned(
           top: 0,
           left: 0,
-          child: Container(
-              width: size,
-              height: thickness,
-              color: color)),
+          child: Container(width: size, height: thickness, color: color)),
       Positioned(
           top: 0,
           left: 0,
-          child: Container(
-              width: thickness,
-              height: size,
-              color: color)),
+          child: Container(width: thickness, height: size, color: color)),
       Positioned(
           top: 0,
           right: 0,
-          child: Container(
-              width: size,
-              height: thickness,
-              color: color)),
+          child: Container(width: size, height: thickness, color: color)),
       Positioned(
           top: 0,
           right: 0,
-          child: Container(
-              width: thickness,
-              height: size,
-              color: color)),
+          child: Container(width: thickness, height: size, color: color)),
       Positioned(
           bottom: 0,
           left: 0,
-          child: Container(
-              width: size,
-              height: thickness,
-              color: color)),
+          child: Container(width: size, height: thickness, color: color)),
       Positioned(
           bottom: 0,
           left: 0,
-          child: Container(
-              width: thickness,
-              height: size,
-              color: color)),
+          child: Container(width: thickness, height: size, color: color)),
       Positioned(
           bottom: 0,
           right: 0,
-          child: Container(
-              width: size,
-              height: thickness,
-              color: color)),
+          child: Container(width: size, height: thickness, color: color)),
       Positioned(
           bottom: 0,
           right: 0,
-          child: Container(
-              width: thickness,
-              height: size,
-              color: color)),
+          child: Container(width: thickness, height: size, color: color)),
     ];
   }
 
@@ -742,9 +736,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           const Text(
             'Searching...',
             style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold),
+                color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -765,39 +757,26 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
   Widget _buildFound() {
     final product = _foundProduct!;
-    return Column(
+    return Scaffold(
       key: const ValueKey('found'),
-      children: [
-        Container(
-          color: AppColors.primary,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white),
-                    onPressed: _scanAnother,
-                  ),
-                  const Text('Scan To Find',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.history_rounded, color: Colors.white),
-                    onPressed: () => context.push('/history'),
-                  ),
-                ],
-              ),
-            ),
-          ),
+      appBar: AppBar(
+        title: const Text('Product Details'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: _scanAnother,
         ),
-
-        Expanded(
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded),
+            onPressed: () => context.push('/history'),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -805,7 +784,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
               children: [
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(20),
@@ -829,7 +809,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   ),
                 ),
                 const SizedBox(height: 20),
-
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -837,7 +816,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: const [
                       BoxShadow(
-                          color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 2)),
+                          color: Color(0x0F000000),
+                          blurRadius: 8,
+                          offset: Offset(0, 2)),
                     ],
                   ),
                   child: Column(
@@ -845,7 +826,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     children: [
                       Text('Product No.',
                           style: TextStyle(
-                              fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant)),
                       Text(
                         product['partNo'] as String,
                         style: TextStyle(
@@ -859,11 +843,15 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                       const SizedBox(height: 12),
                       Text('Description',
                           style: TextStyle(
-                              fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant)),
                       Text(
                         product['description'] as String,
                         style: TextStyle(
-                            fontSize: 15, color: Theme.of(context).colorScheme.onSurface),
+                            fontSize: 15,
+                            color: Theme.of(context).colorScheme.onSurface),
                         maxLines: 3,
                         softWrap: true,
                         overflow: TextOverflow.ellipsis,
@@ -871,7 +859,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                       const SizedBox(height: 12),
                       Text('Available Stock',
                           style: TextStyle(
-                              fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant)),
                       Text(
                         '${product['stock'] ?? '--'} NOS',
                         style: const TextStyle(
@@ -883,7 +874,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -911,13 +901,18 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                               children: [
                                 Text('Location',
                                     style: TextStyle(
-                                        fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                        fontSize: 10,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant)),
                                 Text(
                                   product['location'] as String,
                                   style: TextStyle(
                                       fontSize: 36,
                                       fontWeight: FontWeight.bold,
-                                      color: Theme.of(context).colorScheme.onSurface),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface),
                                   maxLines: 2,
                                   softWrap: true,
                                   overflow: TextOverflow.ellipsis,
@@ -925,7 +920,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                 Text(
                                   product['locationLabel'] as String,
                                   style: TextStyle(
-                                      fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                      fontSize: 11,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant),
                                   maxLines: 2,
                                   softWrap: true,
                                   overflow: TextOverflow.ellipsis,
@@ -939,7 +937,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                       Row(
                         children: [
                           Icon(Icons.warehouse_rounded,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant, size: 18),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                              size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
@@ -947,13 +948,18 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                               children: [
                                 Text('Area',
                                     style: TextStyle(
-                                        fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                        fontSize: 10,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant)),
                                 Text(
                                   product['area'] as String,
                                   style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: Theme.of(context).colorScheme.onSurface),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface),
                                   maxLines: 2,
                                   softWrap: true,
                                   overflow: TextOverflow.ellipsis,
@@ -967,9 +973,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   ),
                 ),
                 const SizedBox(height: 20),
-
-
-
                 SizedBox(
                   height: 50,
                   child: OutlinedButton(
@@ -990,45 +993,34 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _buildNotFound() {
-    return Column(
-      key: const ValueKey('notFound'),
-      children: [
-        Container(
-          color: AppColors.danger,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white),
-                    onPressed: () {
-                      _notFoundTimer?.cancel();
-                      _scanAnother();
-                      _scannerKey.currentState?.restartFeed();
-                    },
-                  ),
-                  const Text('Scan To Find',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          ),
+    return Scaffold(
+      key: const ValueKey('not_found'),
+      appBar: AppBar(
+        title: const Text('Not Found'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () {
+            _notFoundTimer?.cancel();
+            _scanAnother();
+            _scannerKey.currentState?.restartFeed();
+          },
         ),
-        Expanded(
-          child: Column(
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.search_off_rounded, size: 72, color: AppColors.danger),
+              const Icon(Icons.search_off_rounded,
+                  size: 72, color: AppColors.danger),
               const SizedBox(height: 16),
               const Text(
                 'Product Not Found',
@@ -1040,7 +1032,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                 child: Text(
                   '"$_scannedBarcode" was not found.\nReturning to scanner in 3 seconds…',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
+                  style: const TextStyle(
+                      fontSize: 14, color: Colors.black54, height: 1.5),
                 ),
               ),
               const SizedBox(height: 32),
@@ -1058,8 +1051,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: const BorderSide(color: AppColors.primary),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1080,8 +1075,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ],
@@ -1090,43 +1087,33 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _buildMultipleLocations() {
-    final locations = _multipleLocationsList.map((m) => {
-      'code': m.location,
-      'area': 'MAIN WAREHOUSE',
-      'stock': '--',
-      'partNo': m.partNo,
-    }).toList();
-    return Column(
+    final locations = _multipleLocationsList
+        .map((m) => {
+              'code': m.location,
+              'area': 'MAIN WAREHOUSE',
+              'stock': '--',
+              'partNo': m.partNo,
+            })
+        .toList();
+    return Scaffold(
       key: const ValueKey('multiple'),
-      children: [
-        Container(
-          color: AppColors.primary,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white),
-                    onPressed: _scanAnother,
-                  ),
-                  const Text('Scan To Find',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          ),
+      appBar: AppBar(
+        title: const Text('Multiple Locations'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: _scanAnother,
         ),
-        Expanded(
+      ),
+      body: Column(
+        children: [
+          Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -1134,7 +1121,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
               children: [
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(20),
@@ -1157,7 +1145,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('Part No:\n${_multipleLocationsList.firstOrNull?.partNo ?? _scannedBarcode}',
+                Text(
+                    'Part No:\n${_multipleLocationsList.firstOrNull?.partNo ?? _scannedBarcode}',
                     style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -1177,9 +1166,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: const [
                           BoxShadow(
-                            color: Color(0x0F000000),
-                            blurRadius: 6,
-                            offset: Offset(0, 2)),
+                              color: Color(0x0F000000),
+                              blurRadius: 6,
+                              offset: Offset(0, 2)),
                         ],
                       ),
                       child: Row(
@@ -1194,13 +1183,20 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 28,
-                                      color: Theme.of(context).colorScheme.onSurface)),
-                              Text('${loc['partNo']}', 
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface)),
+                              Text('${loc['partNo']}',
                                   style: const TextStyle(
-                                      fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary)),
                               Text(loc['area'] as String,
                                   style: TextStyle(
-                                      fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                      fontSize: 11,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant)),
                             ],
                           ),
                           const Spacer(),
@@ -1217,7 +1213,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('All locations view coming soon'), duration: Duration(seconds: 1)),
+                      const SnackBar(
+                          content: Text('All locations view coming soon'),
+                          duration: Duration(seconds: 1)),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
@@ -1252,6 +1250,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           ),
         ),
       ],
+      ),
     );
   }
 
@@ -1268,11 +1267,18 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
     List<InventoryData> results;
     if (_searchByField == 'Location') {
-      results = await (db.select(db.inventory)..where((t) => t.location.upper().like('%$query%'))).get();
+      results = await (db.select(db.inventory)
+            ..where((t) => t.location.upper().like('%$query%')))
+          .get();
     } else if (_searchByField == 'Description') {
-      results = await (db.select(db.inventory)..where((t) => t.description.upper().like('%$query%'))).get();
+      results = await (db.select(db.inventory)
+            ..where((t) => t.description.upper().like('%$query%')))
+          .get();
     } else {
-      results = await (db.select(db.inventory)..where((t) => t.partNo.upper().like('%$query%') | t.barcode.like('%$query%'))).get();
+      results = await (db.select(db.inventory)
+            ..where((t) =>
+                t.partNo.upper().like('%$query%') | t.barcode.like('%$query%')))
+          .get();
     }
 
     if (results.isNotEmpty) {
@@ -1300,7 +1306,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       }
 
       final inputImage = InputImage.fromFilePath(image.path);
-      
+
       // Also try barcode scanning on the captured image just in case
       final barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);
       final barcodes = await barcodeScanner.processImage(inputImage);
@@ -1363,7 +1369,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                 _isManualMode = true;
               });
             },
-            child: const Text('Search Manually', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            child: const Text('Search Manually',
+                style: TextStyle(
+                    color: AppColors.primary, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1398,7 +1406,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
               children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
-                Text('Analyzing image...', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text('Analyzing image...',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -1453,275 +1462,335 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   }
 
   Widget _buildManualSearch() {
-    return Container(
-      color: Theme.of(context).colorScheme.surface,
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       key: const ValueKey('manual_search'),
-      child: Column(
+      appBar: AppBar(
+        title: const Text('Manual Search'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              setState(() {
+                _isManualMode = false;
+              });
+            }
+          },
+        ),
+      ),
+      body: Column(
         children: [
           Container(
             color: AppColors.primary,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 16, 12),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                      onPressed: () {
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          setState(() {
-                            _isManualMode = false;
-                          });
-                        }
-                      },
-                    ),
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                         child: TextField(
-                          controller: _manualController,
-                          focusNode: _manualFocusNode,
-                          onChanged: (val) {
-                            _manualSearchQuery = val;
-                            _performManualSearch();
-                          },
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Search inventory...',
-                            hintStyle: const TextStyle(color: Colors.white60),
-                            border: InputBorder.none,
-                            prefixIcon: const Icon(Icons.search_rounded, color: Colors.white70),
-                            suffixIcon: _manualController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear_rounded, color: Colors.white70, size: 20),
-                                    onPressed: () {
-                                      _manualController.clear();
-                                      setState(() {
-                                        _manualSearchQuery = '';
-                                        _performManualSearch();
-                                      });
-                                      _manualFocusNode.requestFocus();
-                                    },
-                                  )
-                                : null,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextField(
+                  controller: _manualController,
+                  focusNode: _manualFocusNode,
+                  onChanged: (val) {
+                    _manualSearchQuery = val;
+                    _performManualSearch();
+                  },
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search inventory...',
+                    hintStyle: const TextStyle(color: Colors.white60),
+                    border: InputBorder.none,
+                    prefixIcon:
+                        const Icon(Icons.search_rounded, color: Colors.white70),
+                    suffixIcon: _manualController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded,
+                                color: Colors.white70, size: 20),
+                            onPressed: () {
+                              _manualController.clear();
+                              setState(() {
+                                _manualSearchQuery = '';
+                                _performManualSearch();
+                              });
+                              _manualFocusNode.requestFocus();
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
             ),
           ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Text(
-                    'Search by: ',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(width: 8),
-                  _SearchChip(
-                    label: 'Part No',
-                    selected: _searchByField == 'Part No',
-                    onSelected: (sel) {
-                      if (sel) {
-                        setState(() {
-                          _searchByField = 'Part No';
-                        });
-                        _performManualSearch();
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  _SearchChip(
-                    label: 'Location',
-                    selected: _searchByField == 'Location',
-                    onSelected: (sel) {
-                      if (sel) {
-                        setState(() {
-                          _searchByField = 'Location';
-                        });
-                        _performManualSearch();
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  _SearchChip(
-                    label: 'Description',
-                    selected: _searchByField == 'Description',
-                    onSelected: (sel) {
-                      if (sel) {
-                        setState(() {
-                          _searchByField = 'Description';
-                        });
-                        _performManualSearch();
-                      }
-                    },
-                  ),
-                ],
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Text(
+                  'Search by: ',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(width: 8),
+                _SearchChip(
+                  label: 'Part No',
+                  selected: _searchByField == 'Part No',
+                  onSelected: (sel) {
+                    if (sel) {
+                      setState(() {
+                        _searchByField = 'Part No';
+                      });
+                      _performManualSearch();
+                    }
+                  },
+                ),
+                const SizedBox(width: 6),
+                _SearchChip(
+                  label: 'Location',
+                  selected: _searchByField == 'Location',
+                  onSelected: (sel) {
+                    if (sel) {
+                      setState(() {
+                        _searchByField = 'Location';
+                      });
+                      _performManualSearch();
+                    }
+                  },
+                ),
+                const SizedBox(width: 6),
+                _SearchChip(
+                  label: 'Description',
+                  selected: _searchByField == 'Description',
+                  onSelected: (sel) {
+                    if (sel) {
+                      setState(() {
+                        _searchByField = 'Description';
+                      });
+                      _performManualSearch();
+                    }
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-
-            Expanded(
-              child: _isManualSearching
-                  ? const Center(child: CircularProgressIndicator())
-                  : _manualController.text.isEmpty
-                      ? SingleChildScrollView(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Recent Searches',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                  ),
-                                  if (_recentQueries.isNotEmpty)
-                                    TextButton(
-                                      onPressed: _clearSearchHistory,
-                                      child: Text('Clear', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error)),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              if (_recentQueries.isEmpty)
-                                 Text(
-                                  'No search history yet',
-                                  style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                )
-                              else
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: _recentQueries.map((query) {
-                                    return ActionChip(
-                                      label: Text(query, style: const TextStyle(fontSize: 12)),
-                                      backgroundColor: AppColors.primary.withValues(alpha: 0.10),
-                                      side: BorderSide.none,
-                                      onPressed: () {
-                                        _manualController.text = query;
-                                        _manualSearchQuery = query;
-                                        _performManualSearch();
-                                      },
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                    );
-                                  }).toList(),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          Expanded(
+            child: _isManualSearching
+                ? const Center(child: CircularProgressIndicator())
+                : _manualController.text.isEmpty
+                    ? SingleChildScrollView(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Recent Searches',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant),
                                 ),
-                            ],
-                          ),
-                        )
-                      : _manualSearchResults.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.search_off_rounded, size: 48, color: Theme.of(context).colorScheme.outlineVariant),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'No items found',
-                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                if (_recentQueries.isNotEmpty)
+                                  TextButton(
+                                    onPressed: _clearSearchHistory,
+                                    child: Text('Clear',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error)),
                                   ),
-                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_recentQueries.isEmpty)
+                              Text(
+                                'No search history yet',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
+                              )
+                            else
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _recentQueries.map((query) {
+                                  return ActionChip(
+                                    label: Text(query,
+                                        style: const TextStyle(fontSize: 12)),
+                                    backgroundColor: AppColors.primary
+                                        .withValues(alpha: 0.10),
+                                    side: BorderSide.none,
+                                    onPressed: () {
+                                      _manualController.text = query;
+                                      _manualSearchQuery = query;
+                                      _performManualSearch();
+                                    },
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(20)),
+                                  );
+                                }).toList(),
                               ),
-                            )
-                          : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _manualSearchResults.length,
-                          itemBuilder: (context, index) {
-                            final item = _manualSearchResults[index];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 1,
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.all(16),
-                                title: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Part No', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                                    Text(
-                                      item.partNo,
-                                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                                    ),
-                                  ],
+                          ],
+                        ),
+                      )
+                    : _manualSearchResults.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search_off_rounded,
+                                    size: 48,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No items found',
+                                  style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant),
                                 ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _manualSearchResults.length,
+                            itemBuilder: (context, index) {
+                              final item = _manualSearchResults[index];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                elevation: 1,
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.all(16),
+                                  title: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      if (item.description != null && item.description!.isNotEmpty) ...[
-                                        Text(item.description!, style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                                        const SizedBox(height: 8),
-                                      ],
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 16),
-                                            const SizedBox(width: 4),
-                                            const Text('Location: ', style: TextStyle(fontSize: 11, color: AppColors.primary)),
-                                            Text(
-                                              item.location,
-                                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
-                                            ),
-                                          ],
-                                        ),
+                                      Text('Part No',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant)),
+                                      Text(
+                                        item.partNo,
+                                        style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface),
                                       ),
                                     ],
                                   ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (item.description != null &&
+                                            item.description!.isNotEmpty) ...[
+                                          Text(item.description!,
+                                              style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurfaceVariant)),
+                                          const SizedBox(height: 8),
+                                        ],
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary
+                                                .withValues(alpha: 0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                  Icons.location_on_rounded,
+                                                  color: AppColors.primary,
+                                                  size: 16),
+                                              const SizedBox(width: 4),
+                                              const Text('Location: ',
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      color:
+                                                          AppColors.primary)),
+                                              Text(
+                                                item.location,
+                                                style: const TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.primary),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  trailing: Icon(Icons.chevron_right_rounded,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline),
+                                  onTap: () {
+                                    setState(() {
+                                      _foundProduct = {
+                                        'partNo': item.partNo,
+                                        'description': item.description ?? '',
+                                        'location': item.location,
+                                        'locationLabel':
+                                            'Location: ${item.location}',
+                                        'area': 'MAIN WAREHOUSE',
+                                        'stock': item.stock,
+                                        'multipleLocations': false,
+                                      };
+                                      _state = _ScanState.found;
+                                    });
+                                  },
                                 ),
-                                trailing: Icon(Icons.chevron_right_rounded, color: Theme.of(context).colorScheme.outline),
-                                onTap: () {
-                                  setState(() {
-                                    _foundProduct = {
-                                      'partNo': item.partNo,
-                                      'description': item.description ?? '',
-                                      'location': item.location,
-                                      'locationLabel': 'Location: ${item.location}',
-                                      'area': 'MAIN WAREHOUSE',
-                                      'stock': item.stock,
-                                      'multipleLocations': false,
-                                    };
-                                    _state = _ScanState.found;
-                                  });
-                                },
-                              ),
-                            );
-                          },
-                        ),
-            ),
-          ],
-        ),
-      );
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
+    );
   }
 }
-
 
 class _BottomActionBtn extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _BottomActionBtn({required this.icon, required this.label, required this.onTap});
+  const _BottomActionBtn(
+      {required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1742,7 +1811,10 @@ class _BottomActionBtn extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             label,
-            style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -1754,12 +1826,18 @@ class _SearchChip extends StatelessWidget {
   final String label;
   final bool selected;
   final ValueChanged<bool> onSelected;
-  const _SearchChip({required this.label, required this.selected, required this.onSelected});
+  const _SearchChip(
+      {required this.label, required this.selected, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
     return FilterChip(
-      label: Text(label, style: TextStyle(fontSize: 12, color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface)),
+      label: Text(label,
+          style: TextStyle(
+              fontSize: 12,
+              color: selected
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurface)),
       selected: selected,
       onSelected: onSelected,
       selectedColor: AppColors.primary,
