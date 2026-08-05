@@ -412,11 +412,17 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       }
     }
 
+    // If this screen was pushed onto the stack (e.g. from home screen Manual
+    // Search button), the system back gesture / button should simply pop it.
+    // Only intercept back when it is the shell-tab root (cannot pop).
+    final canPop = context.canPop();
     return PopScope(
-      canPop: false,
+      canPop: canPop,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
+        if (didPop) return; // System already popped — nothing to do
+        // Shell-tab root: intercept and handle manually
         if (_isManualMode) {
+          // In manual mode opened from within the tab: toggle back to scanner
           setState(() {
             _isManualMode = false;
           });
@@ -1463,9 +1469,13 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
                       onPressed: () {
-                        setState(() {
-                          _isManualMode = false;
-                        });
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          setState(() {
+                            _isManualMode = false;
+                          });
+                        }
                       },
                     ),
                     Expanded(
