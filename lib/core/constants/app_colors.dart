@@ -14,6 +14,8 @@ class AppColors {
   static const Color cardBlueDark = Color(0xFF1D4ED8);
   static const Color cardGreen = Color(0xFFDCFCE7);
   static const Color cardGreenDark = Color(0xFF15803D);
+  static const Color cardPurple = Color(0xFFEDE9FD);
+  static const Color cardPurpleDark = Color(0xFF5B21B6);
 
   // Status colors
   static const Color success = Color(0xFF16A34A);

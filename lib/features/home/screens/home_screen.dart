@@ -221,6 +221,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 icon: Icons.inventory_2_outlined,
                                 color: AppColors.primary,
                                 bgColor: AppColors.primary.withValues(alpha: 0.08),
+                                onTap: () => context.push('/history'),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -231,6 +232,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 icon: Icons.check_circle_outline_rounded,
                                 color: AppColors.success,
                                 bgColor: AppColors.success.withValues(alpha: 0.08),
+                                onTap: () => context.push('/history', extra: 'checked'),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -242,6 +244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 color: AppColors.warning,
                                 bgColor:
                                     AppColors.warning.withValues(alpha: 0.08),
+                                onTap: () => context.push('/history', extra: 'picking'),
                               ),
                             ),
                           ],
@@ -280,7 +283,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _ActionCard(
+                icon: Icons.search_rounded,
+                iconColor: AppColors.cardPurpleDark,
+                title: 'Manual Search',
+                subtitle: 'Search parts by part number,\nlocation or description',
+                onTap: () => context.push('/scan-to-find'),
+                isWide: true,
+              ),
+            ),
+            const SizedBox(height: 20),
             _ScanFab(onTap: () => context.push('/scan-to-find')),
           ],
         ),
@@ -295,6 +310,7 @@ class _ActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool isWide;
 
   const _ActionCard({
     required this.icon,
@@ -302,6 +318,7 @@ class _ActionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.isWide = false,
   });
 
   @override
@@ -315,49 +332,98 @@ class _ActionCard extends StatelessWidget {
           color: iconColor.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+        child: isWide
+            ? Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: iconColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: colorScheme.onSurfaceVariant,
+                              height: 1.4),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: iconColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.arrow_forward_rounded,
+                        color: Colors.white, size: 16),
+                  ),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: iconColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 26),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    title,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.4),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: iconColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.arrow_forward_rounded,
+                        color: Colors.white, size: 16),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: iconColor, size: 26),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.4),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: iconColor,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.arrow_forward_rounded,
-                  color: Colors.white, size: 16),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -472,6 +538,7 @@ class _SummaryCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final Color bgColor;
+  final VoidCallback? onTap;
 
   const _SummaryCard({
     required this.title,
@@ -479,61 +546,79 @@ class _SummaryCard extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.bgColor,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(
+            color: onTap != null ? color.withValues(alpha: 0.3) : colorScheme.outlineVariant,
+            width: 1,
           ),
-        ],
-        border: Border.all(color: colorScheme.outlineVariant, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  shape: BoxShape.circle,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 16),
                 ),
-                child: Icon(icon, color: color, size: 16),
+                Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (onTap != null) ...[  
+              const SizedBox(height: 4),
               Text(
-                '$count',
+                'View →',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
                   color: color,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

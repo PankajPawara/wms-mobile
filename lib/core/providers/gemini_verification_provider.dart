@@ -22,6 +22,7 @@ enum GeminiVerificationStatus {
 class GeminiVerificationState {
   final GeminiVerificationStatus status;
   final List<ExtractedMemoItem> updatedItems;
+  final ExtractedMemoHeader? updatedHeader;
   final String? errorMessage;
   final String? rawJsonOutput;
   final int processedCount;
@@ -30,6 +31,7 @@ class GeminiVerificationState {
   const GeminiVerificationState({
     this.status = GeminiVerificationStatus.idle,
     this.updatedItems = const [],
+    this.updatedHeader,
     this.errorMessage,
     this.rawJsonOutput,
     this.processedCount = 0,
@@ -43,6 +45,7 @@ class GeminiVerificationState {
   GeminiVerificationState copyWith({
     GeminiVerificationStatus? status,
     List<ExtractedMemoItem>? updatedItems,
+    ExtractedMemoHeader? updatedHeader,
     String? errorMessage,
     String? rawJsonOutput,
     int? processedCount,
@@ -51,6 +54,7 @@ class GeminiVerificationState {
     return GeminiVerificationState(
       status:         status         ?? this.status,
       updatedItems:   updatedItems   ?? this.updatedItems,
+      updatedHeader:  updatedHeader  ?? this.updatedHeader,
       errorMessage:   errorMessage,
       rawJsonOutput:  rawJsonOutput  ?? this.rawJsonOutput,
       processedCount: processedCount ?? this.processedCount,
@@ -197,39 +201,48 @@ class GeminiVerificationNotifier extends StateNotifier<GeminiVerificationState> 
           .toList());
 
       final prompt = '''
-You are a VALIDATOR for Honda auto-parts pickup memos. Your ONLY job is to correct OCR mistakes in the provided items.
+You are a VALIDATOR for Honda auto-parts pickup memos. Your ONLY job is to:
+1. Correct OCR mistakes in part numbers and quantities.
+2. Correct the customer header details (name, area, memo number, date) if they look wrong based on the raw OCR dump.
 
 RULES (MUST follow):
 1. You CANNOT create new items. Only work with the items provided.
-2. You CANNOT change location, stock, or description — those come from the database.
-3. You CAN correct the part number if you see an obvious OCR mistake.
-4. You CAN correct qty, mrp, pack if the values look wrong based on the image.
-5. Return ONLY the corrected items in the EXACT same order.
-6. Output raw JSON only — no markdown.
+2. You CANNOT change location or description — those come from the database.
+3. You CAN correct part number if you see an obvious OCR mistake.
+4. You CAN correct qty, mrp, pack if the values look wrong.
+5. You CAN correct customer_name, area, memo_number, memo_date if OCR extracted them incorrectly.
+6. Return ONLY a single JSON object with "header" and "items" keys — no markdown, no extra text.
 
-Memo Header:
+RAW OCR DUMP:
+$rawOcrDump
+
+Current Header (may have OCR errors):
   Customer: ${header.customerName}
   Area: ${header.area}
   Memo No: ${header.memoNumber}
   Date: ${header.memoDate ?? 'unknown'}
 
-RAW OCR DUMP:
-$rawOcrDump
-
 ITEMS TO VALIDATE (${lowConfidenceItems.length} items with confidence < 85%):
 $itemsJson
 
-OUTPUT FORMAT:
-[
-  {
-    "raw_ocr": "original raw OCR value",
-    "corrected_part_no": "corrected part number",
-    "qty": 1,
-    "mrp": 0.0,
-    "pack": 0,
-    "stock": 0
-  }
-]
+OUTPUT FORMAT (strictly follow this):
+{
+  "header": {
+    "customer_name": "corrected customer name or same if correct",
+    "area": "corrected area/location or same if correct",
+    "memo_number": "corrected memo number or same if correct",
+    "memo_date": "YYYY-MM-DD or empty string"
+  },
+  "items": [
+    {
+      "raw_ocr": "original raw OCR value",
+      "corrected_part_no": "corrected part number",
+      "qty": 1,
+      "mrp": 0.0,
+      "pack": 0
+    }
+  ]
+}
 ''';
 
       final List<Part> parts = [TextPart(prompt)];
@@ -250,7 +263,41 @@ OUTPUT FORMAT:
       }
       cleanJson = cleanJson.trim();
 
-      final geminiSuggestions = jsonDecode(cleanJson) as List<dynamic>;
+      // Parse response — new format: {header: {...}, items: [...]}
+      // Fall back to old list-only format for resilience
+      List<dynamic> geminiSuggestions;
+      Map<String, dynamic>? geminiHeader;
+
+      try {
+        final decoded = jsonDecode(cleanJson);
+        if (decoded is Map<String, dynamic>) {
+          geminiSuggestions = (decoded['items'] as List<dynamic>?) ?? [];
+          geminiHeader = decoded['header'] as Map<String, dynamic>?;
+        } else if (decoded is List<dynamic>) {
+          // Old format fallback
+          geminiSuggestions = decoded;
+        } else {
+          geminiSuggestions = [];
+        }
+      } catch (_) {
+        geminiSuggestions = [];
+      }
+
+      // Build updated header if Gemini returned one
+      ExtractedMemoHeader? refinedHeader;
+      if (geminiHeader != null) {
+        final cn = geminiHeader['customer_name']?.toString().trim() ?? '';
+        final ar = geminiHeader['area']?.toString().trim() ?? '';
+        final mn = geminiHeader['memo_number']?.toString().trim() ?? '';
+        final md = geminiHeader['memo_date']?.toString().trim() ?? '';
+        refinedHeader = ExtractedMemoHeader(
+          customerName: cn.isNotEmpty ? cn : header.customerName,
+          area: ar.isNotEmpty ? ar : header.area,
+          memoNumber: mn.isNotEmpty ? mn : header.memoNumber,
+          memoDate: md.isNotEmpty ? md : header.memoDate,
+          subArea: header.subArea,
+        );
+      }
 
       // Build a map from rawOcr → suggestion for fast lookup
       final suggestionMap = <String, Map<String, dynamic>>{};
@@ -319,6 +366,7 @@ OUTPUT FORMAT:
       state = GeminiVerificationState(
         status: GeminiVerificationStatus.completed,
         updatedItems: updatedItems,
+        updatedHeader: refinedHeader,
         rawJsonOutput: cleanJson,
         processedCount: updatedItems.length,
         totalCount: allItems.length,

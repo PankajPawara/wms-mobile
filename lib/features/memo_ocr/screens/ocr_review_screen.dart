@@ -4,14 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:drift/drift.dart' hide Column;
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/models/extracted_memo.dart';
 import '../../../core/providers/gemini_verification_provider.dart';
 import '../../../shared/widgets/app_button.dart';
-import '../../../core/database/app_database.dart';
 import '../../picking/repositories/order_repository.dart';
 
 class OcrReviewScreen extends ConsumerStatefulWidget {
@@ -71,6 +69,23 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
         setState(() {
           _items = List.from(state.updatedItems);
         });
+
+        // Apply refined header if Gemini corrected any customer details
+        final h = state.updatedHeader;
+        if (h != null) {
+          if (h.customerName.isNotEmpty && h.customerName != widget.ocrResult.header.customerName) {
+            _customerNameCtrl.text = h.customerName;
+          }
+          if (h.area.isNotEmpty && h.area != widget.ocrResult.header.area) {
+            _areaCtrl.text = h.area;
+          }
+          if (h.memoNumber.isNotEmpty && h.memoNumber != widget.ocrResult.header.memoNumber) {
+            _memoNumberCtrl.text = h.memoNumber;
+          }
+          if ((h.memoDate ?? '').isNotEmpty && h.memoDate != widget.ocrResult.header.memoDate) {
+            _memoDateCtrl.text = _displayMemoDate(h.memoDate);
+          }
+        }
       }
     }
   }
