@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import '../pipeline/models/ocr_word.dart';
@@ -555,7 +553,8 @@ class SandboxGeminiVerifier {
     const storage = FlutterSecureStorage();
     String? apiKey = await storage.read(key: 'gemini_api_key');
     if (apiKey == null || apiKey.isEmpty) {
-      apiKey = dotenv.env['GEMINI_API_KEY'];
+      const dartDefineKey = String.fromEnvironment('GEMINI_API_KEY');
+      if (dartDefineKey.isNotEmpty) apiKey = dartDefineKey;
     }
     if (apiKey == null || apiKey.isEmpty) {
       throw Exception('GEMINI_API_KEY not configured.');

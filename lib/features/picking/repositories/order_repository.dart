@@ -128,6 +128,96 @@ class OrderRepository {
     }
   }
 
+  /// Finalize order by calculating total amount based on checkedQty and PartsMaster prices
+  Future<void> finalizeOrderBill(int orderId) async {
+    final order = await getLocalOrderById(orderId);
+    if (order == null) return;
+
+    final orderItems = await getLocalOrderItems(orderId);
+    final partsService = PartsMasterService(_db);
+    
+    // Normalize part numbers to query PartsMaster
+    final partNos = orderItems.map((i) => PartsMasterService.normalizePart(i.partNo)).toList();
+    final parts = await (_db.select(_db.partsMaster)..where((t) => t.partNo.isIn(partNos))).get();
+    
+    // Create a map of normalized part number to PartsMaster object for quick lookup
+    final partsMap = {for (var p in parts) PartsMasterService.normalizePart(p.partNo): p};
+    
+    double totalAmount = 0.0;
+    
+    // Update each order item
+    for (final item in orderItems) {
+      final normalizedPart = PartsMasterService.normalizePart(item.partNo);
+      final part = partsMap[normalizedPart];
+      final price = (part?.mrp ?? item.unitPrice ?? 0.0).toDouble(); // Fallback to existing item.unitPrice if not found
+      
+      final checkedQty = item.checkedQty;
+      final finalPrice = (checkedQty * price).toDouble();
+      totalAmount += finalPrice;
+      
+      final itemCompanion = OrderItemsCompanion(
+        id: Value(item.id),
+        unitPrice: Value(price),
+        finalPrice: Value(finalPrice),
+        isSynced: const Value(0),
+      );
+      
+      await _db.update(_db.orderItems).write(itemCompanion);
+      
+      // Queue sync for item update
+      if (order.mongoId != null && item.mongoId != null) {
+        await _queue.queueSync(
+          entityType: 'order_item',
+          entityId: item.id.toString(),
+          operation: 'UPDATE_PRICE',
+          payload: {
+            'mongo_order_id': order.mongoId,
+            'mongo_item_id': item.mongoId,
+            'unit_price': price,
+            'final_price': finalPrice,
+          },
+        );
+      }
+    }
+    
+    // Update the order with total amount and status 'checked'
+    final orderCompanion = OrdersCompanion(
+      id: Value(orderId),
+      finalAmount: Value(totalAmount),
+      status: const Value('checked'),
+      updatedAt: Value(DateTime.now().toIso8601String()),
+      isSynced: const Value(0),
+    );
+    
+    await _db.update(_db.orders).write(orderCompanion);
+    
+    // Queue sync for order update
+    if (order.mongoId != null) {
+      await _queue.queueSync(
+        entityType: 'order',
+        entityId: orderId.toString(),
+        operation: 'UPDATE',
+        payload: {
+          'mongo_id': order.mongoId,
+          'status': 'checked',
+          'final_amount': totalAmount,
+        },
+      );
+    }
+    
+    // Also sync PartsMaster
+    if (parts.isNotEmpty) {
+      await _queue.queueSync(
+        entityType: 'parts_master',
+        entityId: orderId.toString(),
+        operation: 'BATCH_UPDATE',
+        payload: {
+          'parts': partsService.toSyncPayload(parts),
+        },
+      );
+    }
+  }
+
   /// Download orders list from backend and sync to local database
   Future<void> syncOrdersFromServer() async {
     try {

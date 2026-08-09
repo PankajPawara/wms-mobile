@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class GeminiFallbackService {
@@ -15,11 +14,12 @@ class GeminiFallbackService {
   }) async {
     String? apiKey = await _storage.read(key: 'gemini_api_key');
     if (apiKey == null || apiKey.isEmpty) {
-      apiKey = dotenv.env['GEMINI_API_KEY'];
+      const dartDefineKey = String.fromEnvironment('GEMINI_API_KEY');
+      if (dartDefineKey.isNotEmpty) apiKey = dartDefineKey;
     }
     
     if (apiKey == null || apiKey.isEmpty) {
-      throw Exception('GEMINI_API_KEY not found in Secure Storage or .env');
+      throw Exception('GEMINI_API_KEY not configured. Set it in Settings or pass --dart-define=GEMINI_API_KEY=<key>.');
     }
 
     final model = GenerativeModel(

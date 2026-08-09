@@ -13,6 +13,10 @@ const _pageTitles = {
   '/home': 'WMS Dashboard',
   '/memo-capture': 'Capture Memo',
   '/scan-to-find': 'Scan to Find',
+  '/scan-to-find/manual': 'Manual Search',
+  '/scan-to-find/found': 'Product Details',
+  '/scan-to-find/not-found': 'Product Not Found',
+  '/scan-to-find/multiple': 'Multiple Locations',
   '/checking-list': 'Checking List',
   '/settings': 'Settings',
   '/history': 'Orders',
@@ -72,15 +76,17 @@ class MainLayout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tabIndex = _tabIndexFor(currentPath);
-    final isShellTab = tabIndex != -1;
-    final title = _titleFor(currentPath);
+    // Read the actual path dynamically from the router state so pushed routes update the title
+    final actualPath = GoRouterState.of(context).uri.path;
+    final tabIndex = _tabIndexFor(actualPath);
+    final isShellTabRoot = _shellTabs.contains(actualPath);
+    final title = _titleFor(actualPath);
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (!isShellTab) {
+        if (!isShellTabRoot) {
           // Sub-pages: go back
           if (context.canPop()) {
             context.pop();
@@ -121,7 +127,7 @@ class MainLayout extends ConsumerWidget {
           shadowColor: Colors.black.withValues(alpha: 0.15),
           centerTitle: false,
           // Show back arrow on sub-pages; show nothing on home; show home icon on other tabs
-          leading: !isShellTab
+          leading: !isShellTabRoot
               ? IconButton(
                   icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
                   onPressed: () {
@@ -132,7 +138,7 @@ class MainLayout extends ConsumerWidget {
                     }
                   },
                 )
-              : tabIndex == 0
+              : actualPath == '/home'
                   ? null
                   : IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
@@ -148,7 +154,7 @@ class MainLayout extends ConsumerWidget {
           ),
           actions: [
             // Orders history icon (shown on all pages except history itself)
-            if (!currentPath.startsWith('/history'))
+            if (!actualPath.startsWith('/history'))
               IconButton(
                 icon: const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 24),
                 onPressed: () => context.push('/history'),

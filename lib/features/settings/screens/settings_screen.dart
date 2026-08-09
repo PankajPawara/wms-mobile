@@ -19,7 +19,9 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authNotifierProvider).user;
     final name = user?.name ?? 'User';
-    final role = user?.role == 'admin' ? 'Admin' : 'Picker';
+    final roleRaw = user?.role ?? 'picker';
+    String roleDisplay = roleRaw.split('_').map((s) => s[0].toUpperCase() + s.substring(1)).join(' ');
+    final isAdminOrDev = roleRaw == 'admin' || roleRaw == 'acting_admin' || roleRaw == 'developer';
     final empId = user?.employeeId ?? 'EMP000';
 
     return PopScope(
@@ -66,7 +68,7 @@ class SettingsScreen extends ConsumerWidget {
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: colorScheme.onSurface)),
-                          Text('$role • $empId',
+                          Text('$roleDisplay • $empId',
                               style: TextStyle(
                                   fontSize: 12, color: colorScheme.onSurfaceVariant)),
                         ],
@@ -89,7 +91,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 20),
 
             // ── DATA MANAGEMENT ─────────────────────────────────────────────
-            if (role == 'Admin') ...[
+            if (isAdminOrDev) ...[
               _SectionLabel('DATA MANAGEMENT'),
               const SizedBox(height: 8),
               StreamBuilder<InventoryMeta?>(
@@ -152,7 +154,7 @@ class SettingsScreen extends ConsumerWidget {
                   title: 'History',
                   subtitle: 'View all orders and status',
                   onTap: () => context.push('/history')),
-              if (role == 'Admin')
+              if (roleRaw == 'developer')
                 _SettingsItem(
                     icon: Icons.auto_awesome_rounded,
                     iconColor: const Color(0xFF8B5CF6),
@@ -198,24 +200,26 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // ── DEVELOPER TOOLS ───────────────────────────────────────────────
-            _SectionLabel('DEVELOPER TOOLS'),
-            const SizedBox(height: 8),
-            _SettingsGroup(items: [
-              _SettingsItem(
-                  icon: Icons.science_rounded,
-                  iconColor: const Color(0xFF9333EA),
-                  title: 'OCR Sandbox Laboratory',
-                  subtitle: 'Legacy coordinate-based OCR debugger',
-                  onTap: () => context.push('/settings/ocr-sandbox')),
-              _SettingsItem(
-                  icon: Icons.account_tree_rounded,
-                  iconColor: const Color(0xFF06B6D4),
-                  title: 'Pipeline Sandbox (v2.0)',
-                  subtitle: 'Document Processing Pipeline — Engine 01 · 02 · 02A',
-                  onTap: () => context.push('/settings/pipeline-sandbox'),
-                  showDivider: false),
-            ]),
-            const SizedBox(height: 16),
+            if (roleRaw == 'developer') ...[
+              _SectionLabel('DEVELOPER TOOLS'),
+              const SizedBox(height: 8),
+              _SettingsGroup(items: [
+                _SettingsItem(
+                    icon: Icons.science_rounded,
+                    iconColor: const Color(0xFF9333EA),
+                    title: 'OCR Sandbox Laboratory',
+                    subtitle: 'Legacy coordinate-based OCR debugger',
+                    onTap: () => context.push('/settings/ocr-sandbox')),
+                _SettingsItem(
+                    icon: Icons.account_tree_rounded,
+                    iconColor: const Color(0xFF06B6D4),
+                    title: 'Pipeline Sandbox (v2.0)',
+                    subtitle: 'Document Processing Pipeline — Engine 01 · 02 · 02A',
+                    onTap: () => context.push('/settings/pipeline-sandbox'),
+                    showDivider: false),
+              ]),
+              const SizedBox(height: 16),
+            ],
 
             // ── OTHERS ──────────────────────────────────────────────────────
             _SectionLabel('OTHERS'),

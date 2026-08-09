@@ -175,7 +175,7 @@ class _CheckingScreenState extends ConsumerState<CheckingScreen> {
                       if (id != null) {
                         await ref
                             .read(orderRepositoryProvider)
-                            .updateOrderStatus(id, 'checked');
+                            .finalizeOrderBill(id);
                       }
                       // Navigate back to checking list (not home) to preserve navigation stack
                       if (context.mounted) {

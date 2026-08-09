@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:drift/drift.dart' as drift;
 
@@ -173,10 +172,11 @@ class GeminiVerificationNotifier extends StateNotifier<GeminiVerificationState> 
     );
 
     try {
-      // Resolve API key
+      // Resolve API key (secure storage first, fallback to dart-define)
       String? apiKey = await _storage.read(key: 'gemini_api_key');
       if (apiKey == null || apiKey.isEmpty) {
-        apiKey = dotenv.env['GEMINI_API_KEY'];
+        const dartDefineKey = String.fromEnvironment('GEMINI_API_KEY');
+        if (dartDefineKey.isNotEmpty) apiKey = dartDefineKey;
       }
       if (apiKey == null || apiKey.isEmpty) {
         throw Exception('GEMINI_API_KEY not configured.');

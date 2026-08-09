@@ -50,6 +50,15 @@ GoRouter appRouter(AppRouterRef ref) {
       }
       if (status == AuthStatus.authenticated) {
         if (isLoginPage || isSplashPage || isChangePassword) return '/home';
+
+        final userRole = authState.user?.role ?? 'picker';
+        final isDevRoute = path.startsWith('/settings/ocr-sandbox') || 
+                           path.startsWith('/settings/pipeline-sandbox') || 
+                           path.startsWith('/ai-vision-test');
+                           
+        if (isDevRoute && userRole != 'developer') {
+          return '/home';
+        }
       }
       return null;
     },
@@ -77,6 +86,46 @@ GoRouter appRouter(AppRouterRef ref) {
               final extra = state.extra as Map<String, dynamic>?;
               return ScanToFindScreen(
                 initialManualMode: extra?['manualMode'] == true,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/scan-to-find/manual',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return ScanToFindScreen(
+                initialManualMode: true,
+                initialQuery: extra?['query'] as String?,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/scan-to-find/found',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return ScanToFindScreen(
+                initialRouteState: 'found',
+                extraData: extra,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/scan-to-find/not-found',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return ScanToFindScreen(
+                initialRouteState: 'not-found',
+                extraData: extra,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/scan-to-find/multiple',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return ScanToFindScreen(
+                initialRouteState: 'multiple',
+                extraData: extra,
               );
             },
           ),

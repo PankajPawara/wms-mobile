@@ -7,15 +7,88 @@ import 'core/router/app_router.dart';
 import 'core/providers/theme_provider.dart';
 import 'shared/widgets/gemini_verification_banner.dart';
 
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint("Handling a background message: ${message.messageId}");
+}
+
+Future<void> _setupFirebase() async {
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const DarwinInitializationSettings initializationSettingsIOS =
+      DarwinInitializationSettings();
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS,
+  );
+  
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'inventory_updates_channel', // id
+    'Inventory Updates', // name
+    description: 'Notifications for location data updates.', // description
+    importance: Importance.max,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+
+  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    RemoteNotification? notification = message.notification;
+    AndroidNotification? android = message.notification?.android;
+
+    if (notification != null && android != null) {
+      flutterLocalNotificationsPlugin.show(
+        notification.hashCode,
+        notification.title,
+        notification.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            channel.id,
+            channel.name,
+            channelDescription: channel.description,
+            icon: android.smallIcon ?? '@mipmap/ic_launcher',
+          ),
+        ),
+      );
+    }
+  });
+
+  // Subscribe to the global topic for inventory updates
+  await FirebaseMessaging.instance.subscribeToTopic('inventory_updates');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Gemini API key is injected at build time via --dart-define=GEMINI_API_KEY=<key>
+  // or can be entered manually in the AI Vision settings screen.
+
   try {
-    await dotenv.load(fileName: ".env");
+    await _setupFirebase();
   } catch (e) {
-    debugPrint("Warning: .env file not found or could not be loaded.");
+    debugPrint("Failed to initialize Firebase (requires google-services.json setup): $e");
   }
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,

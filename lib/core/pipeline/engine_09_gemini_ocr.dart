@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
@@ -57,13 +56,14 @@ Output format (JSON array):
     final errors = <String>[];
 
     try {
-      // 1. Resolve API key (secure storage first, fallback to .env)
+      // 1. Resolve API key (secure storage first, fallback to dart-define)
       String? apiKey = await _storage.read(key: 'gemini_api_key');
       if (apiKey == null || apiKey.isEmpty) {
-        apiKey = dotenv.env['GEMINI_API_KEY'];
+        const dartDefineKey = String.fromEnvironment('GEMINI_API_KEY');
+        if (dartDefineKey.isNotEmpty) apiKey = dartDefineKey;
       }
       if (apiKey == null || apiKey.isEmpty) {
-        throw Exception('GEMINI_API_KEY not found. Add it to your .env file or Settings screen.');
+        throw Exception('GEMINI_API_KEY not configured. Set it in Settings or pass --dart-define=GEMINI_API_KEY=<key>.');
       }
 
       // 2. Load optimized image bytes

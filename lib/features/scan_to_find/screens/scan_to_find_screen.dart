@@ -24,10 +24,16 @@ enum _ScanState { scanning, searching, found, notFound, multipleLocations }
 
 class ScanToFindScreen extends ConsumerStatefulWidget {
   final bool initialManualMode;
+  final String? initialQuery;
+  final String? initialRouteState;
+  final Map<String, dynamic>? extraData;
 
   const ScanToFindScreen({
     super.key,
     this.initialManualMode = false,
+    this.initialQuery,
+    this.initialRouteState,
+    this.extraData,
   });
 
   @override
@@ -128,6 +134,30 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   void initState() {
     super.initState();
     _isManualMode = widget.initialManualMode;
+    
+    if (widget.initialRouteState == 'found') {
+      _state = _ScanState.found;
+      _foundProduct = widget.extraData?['product'] as Map<String, dynamic>?;
+      _isManualMode = widget.extraData?['isManual'] ?? false;
+    } else if (widget.initialRouteState == 'not-found') {
+      _state = _ScanState.notFound;
+      _scannedBarcode = widget.extraData?['query'] ?? '';
+      _isManualMode = widget.extraData?['isManual'] ?? false;
+    } else if (widget.initialRouteState == 'multiple') {
+      _state = _ScanState.multipleLocations;
+      _multipleLocationsList = widget.extraData?['products'] as List<InventoryData>? ?? [];
+      _scannedBarcode = widget.extraData?['query'] ?? '';
+      _isManualMode = widget.extraData?['isManual'] ?? false;
+    }
+
+    if (widget.initialQuery != null) {
+      _manualController.text = widget.initialQuery!;
+      _manualSearchQuery = widget.initialQuery!;
+      // Auto-trigger search after build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _performManualSearch();
+      });
+    }
     _loadRecentQueries();
 
     _pulseController = AnimationController(
@@ -294,24 +324,20 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         if (!mounted) return true;
         if (matches.length == 1) {
           final match = matches.first;
-          setState(() {
-            _scannedBarcode = match.partNo;
-            _foundProduct = {
-              'partNo': match.partNo,
-              'description': match.description ?? '',
-              'location': match.location,
-              'locationLabel': 'Location: ${match.location}',
-              'area': 'MAIN WAREHOUSE',
-              'multipleLocations': false,
-              'matchMethod': matchMethod,
-            };
-            _state = _ScanState.found;
-          });
+          final product = {
+            'partNo': match.partNo,
+            'description': match.description ?? '',
+            'location': match.location,
+            'locationLabel': 'Location: ${match.location}',
+            'area': 'MAIN WAREHOUSE',
+            'multipleLocations': false,
+            'matchMethod': matchMethod,
+          };
+          setState(() => _state = _ScanState.scanning);
+          if (mounted) context.push('/scan-to-find/found', extra: {'product': product, 'isManual': _isManualMode});
         } else {
-          setState(() {
-            _multipleLocationsList = matches;
-            _state = _ScanState.multipleLocations;
-          });
+          setState(() => _state = _ScanState.scanning);
+          if (mounted) context.push('/scan-to-find/multiple', extra: {'products': matches, 'query': matchedQuery, 'isManual': _isManualMode});
         }
         return true;
       }
@@ -331,19 +357,17 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           ScanFeedback.triggerSuccess();
           _addRecordToHistory(product['part_no'] ?? '');
           if (!mounted) return true;
-          setState(() {
-            _scannedBarcode = product['part_no'] ?? queryForApi;
-            _foundProduct = {
-              'partNo': product['part_no'] ?? '',
-              'description': product['description'] ?? '',
-              'location': product['location'] ?? '',
-              'locationLabel': 'Location: ${product['location'] ?? ''}',
-              'area': 'MAIN WAREHOUSE',
-              'multipleLocations': false,
-              'matchMethod': 'api',
-            };
-            _state = _ScanState.found;
-          });
+          final productInfo = {
+            'partNo': product['part_no'] ?? '',
+            'description': product['description'] ?? '',
+            'location': product['location'] ?? '',
+            'locationLabel': 'Location: ${product['location'] ?? ''}',
+            'area': 'MAIN WAREHOUSE',
+            'multipleLocations': false,
+            'matchMethod': 'api',
+          };
+          setState(() => _state = _ScanState.scanning);
+          if (mounted) context.push('/scan-to-find/found', extra: {'product': productInfo, 'isManual': _isManualMode});
           return true;
         }
       } catch (_) {
@@ -367,16 +391,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   void _showNotFoundInline(String scannedCode) {
     _notFoundTimer?.cancel();
     setState(() {
-      _scannedBarcode = scannedCode;
-      _state = _ScanState.notFound;
+      _scannedBarcode = '';
+      _state = _ScanState.scanning;
     });
-    // Auto-reset to scanning after 3 seconds so the user can scan again
-    _notFoundTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && _state == _ScanState.notFound) {
-        _scanAnother();
-        _scannerKey.currentState?.restartFeed();
-      }
-    });
+    context.push('/scan-to-find/not-found', extra: {'query': scannedCode, 'isManual': _isManualMode});
   }
 
   void _setTorch(bool turnOn) {
@@ -400,6 +418,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   }
 
   void _scanAnother() {
+    if (widget.initialRouteState != null && context.canPop()) {
+      context.pop();
+      return;
+    }
     setState(() {
       _state = _ScanState.scanning;
       _foundProduct = null;
@@ -640,9 +662,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     icon: Icons.keyboard_rounded,
                     label: 'Manual',
                     onTap: () {
-                      setState(() {
-                        _isManualMode = true;
-                      });
+                      context.push('/scan-to-find/manual');
                     },
                   ),
                 ],
@@ -759,21 +779,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     final product = _foundProduct!;
     return Scaffold(
       key: const ValueKey('found'),
-      appBar: AppBar(
-        title: const Text('Product Details'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: _scanAnother,
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history_rounded),
-            onPressed: () => context.push('/history'),
-          ),
-        ],
-      ),
       body: Column(
         children: [
           Expanded(
@@ -1000,19 +1005,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   Widget _buildNotFound() {
     return Scaffold(
       key: const ValueKey('not_found'),
-      appBar: AppBar(
-        title: const Text('Not Found'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () {
-            _notFoundTimer?.cancel();
-            _scanAnother();
-            _scannerKey.currentState?.restartFeed();
-          },
-        ),
-      ),
       body: Column(
         children: [
           Expanded(
@@ -1061,14 +1053,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   ElevatedButton.icon(
                     onPressed: () {
                       _notFoundTimer?.cancel();
-                      setState(() {
-                        _state = _ScanState.scanning;
-                        _isManualMode = true;
-                        _manualController.text = _scannedBarcode;
-                        _manualSearchQuery = _scannedBarcode;
-                        _searchByField = 'Part No';
-                      });
-                      _performManualSearch();
+                      context.pushReplacement('/scan-to-find/manual', extra: {'query': _scannedBarcode});
                     },
                     icon: const Icon(Icons.keyboard_rounded),
                     label: const Text('Search Manually'),
@@ -1085,8 +1070,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
               ),
             ],
           ),
-        ),
-      ],
+          ),
+        ],
       ),
     );
   }
@@ -1102,15 +1087,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         .toList();
     return Scaffold(
       key: const ValueKey('multiple'),
-      appBar: AppBar(
-        title: const Text('Multiple Locations'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: _scanAnother,
-        ),
-      ),
       body: Column(
         children: [
           Expanded(
@@ -1365,9 +1341,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              setState(() {
-                _isManualMode = true;
-              });
+              context.push('/scan-to-find/manual');
             },
             child: const Text('Search Manually',
                 style: TextStyle(
@@ -1465,23 +1439,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       key: const ValueKey('manual_search'),
-      appBar: AppBar(
-        title: const Text('Manual Search'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              setState(() {
-                _isManualMode = false;
-              });
-            }
-          },
-        ),
-      ),
       body: Column(
         children: [
           Container(
@@ -1717,7 +1674,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                                   fontSize: 13,
                                                   color: Theme.of(context)
                                                       .colorScheme
-                                                      .onSurfaceVariant)),
+                                                      .onSurfaceVariant),),
                                           const SizedBox(height: 8),
                                         ],
                                         Container(
@@ -1760,19 +1717,16 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                           .colorScheme
                                           .outline),
                                   onTap: () {
-                                    setState(() {
-                                      _foundProduct = {
-                                        'partNo': item.partNo,
-                                        'description': item.description ?? '',
-                                        'location': item.location,
-                                        'locationLabel':
-                                            'Location: ${item.location}',
-                                        'area': 'MAIN WAREHOUSE',
-                                        'stock': item.stock,
-                                        'multipleLocations': false,
-                                      };
-                                      _state = _ScanState.found;
-                                    });
+                                    final productInfo = {
+                                      'partNo': item.partNo,
+                                      'description': item.description ?? '',
+                                      'location': item.location,
+                                      'locationLabel': 'Location: ${item.location}',
+                                      'area': 'MAIN WAREHOUSE',
+                                      'stock': item.stock,
+                                      'multipleLocations': false,
+                                    };
+                                    if (mounted) context.push('/scan-to-find/found', extra: {'product': productInfo, 'isManual': _isManualMode});
                                   },
                                 ),
                               );
