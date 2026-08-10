@@ -344,42 +344,68 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
       // ── API Fallback ──────────────────────────────────────────────────────
       try {
-        final api = ref.read(apiClientProvider);
-        final queryForApi =
-            parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : rawInput;
-        final response = await api
-            .get(ApiEndpoints.inventoryBarcode(queryForApi))
-            .timeout(const Duration(seconds: 5));
-        final data = response['data'] as Map<String, dynamic>?;
-        final product = data?['product'] as Map<String, dynamic>?;
+        // To save latency and avoid spamming the backend with OCR false positives,
+        // we only perform the API fallback for explicit barcodes.
+        if (!isOcr) {
+          final api = ref.read(apiClientProvider);
+          final queryForApi =
+              parsed.ocrCorrected.isNotEmpty ? parsed.ocrCorrected : rawInput;
+          final response = await api
+              .get(ApiEndpoints.inventoryBarcode(queryForApi))
+              .timeout(const Duration(seconds: 5));
+          final data = response['data'] as Map<String, dynamic>?;
+          final product = data?['product'] as Map<String, dynamic>?;
 
-        if (product != null) {
-          ScanFeedback.triggerSuccess();
-          _addRecordToHistory(product['part_no'] ?? '');
-          if (!mounted) return true;
-          final productInfo = {
-            'partNo': product['part_no'] ?? '',
-            'description': product['description'] ?? '',
-            'location': product['location'] ?? '',
-            'locationLabel': 'Location: ${product['location'] ?? ''}',
-            'area': 'MAIN WAREHOUSE',
-            'multipleLocations': false,
-            'matchMethod': 'api',
-          };
-          setState(() => _state = _ScanState.scanning);
-          if (mounted) context.push('/scan-to-find/found', extra: {'product': productInfo, 'isManual': _isManualMode});
-          return true;
+          if (product != null) {
+            ScanFeedback.triggerSuccess();
+            _addRecordToHistory(product['part_no'] ?? '');
+            if (!mounted) return true;
+            final productInfo = {
+              'partNo': product['part_no'] ?? '',
+              'description': product['description'] ?? '',
+              'location': product['location'] ?? '',
+              'locationLabel': 'Location: ${product['location'] ?? ''}',
+              'area': 'MAIN WAREHOUSE',
+              'multipleLocations': false,
+              'matchMethod': 'api',
+            };
+            setState(() => _state = _ScanState.scanning);
+            if (mounted) context.push('/scan-to-find/found', extra: {'product': productInfo, 'isManual': _isManualMode});
+            return true;
+          }
         }
       } catch (_) {
         // API failed, fall through to not-found handling
       }
 
       // ── Not Found ─────────────────────────────────────────────────────────
+      if (isOcr) {
+        // Silently ignore OCR mismatches (likely random text false positives)
+        // so the camera keeps scanning smoothly without locking the user out.
+        if (mounted) {
+          setState(() {
+            _scannedBarcode = '';
+            _state = _ScanState.scanning;
+          });
+        }
+        return false;
+      }
+
       if (!mounted) return true;
       ScanFeedback.triggerError();
       _showNotFoundInline(bestCandidate.isNotEmpty ? bestCandidate : rawInput);
       return true;
     } catch (e) {
+      if (isOcr) {
+        if (mounted) {
+          setState(() {
+            _scannedBarcode = '';
+            _state = _ScanState.scanning;
+          });
+        }
+        return false;
+      }
+      
       if (!mounted) return true;
       ScanFeedback.triggerError();
       _showNotFoundInline(rawInput);
