@@ -5,14 +5,18 @@ int _levenshtein(String a, String b) {
   if (b.isEmpty) return a.length;
   List<int> v0 = List<int>.filled(b.length + 1, 0);
   List<int> v1 = List<int>.filled(b.length + 1, 0);
-  for (int i = 0; i <= b.length; i++) v0[i] = i;
+  for (int i = 0; i <= b.length; i++) {
+    v0[i] = i;
+  }
   for (int i = 0; i < a.length; i++) {
     v1[0] = i + 1;
     for (int j = 0; j < b.length; j++) {
       int cost = (a[i] == b[j]) ? 0 : 1;
       v1[j + 1] = min(v0[j] + cost, min(v1[j] + 1, v0[j + 1] + 1));
     }
-    for (int j = 0; j <= b.length; j++) v0[j] = v1[j];
+    for (int j = 0; j <= b.length; j++) {
+      v0[j] = v1[j];
+    }
   }
   return v0[b.length];
 }
@@ -68,14 +72,14 @@ void main() {
   String barcode = '35150KTE600';
   
   var match = _bestSubstringMatch(barcode, rawText);
-  print('Cost: ' + match.cost.toString());
-  print('Start: ' + match.startRaw.toString());
-  print('End: ' + match.endRaw.toString());
+  print('Cost: ${match.cost}');
+  print('Start: ${match.startRaw}');
+  print('End: ${match.endRaw}');
   
   if (match.cost <= 2) {
     String sr = rawText.substring(0, match.startRaw).replaceAll(RegExp(r'[^0-9]'), '').trim();
     String desc = rawText.substring(match.endRaw).replaceAll(RegExp(r'^[-\s\|]+'), '').trim();
-    print('SR: ' + sr);
-    print('DESC: ' + desc);
+    print('SR: $sr');
+    print('DESC: $desc');
   }
 }
