@@ -72,15 +72,15 @@ class _ChangePasswordScreenState
                   borderRadius:
                       BorderRadius.circular(AppDimensions.radiusMd),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    const Icon(Icons.info_outline,
+                    Icon(Icons.info_outline,
                         color: AppColors.primary, size: 20),
-                    const SizedBox(width: AppDimensions.sm),
+                    SizedBox(width: AppDimensions.sm),
                     Expanded(
                       child: Text(
                         AppStrings.firstLoginMessage,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppColors.primary, fontSize: 13),
                       ),
                     ),
@@ -150,8 +150,9 @@ class _ChangePasswordScreenState
                       setState(() => _obscureConfirm = !_obscureConfirm),
                 ),
                 validator: (v) {
-                  if (v != _newPasswordController.text)
+                  if (v != _newPasswordController.text) {
                     return 'Passwords do not match';
+                  }
                   return null;
                 },
               ),

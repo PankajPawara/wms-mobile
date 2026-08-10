@@ -381,7 +381,7 @@ OUTPUT FORMAT (strictly follow this):
         'Gemini successfully verified and corrected $processed items from the memo.',
       );
     } catch (e) {
-      if (kDebugMode) print('[GeminiVerification] Error: $e');
+      if (kDebugMode) // print('[GeminiVerification] Error: $e');
       state = state.copyWith(
         status: GeminiVerificationStatus.failed,
         errorMessage: e.toString(),

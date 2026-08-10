@@ -33,8 +33,8 @@ class OptimizationReport {
     'processingTimeMs': processingTimeMs,
     'uploadReady': uploadReady,
     'resolution': {
-      'original': '${originalWidth}x${originalHeight}',
-      'optimized': '${optimizedWidth}x${optimizedHeight}',
+      'original': '${originalWidth}x$originalHeight',
+      'optimized': '${optimizedWidth}x$optimizedHeight',
     },
   };
 }

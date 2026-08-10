@@ -2,12 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wms_mobile/core/data/validation_data.dart';
 
 void main() {
-  int _levenshtein(String a, String b) {
+  int levenshtein(String a, String b) {
     if (a.isEmpty) return b.length;
     if (b.isEmpty) return a.length;
     List<int> v0 = List<int>.filled(b.length + 1, 0);
     List<int> v1 = List<int>.filled(b.length + 1, 0);
-    for (int i = 0; i <= b.length; i++) v0[i] = i;
+    for (int i = 0; i <= b.length; i++) {
+      v0[i] = i;
+    }
     for (int i = 0; i < a.length; i++) {
       v1[0] = i + 1;
       for (int j = 0; j < b.length; j++) {
@@ -15,7 +17,9 @@ void main() {
         v1[j + 1] = v1[j] + 1 < v0[j + 1] + 1 ? v1[j] + 1 : v0[j + 1] + 1;
         v1[j + 1] = v1[j + 1] < v0[j] + cost ? v1[j + 1] : v0[j] + cost;
       }
-      for (int j = 0; j <= b.length; j++) v0[j] = v1[j];
+      for (int j = 0; j <= b.length; j++) {
+        v0[j] = v1[j];
+      }
     }
     return v0[b.length];
   }
@@ -53,7 +57,7 @@ void main() {
     String? matchedMainArea;
     for (var mainArea in ValidationData.areaSchedules.keys) {
       final normMainArea = mainArea.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
-      if (normArea.contains(normMainArea) || _levenshtein(normArea, normMainArea) <= 2) {
+      if (normArea.contains(normMainArea) || levenshtein(normArea, normMainArea) <= 2) {
         matchedMainArea = mainArea;
         break;
       }
@@ -69,7 +73,7 @@ void main() {
           bool match = true;
           for (int j = 0; j < subWords.length; j++) {
              final maxDist = subWords[j].length >= 5 ? 2 : (subWords[j].length >= 3 ? 1 : 0);
-             if (_levenshtein(custWords[i+j], subWords[j]) > maxDist) {
+             if (levenshtein(custWords[i+j], subWords[j]) > maxDist) {
                match = false;
                break;
              }

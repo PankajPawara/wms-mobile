@@ -319,7 +319,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 const Spacer(),
                                 GestureDetector(
                                   onTap: _showForgotPasswordDialog,
-                                  child: Text(
+                                  child: const Text(
                                     'Forgot Password?',
                                     style: TextStyle(
                                       fontSize: 13,

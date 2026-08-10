@@ -88,19 +88,19 @@ void main() {
     expect(result.isSuccess, true, reason: result.errors.join('\n'));
 
     final rows = result.data!.rows;
-    print('\n=== ENGINE 07 OUTPUT ===');
-    print('Total rows: ${rows.length}');
+    // print('\n=== ENGINE 07 OUTPUT ===');
+    // print('Total rows: ${rows.length}');
     for (int i = 0; i < rows.length; i++) {
       final r = rows[i];
-      print('---');
-      print('SR   : ${r.sr}');
-      print('PART : ${r.partNo}');
-      print('DESC : ${r.description}');
-      print('MRP  : ${r.mrp}');
-      print('QTY  : ${r.qty}');
-      print('LOC  : ${r.location}');
-      print('PACK : ${r.pack}');
-      print('STOCK: ${r.stock}');
+      // print('---');
+      // print('SR   : ${r.sr}');
+      // print('PART : ${r.partNo}');
+      // print('DESC : ${r.description}');
+      // print('MRP  : ${r.mrp}');
+      // print('QTY  : ${r.qty}');
+      // print('LOC  : ${r.location}');
+      // print('PACK : ${r.pack}');
+      // print('STOCK: ${r.stock}');
     }
 
     // ---- Assertions based on actual image data ----

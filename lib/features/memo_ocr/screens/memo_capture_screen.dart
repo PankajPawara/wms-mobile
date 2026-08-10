@@ -25,7 +25,7 @@ class MemoCaptureScreen extends ConsumerStatefulWidget {
 }
 
 class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
-  List<File> _imageFiles = [];
+  final List<File> _imageFiles = [];
   String _currentStepLabel = '';
   bool get _isProcessing => _currentStepLabel.isNotEmpty && _currentStepLabel != 'Done!';
   List<ImageQualityIssue> _qualityWarnings = [];
@@ -118,7 +118,7 @@ class _MemoCaptureScreenState extends ConsumerState<MemoCaptureScreen> {
         
         // Merge results
         allItems.addAll(result.items);
-        finalDump += '\n\n--- Page ${i + 1} ---\n' + result.rawOcrDump;
+        finalDump += '\n\n--- Page ${i + 1} ---\n${result.rawOcrDump}';
         
         // Use the first valid header we find
         if (finalHeader == null || finalHeader.memoNumber.contains('OCR Generated')) {

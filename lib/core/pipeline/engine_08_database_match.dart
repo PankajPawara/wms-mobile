@@ -14,7 +14,7 @@ class PartsDatabase {
       final List<dynamic> decoded = jsonDecode(jsonString);
       _parts = decoded.cast<Map<String, dynamic>>();
     } catch (e) {
-      print('Error loading parts_db.json: $e');
+      // print('Error loading parts_db.json: $e');
       _parts = [];
     }
   }
@@ -56,14 +56,18 @@ class PartsDatabase {
     if (b.isEmpty) return a.length;
     List<int> v0 = List<int>.filled(b.length + 1, 0);
     List<int> v1 = List<int>.filled(b.length + 1, 0);
-    for (int i = 0; i <= b.length; i++) v0[i] = i;
+    for (int i = 0; i <= b.length; i++) {
+      v0[i] = i;
+    }
     for (int i = 0; i < a.length; i++) {
       v1[0] = i + 1;
       for (int j = 0; j < b.length; j++) {
         int cost = (a[i] == b[j]) ? 0 : 1;
         v1[j + 1] = cost == 0 ? v0[j] : (v1[j] < v0[j + 1] ? (v1[j] < v0[j] ? v1[j] : v0[j]) : (v0[j + 1] < v0[j] ? v0[j + 1] : v0[j])) + 1;
       }
-      for (int j = 0; j <= b.length; j++) v0[j] = v1[j];
+      for (int j = 0; j <= b.length; j++) {
+        v0[j] = v1[j];
+      }
     }
     return v0[b.length];
   }
@@ -158,15 +162,13 @@ class Engine08DatabaseMatch {
           }
 
           // 3. Try fuzzy match (Levenshtein distance <= 2)
-          if (dbMatch == null) {
-            dbMatch = PartsDatabase.fuzzyMatch(barcode);
-          }
+          dbMatch ??= PartsDatabase.fuzzyMatch(barcode);
         }
 
         // 4. If still no match (or if partNo was completely empty due to grid layout issues),
         // try to find the barcode inside the combined text of the row.
         if (dbMatch == null) {
-          final rawRowText = row.sr + " " + row.partNo + " " + row.description;
+          final rawRowText = "${row.sr} ${row.partNo} ${row.description}";
           final substringMatch = PartsDatabase.findBestSubstringMatch(rawRowText);
           
           if (substringMatch != null) {

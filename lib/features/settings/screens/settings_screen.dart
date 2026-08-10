@@ -79,7 +79,7 @@ class SettingsScreen extends ConsumerWidget {
                         Icon(Icons.chevron_right_rounded,
                             color: colorScheme.outline),
                         const SizedBox(height: 4),
-                        Text('View Profile',
+                        const Text('View Profile',
                             style: TextStyle(
                                 fontSize: 11, color: AppColors.primary)),
                       ],
@@ -92,7 +92,7 @@ class SettingsScreen extends ConsumerWidget {
 
             // ── DATA MANAGEMENT ─────────────────────────────────────────────
             if (isAdminOrDev) ...[
-              _SectionLabel('DATA MANAGEMENT'),
+              const _SectionLabel('DATA MANAGEMENT'),
               const SizedBox(height: 8),
               StreamBuilder<InventoryMeta?>(
                 stream: ref.watch(appDatabaseProvider).select(ref.watch(appDatabaseProvider).inventoryMetas).watchSingleOrNull(),
@@ -133,7 +133,7 @@ class SettingsScreen extends ConsumerWidget {
             ],
 
             // ── TOOLS ───────────────────────────────────────────────────────
-            _SectionLabel('TOOLS'),
+            const _SectionLabel('TOOLS'),
             const SizedBox(height: 8),
             _SettingsGroup(items: [
               _SettingsItem(
@@ -166,7 +166,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // ── SCANNER SETTINGS ─────────────────────────────────────────────
-            _SectionLabel('SCANNER SETTINGS'),
+            const _SectionLabel('SCANNER SETTINGS'),
             const SizedBox(height: 8),
             _SettingsGroup(items: [
               _SettingsItem(
@@ -186,7 +186,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // ── THEME SETTINGS ───────────────────────────────────────────────
-            _SectionLabel('THEME SETTINGS'),
+            const _SectionLabel('THEME SETTINGS'),
             const SizedBox(height: 8),
             _SettingsGroup(items: [
               _SettingsItem(
@@ -201,7 +201,7 @@ class SettingsScreen extends ConsumerWidget {
 
             // ── DEVELOPER TOOLS ───────────────────────────────────────────────
             if (roleRaw == 'developer') ...[
-              _SectionLabel('DEVELOPER TOOLS'),
+              const _SectionLabel('DEVELOPER TOOLS'),
               const SizedBox(height: 8),
               _SettingsGroup(items: [
                 _SettingsItem(
@@ -222,7 +222,7 @@ class SettingsScreen extends ConsumerWidget {
             ],
 
             // ── OTHERS ──────────────────────────────────────────────────────
-            _SectionLabel('OTHERS'),
+            const _SectionLabel('OTHERS'),
             const SizedBox(height: 8),
             _SettingsGroup(items: [
               _SettingsItem(
@@ -386,7 +386,7 @@ class SettingsScreen extends ConsumerWidget {
                       SwitchListTile(
                         title: const Text('Vibrate on successful scan'),
                         value: vibrate,
-                        activeColor: AppColors.primary,
+                        activeThumbColor: AppColors.primary,
                         onChanged: (val) async {
                           await db.into(db.appSettings).insertOnConflictUpdate(
                             AppSettingsCompanion(
@@ -400,7 +400,7 @@ class SettingsScreen extends ConsumerWidget {
                       SwitchListTile(
                         title: const Text('Beep on successful scan'),
                         value: beep,
-                        activeColor: AppColors.primary,
+                        activeThumbColor: AppColors.primary,
                         onChanged: (val) async {
                           await db.into(db.appSettings).insertOnConflictUpdate(
                             AppSettingsCompanion(
@@ -513,7 +513,7 @@ class SettingsScreen extends ConsumerWidget {
                       SwitchListTile(
                         title: const Text('Auto-process image after selection'),
                         value: autoTrigger,
-                        activeColor: AppColors.primary,
+                        activeThumbColor: AppColors.primary,
                         onChanged: (val) async {
                           await db.into(db.appSettings).insertOnConflictUpdate(
                             AppSettingsCompanion(

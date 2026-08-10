@@ -223,7 +223,7 @@ class _PartsMasterScreenState extends ConsumerState<PartsMasterScreen> {
                 children: [
                   Text(
                     '${_filtered.length} of ${_allItems.length} parts',
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: AppColors.textSecondary, fontSize: 12),
                   ),
                   const Spacer(),
@@ -232,7 +232,7 @@ class _PartsMasterScreenState extends ConsumerState<PartsMasterScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
@@ -256,7 +256,7 @@ class _PartsMasterScreenState extends ConsumerState<PartsMasterScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.inventory_2_outlined,
+                            const Icon(Icons.inventory_2_outlined,
                                 size: 64, color: AppColors.textDisabled),
                             const SizedBox(height: 12),
                             Text(
@@ -264,7 +264,7 @@ class _PartsMasterScreenState extends ConsumerState<PartsMasterScreen> {
                                   ? 'No parts yet.\nScan a memo to start building the DB.'
                                   : 'No results for "${_searchCtrl.text}"',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: AppColors.textSecondary),
+                              style: const TextStyle(color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -346,7 +346,7 @@ class _PartCard extends StatelessWidget {
           // Description
           Text(
             part.description ?? '—',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
 
           const SizedBox(height: 8),
@@ -372,7 +372,7 @@ class _PartCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Last updated: ${_formatDate(part.lastSeenAt)}',
-            style: TextStyle(color: AppColors.textDisabled, fontSize: 11),
+            style: const TextStyle(color: AppColors.textDisabled, fontSize: 11),
           ),
         ],
       ),
@@ -420,9 +420,9 @@ class _SourceBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Text(
         label,

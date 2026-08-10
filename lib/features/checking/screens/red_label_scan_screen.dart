@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -193,7 +192,7 @@ class _RedLabelScanScreenState extends ConsumerState<RedLabelScanScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(32),
               ),
               child: const Text(
@@ -224,7 +223,7 @@ class _RedLabelScanScreenState extends ConsumerState<RedLabelScanScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _saved ? Colors.green.withOpacity(0.2) : AppColors.primary.withOpacity(0.15),
+                  color: _saved ? Colors.green.withValues(alpha: 0.2) : AppColors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: _saved ? Colors.green : AppColors.primary,
@@ -253,7 +252,7 @@ class _RedLabelScanScreenState extends ConsumerState<RedLabelScanScreen> {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: _saved ? Colors.green.withOpacity(0.4) : AppColors.primary.withOpacity(0.3),
+                color: _saved ? Colors.green.withValues(alpha: 0.4) : AppColors.primary.withValues(alpha: 0.3),
               ),
             ),
             child: Column(
@@ -282,9 +281,9 @@ class _RedLabelScanScreenState extends ConsumerState<RedLabelScanScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
+                color: Colors.amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
               ),
               child: Row(
                 children: [
@@ -307,9 +306,9 @@ class _RedLabelScanScreenState extends ConsumerState<RedLabelScanScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.red.withOpacity(0.4)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
               ),
               child: Text(
                 _error!,
@@ -412,7 +411,7 @@ class _RedLabelScanScreenState extends ConsumerState<RedLabelScanScreen> {
             width: 150,
             child: Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 12,
               ),

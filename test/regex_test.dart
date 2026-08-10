@@ -49,12 +49,12 @@ void main() {
       line = line.substring(srMatch.end);
     }
 
-    print('Original: $original');
-    print('Remaining (Part+Desc): $line');
-    print('SR: $sr');
-    print('LOC: $loc');
-    print('QTY: $qty');
-    print('MRP: $mrp');
-    print('---');
+    // print('Original: $original');
+    // print('Remaining (Part+Desc): $line');
+    // print('SR: $sr');
+    // print('LOC: $loc');
+    // print('QTY: $qty');
+    // print('MRP: $mrp');
+    // print('---');
   }
 }

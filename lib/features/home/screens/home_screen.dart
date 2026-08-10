@@ -440,8 +440,8 @@ class _ScanFab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Wave top — passes color via constructor parameter
-        CustomPaint(
-          size: const Size(double.infinity, 40),
+        const CustomPaint(
+          size: Size(double.infinity, 40),
           painter: _WavePainter(color: AppColors.primaryDark),
         ),
         // Solid purple section

@@ -70,6 +70,7 @@ dev_dependencies:
   drift_dev: ^2.23.1
   build_runner: ^2.4.13
   riverpod_generator: ^2.6.1
+  sqlite3: ^2.9.4
 
 flutter:
   uses-material-design: true

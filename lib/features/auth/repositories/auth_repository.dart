@@ -1,5 +1,4 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/network/api_client.dart';

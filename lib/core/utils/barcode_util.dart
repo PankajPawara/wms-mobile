@@ -1,4 +1,4 @@
-﻿class BarcodeUtil {
+class BarcodeUtil {
   BarcodeUtil._();
 
   static String cleanExtractedPartNo(String input) {
@@ -163,7 +163,7 @@
       if (line.isEmpty) continue;
 
       // Helper to clean O->0, l/I->1 for numeric fields
-      String _cleanNum(String s) => s.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1');
+      String cleanNum(String s) => s.replaceAll(RegExp(r'[Oo]'), '0').replaceAll(RegExp(r'[Il]'), '1');
 
       // â”€â”€â”€ CASE A: FAS Software Pipe Delimited Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (line.contains('|')) {
@@ -208,7 +208,7 @@
             double price = 0.0;
             for (int c = 0; c < cols.length; c++) {
               if (c == partColIdx) continue;
-              final colVal = _cleanNum(cols[c]);
+              final colVal = cleanNum(cols[c]);
               final decimalMatch = RegExp(r'\b\d+[\.,]\d{2}\b').firstMatch(colVal);
               if (decimalMatch != null) {
                 price = double.tryParse(decimalMatch.group(0)!.replaceAll(',', '.')) ?? 0.0;
@@ -222,9 +222,9 @@
             int stock = 0;
 
             if (cols.length >= 8) {
-              qty = int.tryParse(_cleanNum(cols[4])) ?? 1;
+              qty = int.tryParse(cleanNum(cols[4])) ?? 1;
               location = cols[5];
-              stock = int.tryParse(_cleanNum(cols[7])) ?? 0;
+              stock = int.tryParse(cleanNum(cols[7])) ?? 0;
             } else {
               // Guess columns if count is different
               for (int c = partColIdx + 2; c < cols.length; c++) {
@@ -232,7 +232,7 @@
                 if (RegExp(r'^[A-Z0-9]+-[A-Z0-9]+(-[A-Z0-9]+)?$').hasMatch(val)) {
                   location = val;
                 } else {
-                  final numVal = int.tryParse(_cleanNum(val));
+                  final numVal = int.tryParse(cleanNum(val));
                   if (numVal != null) {
                     if (qty == 1 && numVal > 0 && numVal < 100) {
                       qty = numVal;
@@ -267,7 +267,7 @@
         final rawPartNo = partMatch.group(0)!;
         final normalizedPartNo = rawPartNo.replaceAll(RegExp(r'[-.\s]+'), '-').toUpperCase();
 
-        final contextText = _cleanNum('$line ${i + 1 < lines.length ? lines[i + 1] : ""}');
+        final contextText = cleanNum('$line ${i + 1 < lines.length ? lines[i + 1] : ""}');
 
         // Extract unit price
         double? price;
@@ -284,7 +284,7 @@
 
         // Extract qty
         int qty = 1;
-        final cleanedLine = _cleanNum(line);
+        final cleanedLine = cleanNum(line);
         final qtyMatch1 = RegExp(r'(?:QTY|QTY\.|QTY\s*:|PCS|PCS\.|x|\b)\s*(\d{1,2})\b', caseSensitive: false).firstMatch(cleanedLine);
         if (qtyMatch1 != null) {
           qty = int.tryParse(qtyMatch1.group(1)!) ?? 1;

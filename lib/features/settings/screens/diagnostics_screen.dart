@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' hide Column, Table;
 
 import '../../../core/constants/app_colors.dart';
@@ -174,7 +173,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
           padding: const EdgeInsets.all(AppDimensions.md),
           children: [
             // ── SECTION 1: SYNC LOG HEALTH ───────────────────────────────
-            _SectionHeader(title: 'SYNC HEALTH LOGS'),
+            const _SectionHeader(title: 'SYNC HEALTH LOGS'),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -257,7 +256,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
             const SizedBox(height: 20),
 
             // ── SECTION 2: COUNTS SUMMARY ─────────────────────────────────
-            _SectionHeader(title: 'SQLITE STATS'),
+            const _SectionHeader(title: 'SQLITE STATS'),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -275,7 +274,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
             const SizedBox(height: 20),
 
             // ── SECTION 3: CATALOG VIEWER ──────────────────────────────────
-            _SectionHeader(title: 'SQLITE INVENTORY VIEWER (10 PER PAGE)'),
+            const _SectionHeader(title: 'SQLITE INVENTORY VIEWER (10 PER PAGE)'),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(

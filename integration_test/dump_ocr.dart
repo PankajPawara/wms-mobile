@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -9,7 +8,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:wms_mobile/core/pipeline/engine_01_acquisition.dart';
 import 'package:wms_mobile/core/pipeline/engine_02_processing.dart';
 import 'package:wms_mobile/core/pipeline/engine_02a_optimization.dart';
-import 'package:wms_mobile/core/pipeline/engine_03_header.dart';
 import 'package:wms_mobile/core/pipeline/engine_04_table_detection.dart';
 
 void main() {

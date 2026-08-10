@@ -1,5 +1,6 @@
 /// Strongly-typed models for the memo OCR pipeline.
 /// Replaces the raw Map<String, dynamic> approach throughout the OCR feature.
+library;
 
 /// Confidence level for a DB-validated part number.
 enum MatchConfidence {

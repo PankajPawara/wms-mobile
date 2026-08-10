@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -110,8 +109,9 @@ class Engine04TableDetection {
 
           for (final bw in bandWords) {
             final t = bw.text.toUpperCase();
-            if (t == 'SR' || t == 'S.R' || t == 'SR.') hasSr = true;
-            else if (t.contains('PART') || t.contains('PARI') || t.contains('PRT') || t.contains('1ART')) hasPart = true;
+            if (t == 'SR' || t == 'S.R' || t == 'SR.') {
+              hasSr = true;
+            } else if (t.contains('PART') || t.contains('PARI') || t.contains('PRT') || t.contains('1ART')) hasPart = true;
             else if (t.contains('DESC') || t == 'DES' || t.contains('DSCR')) hasDesc = true;
             else if (t.contains('QTY') || t.contains('QTV')) hasQty = true;
             else if (t.contains('MRP') || t.contains('M.R.P')) hasMrp = true;

@@ -25,7 +25,7 @@ class _AIVisionTestScreenState extends ConsumerState<AIVisionTestScreen> {
   static const _storage = FlutterSecureStorage();
   
   AIVisionMode _mode = AIVisionMode.memo;
-  List<File> _imageFiles = [];
+  final List<File> _imageFiles = [];
   bool _isProcessing = false;
   bool _isGeminiProcessing = false;
   String _resultText = '';

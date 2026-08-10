@@ -214,8 +214,9 @@ class CandidateGenerator {
       );
       
       double score = 0.0;
-      if (item.confidence == MatchConfidence.exact) score = 1.0;
-      else if (item.confidence == MatchConfidence.normalized) score = 0.95;
+      if (item.confidence == MatchConfidence.exact) {
+        score = 1.0;
+      } else if (item.confidence == MatchConfidence.normalized) score = 0.95;
       else if (item.confidence == MatchConfidence.fuzzy) score = 0.85;
       else score = 0.0;
       

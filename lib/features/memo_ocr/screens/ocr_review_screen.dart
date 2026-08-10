@@ -294,12 +294,12 @@ class _OcrReviewScreenState extends ConsumerState<OcrReviewScreen> {
                     'Correcting with AI... (${geminiState.processedCount}/${geminiState.totalCount})',
                 isRunning: true),
           if (geminiState.isCompleted && !geminiState.isRunning)
-            _GeminiStatusBar(
+            const _GeminiStatusBar(
                 label:
                     '✅ AI verification complete',
                 isRunning: false),
           if (geminiState.hasFailed)
-            _GeminiStatusBar(
+            const _GeminiStatusBar(
                 label: '⚠️ AI verification failed — showing best local results',
                 isRunning: false,
                 isError: true),
@@ -482,11 +482,11 @@ class _OcrItemCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
         border: Border.all(color: AppColors.border),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
               color: AppColors.cardShadow,
               blurRadius: 6,
-              offset: const Offset(0, 2))
+              offset: Offset(0, 2))
         ],
       ),
       child: Column(
