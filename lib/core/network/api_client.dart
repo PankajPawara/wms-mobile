@@ -29,7 +29,9 @@ class ApiClient {
   final Dio _dio;
   final SecureStorage _storage;
 
-  ApiClient(this._storage)
+  final void Function()? onUnauthenticated;
+
+  ApiClient(this._storage, {this.onUnauthenticated})
       : _dio = Dio(
           BaseOptions(
             baseUrl: ApiEndpoints.baseUrl,
@@ -59,12 +61,16 @@ class ApiClient {
       onError: (error, handler) {
         if (error.response != null) {
           final data = error.response!.data;
+          if (error.response!.statusCode == 401 && onUnauthenticated != null) {
+            onUnauthenticated!();
+          }
+
           handler.reject(error.copyWith(
             error: ApiException(
-              message: data['message'] ?? AppStrings.error,
-              errorCode: data['error_code'] ?? 'INTERNAL_ERROR',
+              message: data is Map<String, dynamic> ? (data['message'] ?? AppStrings.error) : 'Unauthorized or Invalid Token',
+              errorCode: data is Map<String, dynamic> ? (data['error_code'] ?? 'INTERNAL_ERROR') : 'UNAUTHORIZED',
               statusCode: error.response!.statusCode ?? 500,
-              errors: List<String>.from(data['errors'] ?? []),
+              errors: data is Map<String, dynamic> ? List<String>.from(data['errors'] ?? []) : [],
             ),
           ));
           return;
@@ -82,28 +88,52 @@ class ApiClient {
 
   Future<Map<String, dynamic>> get(String path,
       {Map<String, dynamic>? queryParams}) async {
-    final response = await _dio.get(path, queryParameters: queryParams);
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.get(path, queryParameters: queryParams);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.error is ApiException) throw e.error!;
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> post(String path, {dynamic data}) async {
-    final response = await _dio.post(path, data: data);
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.post(path, data: data);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.error is ApiException) throw e.error!;
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> patch(String path, {dynamic data}) async {
-    final response = await _dio.patch(path, data: data);
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.patch(path, data: data);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.error is ApiException) throw e.error!;
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> put(String path, {dynamic data}) async {
-    final response = await _dio.put(path, data: data);
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.put(path, data: data);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.error is ApiException) throw e.error!;
+      rethrow;
+    }
   }
 }
+
+final unauthenticatedEventProvider = StateProvider<bool>((ref) => false);
 
 @riverpod
 ApiClient apiClient(Ref ref) {
   final storage = ref.watch(secureStorageProvider);
-  return ApiClient(storage);
+  return ApiClient(storage, onUnauthenticated: () {
+    ref.read(unauthenticatedEventProvider.notifier).state = true;
+  });
 }

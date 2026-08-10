@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../core/network/api_client.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/screens/change_password_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
@@ -34,6 +35,14 @@ part 'app_router.g.dart';
 @riverpod
 GoRouter appRouter(AppRouterRef ref) {
   final authState = ref.watch(authNotifierProvider);
+  final isUnauthenticatedEvent = ref.watch(unauthenticatedEventProvider);
+
+  if (isUnauthenticatedEvent) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authNotifierProvider.notifier).logout();
+      ref.read(unauthenticatedEventProvider.notifier).state = false;
+    });
+  }
 
   return GoRouter(
     initialLocation: '/',
