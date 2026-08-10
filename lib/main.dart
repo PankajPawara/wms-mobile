@@ -36,10 +36,12 @@ Future<void> _setupFirebase() async {
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'inventory_updates_channel', // id
+    'inventory_updates_channel_v2', // id
     'Inventory Updates', // name
     description: 'Notifications for location data updates.', // description
     importance: Importance.max,
+    playSound: true,
+    enableVibration: true,
   );
 
   await flutterLocalNotificationsPlugin
@@ -68,6 +70,10 @@ Future<void> _setupFirebase() async {
             channel.name,
             channelDescription: channel.description,
             icon: android.smallIcon ?? '@mipmap/ic_launcher',
+            playSound: true,
+            enableVibration: true,
+            priority: Priority.max,
+            importance: Importance.max,
           ),
         ),
       );
