@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
@@ -75,34 +76,37 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   StreamSubscription<double>? _lightSensorSubscription;
 
   // Recent searches history
-  List<String> _recentQueries = [];
+  List<Map<String, dynamic>> _recentQueries = [];
 
   Future<void> _loadRecentQueries() async {
     try {
       const storage = FlutterSecureStorage(
         aOptions: AndroidOptions(encryptedSharedPreferences: true),
       );
-      final jsonStr = await storage.read(key: 'wms_search_history');
+      final jsonStr = await storage.read(key: 'wms_search_history_v2');
       if (jsonStr != null) {
         final List<dynamic> decoded = json.decode(jsonStr);
         if (mounted) {
           setState(() {
-            _recentQueries = decoded.cast<String>();
+            _recentQueries = decoded.map((e) => e as Map<String, dynamic>).toList();
           });
         }
       }
     } catch (_) {}
   }
 
-  Future<void> _addRecordToHistory(String query) async {
-    final trimmed = query.trim().toUpperCase();
-    if (trimmed.isEmpty) return;
+  Future<void> _addRecordToHistory(Map<String, dynamic> record) async {
+    if (record['partNo'] == null || record['partNo'].toString().trim().isEmpty) return;
+    
+    final trimmedPartNo = record['partNo'].toString().trim().toUpperCase();
+    record['partNo'] = trimmedPartNo;
+    record['timestamp'] = DateTime.now().toIso8601String();
 
-    _recentQueries.remove(trimmed);
-    _recentQueries.insert(0, trimmed);
+    _recentQueries.removeWhere((r) => r['partNo']?.toString().toUpperCase() == trimmedPartNo);
+    _recentQueries.insert(0, record);
 
-    if (_recentQueries.length > 8) {
-      _recentQueries = _recentQueries.sublist(0, 8);
+    if (_recentQueries.length > 20) {
+      _recentQueries = _recentQueries.sublist(0, 20);
     }
 
     if (mounted) setState(() {});
@@ -112,7 +116,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         aOptions: AndroidOptions(encryptedSharedPreferences: true),
       );
       await storage.write(
-          key: 'wms_search_history', value: json.encode(_recentQueries));
+          key: 'wms_search_history_v2', value: json.encode(_recentQueries));
     } catch (_) {}
   }
 
@@ -320,7 +324,12 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       // ── Handle local DB match ─────────────────────────────────────────────
       if (matches.isNotEmpty) {
         ScanFeedback.triggerSuccess();
-        _addRecordToHistory(matches.first.partNo);
+        _addRecordToHistory({
+          'partNo': matches.first.partNo,
+          'description': matches.first.description ?? '',
+          'location': matches.first.location,
+          'stock': matches.first.stock,
+        });
         if (!mounted) return true;
         if (matches.length == 1) {
           final match = matches.first;
@@ -358,7 +367,12 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
           if (product != null) {
             ScanFeedback.triggerSuccess();
-            _addRecordToHistory(product['part_no'] ?? '');
+            _addRecordToHistory({
+              'partNo': product['part_no'] ?? '',
+              'description': product['description'] ?? '',
+              'location': product['location'] ?? '',
+              'stock': product['stock'] ?? 0,
+            });
             if (!mounted) return true;
             final productInfo = {
               'partNo': product['part_no'] ?? '',
@@ -1009,8 +1023,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
               ],
             ),
           ),
-        ),
-      ],
+          ),
+        ],
       ),
     );
   }
@@ -1237,8 +1251,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
               ],
             ),
           ),
-        ),
-      ],
+          ),
+        ],
       ),
     );
   }
@@ -1271,7 +1285,12 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     }
 
     if (results.isNotEmpty) {
-      _addRecordToHistory(results.first.partNo);
+      _addRecordToHistory({
+        'partNo': results.first.partNo,
+        'description': results.first.description ?? '',
+        'location': results.first.location,
+        'stock': results.first.stock,
+      });
     }
 
     setState(() {
@@ -1596,26 +1615,81 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                         .onSurfaceVariant),
                               )
                             else
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: _recentQueries.map((query) {
-                                  return ActionChip(
-                                    label: Text(query,
-                                        style: const TextStyle(fontSize: 12)),
-                                    backgroundColor: AppColors.primary
-                                        .withValues(alpha: 0.10),
-                                    side: BorderSide.none,
-                                    onPressed: () {
-                                      _manualController.text = query;
-                                      _manualSearchQuery = query;
-                                      _performManualSearch();
-                                    },
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(20)),
+                              ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _recentQueries.length,
+                                itemBuilder: (context, index) {
+                                  final query = _recentQueries[index];
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    elevation: 1,
+                                    child: ListTile(
+                                      contentPadding: const EdgeInsets.all(16),
+                                      title: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            query['partNo']?.toString() ?? '',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Theme.of(context).colorScheme.onSurface,
+                                            ),
+                                          ),
+                                          if (query['location'] != null && query['location'].toString().isNotEmpty)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary.withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 16),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    query['location'].toString(),
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppColors.primary,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      subtitle: Padding(
+                                        padding: const EdgeInsets.only(top: 8.0),
+                                        child: Text(
+                                          query['timestamp'] != null 
+                                            ? DateFormat('MMM d, yyyy h:mm a').format(DateTime.tryParse(query['timestamp'].toString()) ?? DateTime.now()) 
+                                            : '',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                      onTap: () {
+                                        final productInfo = {
+                                          'partNo': query['partNo'] ?? '',
+                                          'description': query['description'] ?? '',
+                                          'location': query['location'] ?? '',
+                                          'locationLabel': 'Location: ${query['location'] ?? ''}',
+                                          'area': 'MAIN WAREHOUSE',
+                                          'stock': query['stock'] ?? 0,
+                                          'multipleLocations': false,
+                                        };
+                                        if (mounted) setState(() { _foundProduct = productInfo; _state = _ScanState.found; });
+                                      },
+                                    ),
                                   );
-                                }).toList(),
+                                },
                               ),
                           ],
                         ),
