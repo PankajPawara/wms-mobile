@@ -63,6 +63,13 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   List<InventoryData> _manualSearchResults = [];
   bool _isManualSearching = false;
 
+  String _formatLocation(String? loc) {
+    if (loc == null || loc.trim().isEmpty) return 'No Location';
+    if (loc.trim().toLowerCase() == 'location not defined') return 'No Location';
+    return loc;
+  }
+
+
   bool _isDetecting = false;
   Timer? _detectionTimer;
   Timer? _notFoundTimer;
@@ -327,7 +334,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         _addRecordToHistory({
           'partNo': matches.first.partNo,
           'description': matches.first.description ?? '',
-          'location': matches.first.location,
+          'location': _formatLocation(matches.first.location),
           'stock': matches.first.stock,
         });
         if (!mounted) return true;
@@ -336,8 +343,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           final product = {
             'partNo': match.partNo,
             'description': match.description ?? '',
-            'location': match.location,
-            'locationLabel': 'Location: ${match.location}',
+            'location': _formatLocation(match.location),
+            'locationLabel': 'Location: ',
             'area': 'MAIN WAREHOUSE',
             'multipleLocations': false,
             'matchMethod': matchMethod,
@@ -370,15 +377,15 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
             _addRecordToHistory({
               'partNo': product['part_no'] ?? '',
               'description': product['description'] ?? '',
-              'location': product['location'] ?? '',
+              'location': _formatLocation(product['location']),
               'stock': product['stock'] ?? 0,
             });
             if (!mounted) return true;
             final productInfo = {
               'partNo': product['part_no'] ?? '',
               'description': product['description'] ?? '',
-              'location': product['location'] ?? '',
-              'locationLabel': 'Location: ${product['location'] ?? ''}',
+              'location': _formatLocation(product['location']),
+              'locationLabel': 'Location: ',
               'area': 'MAIN WAREHOUSE',
               'multipleLocations': false,
               'matchMethod': 'api',
@@ -1288,7 +1295,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       _addRecordToHistory({
         'partNo': results.first.partNo,
         'description': results.first.description ?? '',
-        'location': results.first.location,
+        'location': _formatLocation(results.first.location),
         'stock': results.first.stock,
       });
     }
@@ -1679,8 +1686,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                         final productInfo = {
                                           'partNo': query['partNo'] ?? '',
                                           'description': query['description'] ?? '',
-                                          'location': query['location'] ?? '',
-                                          'locationLabel': 'Location: ${query['location'] ?? ''}',
+                                          'location': _formatLocation(query['location']?.toString()),
+                                          'locationLabel': 'Location: ',
                                           'area': 'MAIN WAREHOUSE',
                                           'stock': query['stock'] ?? 0,
                                           'multipleLocations': false,
@@ -1787,7 +1794,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                                       color:
                                                           AppColors.primary)),
                                               Text(
-                                                item.location,
+_formatLocation(item.location),
                                                 style: const TextStyle(
                                                     fontSize: 18,
                                                     fontWeight: FontWeight.bold,
@@ -1807,8 +1814,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                     final productInfo = {
                                       'partNo': item.partNo,
                                       'description': item.description ?? '',
-                                      'location': item.location,
-                                      'locationLabel': 'Location: ${item.location}',
+                                      'location': _formatLocation(item.location),
+                                      'locationLabel': 'Location: ',
                                       'area': 'MAIN WAREHOUSE',
                                       'stock': item.stock,
                                       'multipleLocations': false,
