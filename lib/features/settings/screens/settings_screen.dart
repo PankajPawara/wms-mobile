@@ -148,12 +148,6 @@ class SettingsScreen extends ConsumerWidget {
                   title: 'Scanner Test (Diagnostic)',
                   subtitle: 'Test camera, barcode, OCR etc.',
                   onTap: () => context.push('/scan-to-find')),
-              _SettingsItem(
-                  icon: Icons.history_rounded,
-                  iconColor: const Color(0xFFD97706),
-                  title: 'History',
-                  subtitle: 'View all orders and status',
-                  onTap: () => context.push('/history')),
               if (roleRaw == 'developer')
                 _SettingsItem(
                     icon: Icons.auto_awesome_rounded,
