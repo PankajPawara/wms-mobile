@@ -64,8 +64,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   bool _isManualSearching = false;
 
   String _formatLocation(String? loc) {
-    if (loc == null || loc.trim().isEmpty) return 'No Location';
-    if (loc.trim().toLowerCase() == 'location not defined') return 'No Location';
+    if (loc == null || loc.trim().isEmpty) return 'NN';
+    if (loc.trim().toLowerCase() == 'location not defined') return 'NN';
     return loc;
   }
 
@@ -1291,15 +1291,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           .get();
     }
 
-    if (results.isNotEmpty) {
-      _addRecordToHistory({
-        'partNo': results.first.partNo,
-        'description': results.first.description ?? '',
-        'location': _formatLocation(results.first.location),
-        'stock': results.first.stock,
-      });
-    }
-
     setState(() {
       _manualSearchResults = results;
       _isManualSearching = false;
@@ -1820,6 +1811,7 @@ _formatLocation(item.location),
                                       'stock': item.stock,
                                       'multipleLocations': false,
                                     };
+                                    _addRecordToHistory(productInfo);
                                     if (mounted) setState(() { _foundProduct = productInfo; _state = _ScanState.found; });
                                   },
                                 ),
