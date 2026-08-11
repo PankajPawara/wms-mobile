@@ -334,10 +334,10 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
             'matchMethod': matchMethod,
           };
           setState(() => _state = _ScanState.scanning);
-          if (mounted) context.push('/scan-to-find/found', extra: {'product': product, 'isManual': _isManualMode});
+          if (mounted) setState(() { _foundProduct = product; _state = _ScanState.found; });
         } else {
           setState(() => _state = _ScanState.scanning);
-          if (mounted) context.push('/scan-to-find/multiple', extra: {'products': matches, 'query': matchedQuery, 'isManual': _isManualMode});
+          if (mounted) setState(() { _multipleLocationsList = matches; _state = _ScanState.multipleLocations; });
         }
         return true;
       }
@@ -370,7 +370,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
               'matchMethod': 'api',
             };
             setState(() => _state = _ScanState.scanning);
-            if (mounted) context.push('/scan-to-find/found', extra: {'product': productInfo, 'isManual': _isManualMode});
+            if (mounted) setState(() { _foundProduct = productInfo; _state = _ScanState.found; });
             return true;
           }
         }
@@ -420,7 +420,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       _scannedBarcode = '';
       _state = _ScanState.scanning;
     });
-    context.push('/scan-to-find/not-found', extra: {'query': scannedCode, 'isManual': _isManualMode});
+    setState(() => _state = _ScanState.notFound);
   }
 
   void _setTorch(bool turnOn) {
@@ -457,19 +457,6 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
-    if (location != '/scan-to-find') {
-      if (_manualController.text.isNotEmpty ||
-          _manualSearchQuery.isNotEmpty ||
-          _isManualMode) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _manualController.clear();
-          _manualSearchQuery = '';
-          _isManualMode = false;
-          if (mounted) setState(() {});
-        });
-      }
-    }
 
     // If this screen was pushed onto the stack (e.g. from home screen Manual
     // Search button), the system back gesture / button should simply pop it.
@@ -688,7 +675,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     icon: Icons.keyboard_rounded,
                     label: 'Manual',
                     onTap: () {
-                      context.push('/scan-to-find/manual');
+                      setState(() { _isManualMode = true; _state = _ScanState.scanning; });
                     },
                   ),
                 ],
@@ -1079,7 +1066,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   ElevatedButton.icon(
                     onPressed: () {
                       _notFoundTimer?.cancel();
-                      context.pushReplacement('/scan-to-find/manual', extra: {'query': _scannedBarcode});
+                      setState(() { _isManualMode = true; _manualController.text = _scannedBarcode; _state = _ScanState.scanning; });
                     },
                     icon: const Icon(Icons.keyboard_rounded),
                     label: const Text('Search Manually'),
@@ -1367,7 +1354,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              context.push('/scan-to-find/manual');
+              setState(() { _isManualMode = true; _state = _ScanState.scanning; });
             },
             child: const Text('Search Manually',
                 style: TextStyle(
@@ -1752,7 +1739,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                                       'stock': item.stock,
                                       'multipleLocations': false,
                                     };
-                                    if (mounted) context.push('/scan-to-find/found', extra: {'product': productInfo, 'isManual': _isManualMode});
+                                    if (mounted) setState(() { _foundProduct = productInfo; _state = _ScanState.found; });
                                   },
                                 ),
                               );

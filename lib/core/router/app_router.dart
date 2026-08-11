@@ -97,46 +97,7 @@ GoRouter appRouter(AppRouterRef ref) {
               );
             },
           ),
-          GoRoute(
-            path: '/scan-to-find/manual',
-            builder: (context, state) {
-              final extra = state.extra as Map<String, dynamic>?;
-              return ScanToFindScreen(
-                initialManualMode: true,
-                initialQuery: extra?['query'] as String?,
-              );
-            },
-          ),
-          GoRoute(
-            path: '/scan-to-find/found',
-            builder: (context, state) {
-              final extra = state.extra as Map<String, dynamic>?;
-              return ScanToFindScreen(
-                initialRouteState: 'found',
-                extraData: extra,
-              );
-            },
-          ),
-          GoRoute(
-            path: '/scan-to-find/not-found',
-            builder: (context, state) {
-              final extra = state.extra as Map<String, dynamic>?;
-              return ScanToFindScreen(
-                initialRouteState: 'not-found',
-                extraData: extra,
-              );
-            },
-          ),
-          GoRoute(
-            path: '/scan-to-find/multiple',
-            builder: (context, state) {
-              final extra = state.extra as Map<String, dynamic>?;
-              return ScanToFindScreen(
-                initialRouteState: 'multiple',
-                extraData: extra,
-              );
-            },
-          ),
+
           GoRoute(path: '/checking-list', builder: (_, __) => const CheckingListScreen()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
 
