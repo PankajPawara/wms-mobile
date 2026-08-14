@@ -20,6 +20,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/utils/barcode_util.dart';
 import '../../../core/utils/scan_feedback.dart';
+import '../../../shared/widgets/advanced_search_bar.dart';
 
 enum _ScanState { scanning, searching, found, notFound, multipleLocations }
 
@@ -59,7 +60,9 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   // Manual search & automatic triggers state
   bool _isManualMode = false;
   String _manualSearchQuery = '';
-  String _searchByField = 'Part No'; // 'Part No', 'Location', 'Description'
+  String _searchByField = 'All Fields';
+  String _sortField = 'Part No';
+  String _sortOrder = 'Ascending'; // 'Part No', 'Location', 'Description'
   List<InventoryData> _manualSearchResults = [];
   bool _isManualSearching = false;
 
@@ -144,21 +147,21 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   @override
   void initState() {
     super.initState();
-    _isManualMode = widget.initialManualMode;
-    
-    if (widget.initialRouteState == 'found') {
+    if (widget.initialRouteState == null) {
+      _isManualMode = widget.initialManualMode || (widget.extraData?['manualMode'] == true) || (widget.extraData?['isManual'] == true);
+    } else if (widget.initialRouteState == 'found') {
       _state = _ScanState.found;
       _foundProduct = widget.extraData?['product'] as Map<String, dynamic>?;
-      _isManualMode = widget.extraData?['isManual'] ?? false;
+      _isManualMode = widget.extraData?['manualMode'] ?? widget.extraData?['isManual'] ?? false;
     } else if (widget.initialRouteState == 'not-found') {
       _state = _ScanState.notFound;
       _scannedBarcode = widget.extraData?['query'] ?? '';
-      _isManualMode = widget.extraData?['isManual'] ?? false;
+      _isManualMode = widget.extraData?['manualMode'] ?? widget.extraData?['isManual'] ?? false;
     } else if (widget.initialRouteState == 'multiple') {
       _state = _ScanState.multipleLocations;
       _multipleLocationsList = widget.extraData?['products'] as List<InventoryData>? ?? [];
       _scannedBarcode = widget.extraData?['query'] ?? '';
-      _isManualMode = widget.extraData?['isManual'] ?? false;
+      _isManualMode = widget.extraData?['manualMode'] ?? widget.extraData?['isManual'] ?? false;
     }
 
     if (widget.initialQuery != null) {
@@ -487,12 +490,11 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       canPop: canPop,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return; // System already popped — nothing to do
-        // Shell-tab root: intercept and handle manually
+        // canPop=false means we're at the shell-tab root (no parent to pop to)
+        // Handle internal state transitions:
         if (_isManualMode) {
-          // In manual mode opened from within the tab: toggle back to scanner
-          setState(() {
-            _isManualMode = false;
-          });
+          // In manual mode opened from within the scanner tab: toggle back to scanner
+          setState(() => _isManualMode = false);
         } else if (_state != _ScanState.scanning) {
           _scanAnother();
         } else {
@@ -508,7 +510,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         body: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: _isManualMode && _state == _ScanState.scanning
-              ? _buildManualSearch()
+              ? _buildManualSearch(canPop)
               : switch (_state) {
                   _ScanState.scanning => _buildScanning(),
                   _ScanState.searching => _buildSearching(),
@@ -1275,21 +1277,25 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     final db = ref.read(appDatabaseProvider);
     final query = _manualSearchQuery.trim().toUpperCase();
 
-    List<InventoryData> results;
+    var selectStmt = db.select(db.inventory);
+    
     if (_searchByField == 'Location') {
-      results = await (db.select(db.inventory)
-            ..where((t) => t.location.upper().like('%$query%')))
-          .get();
+      selectStmt.where((t) => t.location.upper().like('%$query%'));
     } else if (_searchByField == 'Description') {
-      results = await (db.select(db.inventory)
-            ..where((t) => t.description.upper().like('%$query%')))
-          .get();
+      selectStmt.where((t) => t.description.upper().like('%$query%'));
+    } else if (_searchByField == 'Part No') {
+      selectStmt.where((t) => t.partNo.upper().like('%$query%') | t.barcode.like('%$query%'));
     } else {
-      results = await (db.select(db.inventory)
-            ..where((t) =>
-                t.partNo.upper().like('%$query%') | t.barcode.like('%$query%')))
-          .get();
+      selectStmt.where((t) => t.partNo.upper().like('%$query%') | t.barcode.like('%$query%') | t.location.upper().like('%$query%') | t.description.upper().like('%$query%'));
     }
+    
+    if (_sortField == 'Location') {
+      selectStmt.orderBy([(t) => OrderingTerm(expression: t.location, mode: _sortOrder == 'Descending' ? OrderingMode.desc : OrderingMode.asc)]);
+    } else {
+      selectStmt.orderBy([(t) => OrderingTerm(expression: t.partNo, mode: _sortOrder == 'Descending' ? OrderingMode.desc : OrderingMode.asc)]);
+    }
+    
+    List<InventoryData> results = await selectStmt.get();
 
     setState(() {
       _manualSearchResults = results;
@@ -1465,110 +1471,83 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     }
   }
 
-  Widget _buildManualSearch() {
+  Widget _buildManualSearch([bool pushedFromOutside = false]) {
+    // When pushed from outside (Home), back = pop to Home.
+    // When opened via the in-tab Manual button (canPop=false), back = return to scanner.
+    final backLabel = pushedFromOutside ? 'Back to Home' : 'Back to Scanner';
+    final backIcon = pushedFromOutside ? Icons.home_rounded : Icons.arrow_back_rounded;
+    final backAction = pushedFromOutside
+        ? () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          }
+        : () => setState(() => _isManualMode = false);
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       key: const ValueKey('manual_search'),
       body: Column(
         children: [
           Container(
-            color: AppColors.primary,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextField(
-                  controller: _manualController,
-                  focusNode: _manualFocusNode,
-                  onChanged: (val) {
-                    _manualSearchQuery = val;
-                    _performManualSearch();
-                  },
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Search inventory...',
-                    hintStyle: const TextStyle(color: Colors.white60),
-                    border: InputBorder.none,
-                    prefixIcon:
-                        const Icon(Icons.search_rounded, color: Colors.white70),
-                    suffixIcon: _manualController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded,
-                                color: Colors.white70, size: 20),
-                            onPressed: () {
-                              _manualController.clear();
-                              setState(() {
-                                _manualSearchQuery = '';
-                                _performManualSearch();
-                              });
-                              _manualFocusNode.requestFocus();
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.only(top: 8, left: 8, right: 16),
             child: Row(
               children: [
+                IconButton(
+                  icon: Icon(backIcon),
+                  onPressed: backAction,
+                  tooltip: backLabel,
+                ),
                 Text(
-                  'Search by: ',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(width: 8),
-                _SearchChip(
-                  label: 'Part No',
-                  selected: _searchByField == 'Part No',
-                  onSelected: (sel) {
-                    if (sel) {
-                      setState(() {
-                        _searchByField = 'Part No';
-                      });
-                      _performManualSearch();
-                    }
-                  },
-                ),
-                const SizedBox(width: 6),
-                _SearchChip(
-                  label: 'Location',
-                  selected: _searchByField == 'Location',
-                  onSelected: (sel) {
-                    if (sel) {
-                      setState(() {
-                        _searchByField = 'Location';
-                      });
-                      _performManualSearch();
-                    }
-                  },
-                ),
-                const SizedBox(width: 6),
-                _SearchChip(
-                  label: 'Description',
-                  selected: _searchByField == 'Description',
-                  onSelected: (sel) {
-                    if (sel) {
-                      setState(() {
-                        _searchByField = 'Description';
-                      });
-                      _performManualSearch();
-                    }
-                  },
+                  backLabel,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
+          AdvancedSearchBar(
+            controller: _manualController,
+            focusNode: _manualFocusNode,
+            onGoPressed: () {
+              _manualFocusNode.unfocus();
+            },
+            onChanged: (val) {
+              _manualSearchQuery = val;
+              _performManualSearch();
+            },
+            onClear: () {
+              _manualController.clear();
+              setState(() {
+                _manualSearchQuery = '';
+                _performManualSearch();
+              });
+              _manualFocusNode.requestFocus();
+            },
+            searchField: _searchByField,
+            onSearchFieldChanged: (val) {
+              if (val != null) {
+                setState(() => _searchByField = val);
+                _performManualSearch();
+              }
+            },
+            sortField: _sortField,
+            onSortFieldChanged: (val) {
+              if (val != null) {
+                setState(() => _sortField = val);
+                _performManualSearch();
+              }
+            },
+            sortOrder: _sortOrder,
+            onSortOrderChanged: (val) {
+              if (val != null) {
+                setState(() => _sortOrder = val);
+                _performManualSearch();
+              }
+            },
+          ),
+          const Divider(height: 1, thickness: 1),
           Expanded(
             child: _isManualSearching
                 ? const Center(child: CircularProgressIndicator())
@@ -1862,29 +1841,4 @@ class _BottomActionBtn extends StatelessWidget {
   }
 }
 
-class _SearchChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final ValueChanged<bool> onSelected;
-  const _SearchChip(
-      {required this.label, required this.selected, required this.onSelected});
 
-  @override
-  Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label,
-          style: TextStyle(
-              fontSize: 12,
-              color: selected
-                  ? Colors.white
-                  : Theme.of(context).colorScheme.onSurface)),
-      selected: selected,
-      onSelected: onSelected,
-      selectedColor: AppColors.primary,
-      checkmarkColor: Colors.white,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-    );
-  }
-}

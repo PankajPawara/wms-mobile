@@ -36,10 +36,18 @@ GoRouter appRouter(AppRouterRef ref) {
   final authState = ref.watch(authNotifierProvider);
   final isUnauthenticatedEvent = ref.watch(unauthenticatedEventProvider);
 
+  // Mid-session 401: instead of silently logging out, mark session as expired.
+  // The HomeScreen and Router will detect this and show the re-login sheet.
   if (isUnauthenticatedEvent) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(authNotifierProvider.notifier).logout();
       ref.read(unauthenticatedEventProvider.notifier).state = false;
+      // Transition to sessionExpired so the re-login sheet appears on the current page
+      final user = authState.user;
+      if (user != null) {
+        ref.read(authNotifierProvider.notifier).markSessionExpired();
+      } else {
+        ref.read(authNotifierProvider.notifier).logout();
+      }
     });
   }
 
@@ -53,6 +61,13 @@ GoRouter appRouter(AppRouterRef ref) {
       final isSplashPage = path == '/';
 
       if (status == AuthStatus.unknown) return null;
+
+      if (status == AuthStatus.sessionExpired) {
+        // Show home but trigger re-login sheet — don't redirect to login
+        if (isSplashPage || isLoginPage) return '/home';
+        return null; // Stay on current page; sheet will be shown
+      }
+
       if (status == AuthStatus.unauthenticated) {
         if (!isLoginPage) return '/login';
       }
@@ -60,10 +75,10 @@ GoRouter appRouter(AppRouterRef ref) {
         if (isLoginPage || isSplashPage || isChangePassword) return '/home';
 
         final userRole = authState.user?.role ?? 'picker';
-        final isDevRoute = path.startsWith('/settings/ocr-sandbox') || 
-                           path.startsWith('/settings/pipeline-sandbox') || 
+        final isDevRoute = path.startsWith('/settings/ocr-sandbox') ||
+                           path.startsWith('/settings/pipeline-sandbox') ||
                            path.startsWith('/ai-vision-test');
-                           
+
         if (isDevRoute && userRole != 'developer') {
           return '/home';
         }

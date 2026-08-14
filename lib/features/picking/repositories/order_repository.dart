@@ -147,7 +147,7 @@ class OrderRepository {
     for (final item in orderItems) {
       final normalizedPart = PartsMasterService.normalizePart(item.partNo);
       final part = partsMap[normalizedPart];
-      final price = (part?.mrp ?? item.unitPrice ?? 0.0).toDouble(); // Fallback to existing item.unitPrice if not found
+      final price = (part?.mrp ?? item.unitPrice).toDouble(); // Fallback to existing item.unitPrice if not found
       
       final checkedQty = item.checkedQty;
       final finalPrice = (checkedQty * price).toDouble();

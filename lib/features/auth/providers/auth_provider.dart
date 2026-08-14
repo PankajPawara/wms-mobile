@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../models/user_model.dart';
@@ -9,7 +10,7 @@ import '../repositories/auth_repository.dart';
 
 part 'auth_provider.g.dart';
 
-enum AuthStatus { unknown, authenticated, unauthenticated }
+enum AuthStatus { unknown, authenticated, unauthenticated, sessionExpired }
 
 class AuthState {
   final AuthStatus status;
@@ -57,6 +58,34 @@ class AuthNotifier extends _$AuthNotifier {
     if (isLoggedIn) {
       final cachedUser = await storage.getUser();
       if (cachedUser['id'] != null) {
+        // ── Check local SQLite token expiry ────────────────────────────────
+        final db = ref.read(appDatabaseProvider);
+        final dbUser = await (db.select(db.currentUsers)).getSingleOrNull();
+
+        if (dbUser != null && dbUser.tokenExpiry.isNotEmpty) {
+          final expiry = DateTime.tryParse(dbUser.tokenExpiry);
+          if (expiry != null && DateTime.now().isAfter(expiry)) {
+            // Token has expired — set sessionExpired state so UI can show
+            // the quick re-login sheet instead of full logout.
+            final user = UserModel(
+              id: cachedUser['id']!,
+              employeeId: cachedUser['employeeId'] ?? '',
+              name: cachedUser['name'] ?? '',
+              role: cachedUser['role'] ?? 'employee',
+              email: '',
+              mobile: '',
+              status: 'active',
+              isFirstLogin: false,
+            );
+            state = AuthState(
+              status: AuthStatus.sessionExpired,
+              user: user,
+              isFirstLogin: false,
+            );
+            return;
+          }
+        }
+        // ── Token still valid — restore session ────────────────────────────
         final user = UserModel(
           id: cachedUser['id']!,
           employeeId: cachedUser['employeeId'] ?? '',
@@ -88,8 +117,11 @@ class AuthNotifier extends _$AuthNotifier {
         user: user,
         isFirstLogin: user.isFirstLogin,
       );
-    } catch (_) {
-      // Keep existing cached state on connection error
+    } catch (e) {
+      // On a network error, keep existing cached state — don't log out.
+      // On a 401 from the server, the ApiClient will fire onUnauthenticated
+      // which sets unauthenticatedEventProvider = true. The router will then
+      // show the session expired sheet rather than silently logging out.
     }
   }
 
@@ -147,6 +179,13 @@ class AuthNotifier extends _$AuthNotifier {
       state = state.copyWith(isLoading: false, error: errorMessage);
       return false;
     }
+  }
+
+  /// Called when a mid-session 401 is received. Keeps the user data in state
+  /// so the re-login sheet can pre-fill the username, but blocks further
+  /// authenticated actions until they re-authenticate.
+  void markSessionExpired() {
+    state = state.copyWith(status: AuthStatus.sessionExpired);
   }
 
   Future<void> logout() async {

@@ -89,8 +89,9 @@ class OcrPipelineManager {
     }
 
     bool isGeminiValidated = false;
+    const bool alwaysUseGemini = true; // ALWAYS use Gemini as requested
 
-    if (true) { // ALWAYS use Gemini as requested
+    if (alwaysUseGemini) {
       debugPrint('[Pipeline] ALWAYS triggering ENGINE 09 Gemini OCR fallback for max accuracy...');
       onProgress?.call('Refining data using Gemini AI...');
       final e09Result = await Engine09GeminiOcr.extractFromImage(
@@ -121,16 +122,6 @@ class OcrPipelineManager {
         }
       } else {
         debugPrint('[Pipeline] Gemini fallback failed — using ML Kit results as fallback.');
-      }
-    } else {
-      if (kDebugMode) {
-        debugPrint('\n=== OCR PIPELINE OUTPUT (ML Kit) ===\n');
-        debugPrint(const JsonEncoder.withIndent('  ').convert({
-          'source': 'ml-kit',
-          'E07': e07Result.data!.toJson(),
-          'E08': e08Result.data!.toJson(),
-        }));
-        debugPrint('\n=====================================\n');
       }
     }
 

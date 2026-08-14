@@ -8,6 +8,7 @@ import '../../notifications/providers/notification_provider.dart';
 import '../../../core/database/app_database.dart';
 import '../../settings/repositories/inventory_repository.dart';
 import '../../settings/providers/app_config_provider.dart';
+import '../../../features/auth/screens/session_expired_sheet.dart';
 
 // ── Top-level provider (MUST be outside the class) ──────────────────────────
 final _watchOrdersProvider = StreamProvider<List<Order>>((ref) {
@@ -29,7 +30,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationNotifierProvider.notifier).refresh();
       _checkUpdates();
+      _checkSessionExpiry();
     });
+  }
+
+  Future<void> _checkSessionExpiry() async {
+    final authState = ref.read(authNotifierProvider);
+    if (authState.status == AuthStatus.sessionExpired && authState.user != null) {
+      if (!mounted) return;
+      await showSessionExpiredSheet(
+        context,
+        ref,
+        employeeId: authState.user!.employeeId,
+        displayName: authState.user!.name,
+        logoutOnDismiss: true,
+      );
+    }
   }
 
   Future<void> _checkUpdates() async {
@@ -201,7 +217,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 iconColor: AppColors.cardPurpleDark,
                 title: 'Manual Search',
                 subtitle: 'Search parts by part number,\nlocation or description',
-                onTap: () => context.go('/scan-to-find', extra: {'manualMode': true}),
+                onTap: () => context.push('/scan-to-find', extra: {'manualMode': true}),
                 isWide: true,
               ),
             ),

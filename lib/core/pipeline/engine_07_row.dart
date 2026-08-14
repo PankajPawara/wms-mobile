@@ -67,8 +67,7 @@ class _ProjectedWord {
 class Engine07RowBuilder {
   // Priority order for anchor column selection.
   // MRP has exactly one clean price-format cell per data row — the best anchor.
-  static const _anchorPriority = ['MRP', 'PART', 'DESC', 'QTY', 'SR'];
-
+  // static const _anchorPriority = ['MRP', 'PART', 'DESC', 'QTY', 'SR'];
   // Honda part number: exactly 5 digits, two alphanumeric segments.
   // Uses (?<!\d) negative lookbehind so "135010-KWP-H10" does NOT match
   // "135010" (6 digits) — it only matches when 5 digits are not preceded by

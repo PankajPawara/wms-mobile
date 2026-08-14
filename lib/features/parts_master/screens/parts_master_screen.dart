@@ -6,6 +6,7 @@ import '../../../core/constants/app_dimensions.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/parts_master_service.dart';
 import '../../../features/auth/providers/auth_provider.dart';
+import '../../../shared/widgets/advanced_search_bar.dart';
 
 /// Parts Master browser screen.
 ///
@@ -21,6 +22,9 @@ class PartsMasterScreen extends ConsumerStatefulWidget {
 class _PartsMasterScreenState extends ConsumerState<PartsMasterScreen> {
   late final PartsMasterService _service;
   final TextEditingController _searchCtrl = TextEditingController();
+  String _searchByField = 'All Fields';
+  String _sortField = 'Part No';
+  String _sortOrder = 'Ascending';
 
   List<PartsMasterData> _allItems = [];
   List<PartsMasterData> _filtered = [];
@@ -57,13 +61,36 @@ class _PartsMasterScreenState extends ConsumerState<PartsMasterScreen> {
   void _applyFilter() {
     final q = _searchCtrl.text.trim().toLowerCase();
     setState(() {
-      _filtered = q.isEmpty
-          ? _allItems
+      var filtered = q.isEmpty
+          ? List<PartsMasterData>.from(_allItems)
           : _allItems.where((p) {
-              return (p.partNo.toLowerCase().contains(q)) ||
-                  (p.description?.toLowerCase().contains(q) ?? false) ||
-                  (p.location?.toLowerCase().contains(q) ?? false);
+              if (_searchByField == 'Location') {
+                return p.location?.toLowerCase().contains(q) ?? false;
+              } else if (_searchByField == 'Description') {
+                return p.description?.toLowerCase().contains(q) ?? false;
+              } else if (_searchByField == 'Part No') {
+                return p.partNo.toLowerCase().contains(q);
+              } else {
+                return (p.partNo.toLowerCase().contains(q)) ||
+                    (p.description?.toLowerCase().contains(q) ?? false) ||
+                    (p.location?.toLowerCase().contains(q) ?? false);
+              }
             }).toList();
+
+      if (_sortField == 'Location') {
+        filtered.sort((a, b) {
+          final locA = a.location?.toLowerCase() ?? '';
+          final locB = b.location?.toLowerCase() ?? '';
+          return _sortOrder == 'Descending' ? locB.compareTo(locA) : locA.compareTo(locB);
+        });
+      } else {
+        filtered.sort((a, b) {
+          final pA = a.partNo.toLowerCase();
+          final pB = b.partNo.toLowerCase();
+          return _sortOrder == 'Descending' ? pB.compareTo(pA) : pA.compareTo(pB);
+        });
+      }
+      _filtered = filtered;
     });
   }
 
@@ -182,37 +209,28 @@ class _PartsMasterScreenState extends ConsumerState<PartsMasterScreen> {
       body: Column(
         children: [
           // Search bar
-          Container(
-            color: AppColors.surface,
-            padding: const EdgeInsets.fromLTRB(
-                AppDimensions.md, AppDimensions.sm,
-                AppDimensions.md, AppDimensions.md),
-            child: TextField(
-              controller: _searchCtrl,
-              decoration: InputDecoration(
-                hintText: 'Search by part no, description or location…',
-                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          _applyFilter();
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius:
-                      BorderRadius.circular(AppDimensions.radiusMd),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
+          AdvancedSearchBar(
+            controller: _searchCtrl,
+            onGoPressed: () => FocusScope.of(context).unfocus(),
+            onChanged: (_) {}, // handled by listener
+            onClear: () {
+              _searchCtrl.clear();
+              _applyFilter();
+            },
+            searchField: _searchByField,
+            onSearchFieldChanged: (val) {
+              if (val != null) setState(() { _searchByField = val; _applyFilter(); });
+            },
+            sortField: _sortField,
+            onSortFieldChanged: (val) {
+              if (val != null) setState(() { _sortField = val; _applyFilter(); });
+            },
+            sortOrder: _sortOrder,
+            onSortOrderChanged: (val) {
+              if (val != null) setState(() { _sortOrder = val; _applyFilter(); });
+            },
           ),
+          const Divider(height: 1, thickness: 1),
 
           // Stats bar
           if (!_isLoading)

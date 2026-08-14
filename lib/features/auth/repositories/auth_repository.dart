@@ -44,7 +44,7 @@ class AuthRepository {
       email: user.email,
       role: user.role,
       token: token,
-      tokenExpiry: DateTime.now().add(const Duration(hours: 8)).toIso8601String(),
+      tokenExpiry: DateTime.now().add(const Duration(hours: 10)).toIso8601String(),
     ));
 
     return (user: user, isFirstLogin: isFirstLogin);
