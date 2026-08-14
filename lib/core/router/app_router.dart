@@ -105,10 +105,15 @@ GoRouter appRouter(AppRouterRef ref) {
           GoRoute(path: '/memo-capture', builder: (_, __) => const MemoCaptureScreen()),
           GoRoute(
             path: '/scan-to-find',
+            builder: (context, state) => const ScanToFindScreen(initialManualMode: false),
+          ),
+          GoRoute(
+            path: '/manual-search',
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>?;
               return ScanToFindScreen(
-                initialManualMode: extra?['manualMode'] == true,
+                initialManualMode: true,
+                initialQuery: extra?['initialQuery'] as String?,
               );
             },
           ),

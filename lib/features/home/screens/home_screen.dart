@@ -217,7 +217,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 iconColor: AppColors.cardPurpleDark,
                 title: 'Manual Search',
                 subtitle: 'Search parts by part number,\nlocation or description',
-                onTap: () => context.push('/scan-to-find', extra: {'manualMode': true}),
+                onTap: () => context.push('/manual-search'),
                 isWide: true,
               ),
             ),

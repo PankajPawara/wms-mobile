@@ -57,8 +57,8 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   String _scannedBarcode = '';
   List<InventoryData> _multipleLocationsList = [];
 
-  // Manual search & automatic triggers state
-  bool _isManualMode = false;
+  // _isManualMode is now immutable per instance
+  bool get _isManualMode => widget.initialManualMode;
   String _manualSearchQuery = '';
   String _searchByField = 'All Fields';
   String _sortField = 'Part No';
@@ -147,21 +147,16 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   @override
   void initState() {
     super.initState();
-    if (widget.initialRouteState == null) {
-      _isManualMode = widget.initialManualMode || (widget.extraData?['manualMode'] == true) || (widget.extraData?['isManual'] == true);
-    } else if (widget.initialRouteState == 'found') {
+    if (widget.initialRouteState == 'found') {
       _state = _ScanState.found;
       _foundProduct = widget.extraData?['product'] as Map<String, dynamic>?;
-      _isManualMode = widget.extraData?['manualMode'] ?? widget.extraData?['isManual'] ?? false;
     } else if (widget.initialRouteState == 'not-found') {
       _state = _ScanState.notFound;
       _scannedBarcode = widget.extraData?['query'] ?? '';
-      _isManualMode = widget.extraData?['manualMode'] ?? widget.extraData?['isManual'] ?? false;
     } else if (widget.initialRouteState == 'multiple') {
       _state = _ScanState.multipleLocations;
       _multipleLocationsList = widget.extraData?['products'] as List<InventoryData>? ?? [];
       _scannedBarcode = widget.extraData?['query'] ?? '';
-      _isManualMode = widget.extraData?['manualMode'] ?? widget.extraData?['isManual'] ?? false;
     }
 
     if (widget.initialQuery != null) {
@@ -491,11 +486,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return; // System already popped — nothing to do
         // canPop=false means we're at the shell-tab root (no parent to pop to)
-        // Handle internal state transitions:
-        if (_isManualMode) {
-          // In manual mode opened from within the scanner tab: toggle back to scanner
-          setState(() => _isManualMode = false);
-        } else if (_state != _ScanState.scanning) {
+        if (_state != _ScanState.scanning) {
           _scanAnother();
         } else {
           context.go('/home');
@@ -698,7 +689,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                     icon: Icons.keyboard_rounded,
                     label: 'Manual',
                     onTap: () {
-                      setState(() { _isManualMode = true; _state = _ScanState.scanning; });
+                      context.push('/manual-search');
                     },
                   ),
                 ],
@@ -1089,7 +1080,11 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                   ElevatedButton.icon(
                     onPressed: () {
                       _notFoundTimer?.cancel();
-                      setState(() { _isManualMode = true; _manualController.text = _scannedBarcode; _state = _ScanState.scanning; });
+                      if (_isManualMode) {
+                        setState(() { _state = _ScanState.scanning; });
+                      } else {
+                        context.push('/manual-search', extra: {'initialQuery': _scannedBarcode});
+                      }
                     },
                     icon: const Icon(Icons.keyboard_rounded),
                     label: const Text('Search Manually'),
@@ -1377,7 +1372,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              setState(() { _isManualMode = true; _state = _ScanState.scanning; });
+              context.push('/manual-search');
             },
             child: const Text('Search Manually',
                 style: TextStyle(
@@ -1472,41 +1467,12 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   }
 
   Widget _buildManualSearch([bool pushedFromOutside = false]) {
-    // When pushed from outside (Home), back = pop to Home.
-    // When opened via the in-tab Manual button (canPop=false), back = return to scanner.
-    final backLabel = pushedFromOutside ? 'Back to Home' : 'Back to Scanner';
-    final backIcon = pushedFromOutside ? Icons.home_rounded : Icons.arrow_back_rounded;
-    final backAction = pushedFromOutside
-        ? () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          }
-        : () => setState(() => _isManualMode = false);
-
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       key: const ValueKey('manual_search'),
       body: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.only(top: 8, left: 8, right: 16),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(backIcon),
-                  onPressed: backAction,
-                  tooltip: backLabel,
-                ),
-                Text(
-                  backLabel,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 16), // A little spacing since we removed the row
           AdvancedSearchBar(
             controller: _manualController,
             focusNode: _manualFocusNode,

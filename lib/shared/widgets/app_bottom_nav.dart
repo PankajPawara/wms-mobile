@@ -15,6 +15,7 @@ const _pageTitles = {
   '/home': 'WMS Dashboard',
   '/memo-capture': 'Capture Memo',
   '/scan-to-find': 'Scan to Find',
+  '/manual-search': 'Manual Search',
   '/checking-list': 'Checking List',
   '/settings': 'Settings',
   '/history': 'Orders',
@@ -167,8 +168,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
           elevation: 6,
           shadowColor: Colors.black.withValues(alpha: 0.15),
           centerTitle: false,
-          // Show back arrow on sub-pages; show nothing on home; show home icon on other tabs
-          leading: !isShellTabRoot
+          // Show back arrow on all pages except home
+          leading: actualPath != '/home'
               ? IconButton(
                   icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
                   onPressed: () {
