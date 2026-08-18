@@ -22,7 +22,7 @@ class CurrentUsers extends Table {
 
 class Inventory extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get partNo => text()();
+  TextColumn get partNo => text().unique()();
   TextColumn get barcode => text()();
   TextColumn get description => text().nullable()();
   TextColumn get location => text()();
@@ -144,7 +144,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -164,6 +164,12 @@ class AppDatabase extends _$AppDatabase {
           if (from < 5) {
             // v5: Add PartsMaster table — self-learning parts DB from memo + red label scans
             await m.create(partsMaster);
+          }
+          if (from < 6) {
+            // v6: Make partNo unique for delta syncs
+            await m.drop(inventory);
+            await m.create(inventory);
+            await customStatement('DELETE FROM inventory_metas');
           }
         },
       );

@@ -20,6 +20,8 @@ class AdvancedSearchBar extends StatelessWidget {
   final String sortOrder;
   final ValueChanged<String?> onSortOrderChanged;
   final List<String> sortOrderOptions;
+  
+  final VoidCallback? onScanPressed;
 
   const AdvancedSearchBar({
     super.key,
@@ -38,6 +40,7 @@ class AdvancedSearchBar extends StatelessWidget {
     required this.sortOrder,
     required this.onSortOrderChanged,
     this.sortOrderOptions = const ['Ascending', 'Descending'],
+    this.onScanPressed,
   });
 
   @override
@@ -71,12 +74,23 @@ class AdvancedSearchBar extends StatelessWidget {
                       hintStyle: TextStyle(color: Colors.grey.shade500),
                       border: InputBorder.none,
                       prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey),
-                      suffixIcon: controller.text.isNotEmpty
-                          ? IconButton(
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (controller.text.isNotEmpty)
+                            IconButton(
                               icon: const Icon(Icons.clear_rounded, color: Colors.grey, size: 20),
                               onPressed: onClear,
-                            )
-                          : null,
+                            ),
+                          if (onScanPressed != null)
+                            IconButton(
+                              icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary, size: 20),
+                              onPressed: onScanPressed,
+                            ),
+                          if (controller.text.isEmpty && onScanPressed == null)
+                            const SizedBox(width: 8), // Padding if nothing is shown
+                        ],
+                      ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),

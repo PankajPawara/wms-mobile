@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../features/notifications/providers/notification_provider.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -79,16 +80,24 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                               final item = items[index];
                               final isPasswordRequest = item.type == 'PASSWORD_RESET_REQUEST';
 
-                              return Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: item.isRead ? Colors.white : const Color(0xFFF5F3FF),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFFDDD6FE),
+                              return InkWell(
+                                onTap: () {
+                                  if (item.type == 'APP_UPDATE') {
+                                    Navigator.pop(context); // close bottom sheet
+                                    context.push('/settings/diagnostics');
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: item.isRead ? Colors.white : const Color(0xFFF5F3FF),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: item.isRead ? const Color(0xFFE5E7EB) : const Color(0xFFDDD6FE),
+                                    ),
                                   ),
-                                ),
-                                child: Column(
+                                  child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
@@ -166,7 +175,7 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                                     ],
                                   ],
                                 ),
-                              );
+                              ));
                             },
                           );
                         },

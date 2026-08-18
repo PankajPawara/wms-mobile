@@ -29,7 +29,7 @@ dependencies:
   dio: ^5.7.0
 
   # Secure storage (JWT token)
-  flutter_secure_storage: ^9.2.4
+  flutter_secure_storage: 9.2.4
 
   # Barcode scanner
   mobile_scanner: ^6.0.10
@@ -58,7 +58,7 @@ dependencies:
   image: ^4.3.0
   firebase_core: ^4.13.0
   firebase_messaging: ^16.5.0
-
+  permission_handler: ^12.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

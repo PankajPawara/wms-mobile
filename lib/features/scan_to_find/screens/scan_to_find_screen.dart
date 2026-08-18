@@ -29,6 +29,7 @@ class ScanToFindScreen extends ConsumerStatefulWidget {
   final String? initialQuery;
   final String? initialRouteState;
   final Map<String, dynamic>? extraData;
+  final bool returnResult;
 
   const ScanToFindScreen({
     super.key,
@@ -36,6 +37,7 @@ class ScanToFindScreen extends ConsumerStatefulWidget {
     this.initialQuery,
     this.initialRouteState,
     this.extraData,
+    this.returnResult = false,
   });
 
   @override
@@ -224,6 +226,12 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     final bestCandidate = parsed.ocrCorrected.isNotEmpty
         ? parsed.ocrCorrected
         : parsed.normalized;
+
+    if (widget.returnResult) {
+      ScanFeedback.triggerSuccess();
+      if (mounted) Navigator.pop(context, bestCandidate.isNotEmpty ? bestCandidate : rawInput);
+      return true;
+    }
 
     setState(() {
       _scannedBarcode = bestCandidate.isNotEmpty ? bestCandidate : rawInput;
@@ -1490,6 +1498,15 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
                 _performManualSearch();
               });
               _manualFocusNode.requestFocus();
+            },
+            onScanPressed: () async {
+              FocusScope.of(context).unfocus();
+              final result = await context.push<String>('/scan-to-find', extra: {'returnResult': true});
+              if (result != null && result.isNotEmpty) {
+                _manualController.text = result;
+                _manualSearchQuery = result;
+                _performManualSearch();
+              }
             },
             searchField: _searchByField,
             onSearchFieldChanged: (val) {

@@ -19,6 +19,7 @@ class ApiEndpoints {
   // Inventory
   static const String inventoryVersion = '/inventory/version';
   static const String inventoryDownload = '/inventory/download';
+  static const String inventoryImport = '/inventory/import';
   static String inventoryBarcode(String barcode) => '/inventory/barcode/$barcode';
   static const String inventorySearch = '/inventory/search';
 

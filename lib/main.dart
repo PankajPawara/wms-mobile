@@ -22,6 +22,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> _setupFirebase() async {
   await Firebase.initializeApp();
+  
+  // Request permission for push notifications (required for Android 13+ and iOS)
+  await FirebaseMessaging.instance.requestPermission();
+
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   const AndroidInitializationSettings initializationSettingsAndroid =

@@ -28,49 +28,56 @@ import '../../shared/widgets/app_bottom_nav.dart';
 import '../../core/models/extracted_memo.dart';
 import '../../features/checking/screens/red_label_scan_screen.dart';
 import '../../features/parts_master/screens/parts_master_screen.dart';
+import 'auth_listenable.dart';
 
 part 'app_router.g.dart';
 
 @riverpod
 GoRouter appRouter(AppRouterRef ref) {
-  final authState = ref.watch(authNotifierProvider);
-  final isUnauthenticatedEvent = ref.watch(unauthenticatedEventProvider);
-
-  // Mid-session 401: instead of silently logging out, mark session as expired.
-  // The HomeScreen and Router will detect this and show the re-login sheet.
-  if (isUnauthenticatedEvent) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(unauthenticatedEventProvider.notifier).state = false;
-      // Transition to sessionExpired so the re-login sheet appears on the current page
-      final user = authState.user;
-      if (user != null) {
-        ref.read(authNotifierProvider.notifier).markSessionExpired();
-      } else {
-        ref.read(authNotifierProvider.notifier).logout();
-      }
-    });
-  }
+  // A stable ChangeNotifier — GoRouter subscribes to this rather than
+  // rebuilding the entire router every time auth state changes.
+  final listenable = AuthListenable(ref);
 
   return GoRouter(
     initialLocation: '/',
+    refreshListenable: listenable,
     redirect: (context, state) {
+      // Read auth state at redirect time (not at build time), preventing
+      // the entire router from being recreated on every state change.
+      final authState = ref.read(authNotifierProvider);
+      final isUnauthenticatedEvent = ref.read(unauthenticatedEventProvider);
+
+      // Mid-session 401: mark session expired, show re-login sheet
+      if (isUnauthenticatedEvent) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(unauthenticatedEventProvider.notifier).state = false;
+          final user = authState.user;
+          if (user != null) {
+            ref.read(authNotifierProvider.notifier).markSessionExpired();
+          } else {
+            ref.read(authNotifierProvider.notifier).logout();
+          }
+        });
+      }
+
       final status = authState.status;
       final path = state.matchedLocation;
       final isLoginPage = path == '/login';
       final isChangePassword = path == '/change-password';
       final isSplashPage = path == '/';
 
+      // Still initialising — stay on splash, don't flicker
       if (status == AuthStatus.unknown) return null;
 
       if (status == AuthStatus.sessionExpired) {
-        // Show home but trigger re-login sheet — don't redirect to login
         if (isSplashPage || isLoginPage) return '/home';
-        return null; // Stay on current page; sheet will be shown
+        return null;
       }
 
       if (status == AuthStatus.unauthenticated) {
         if (!isLoginPage) return '/login';
       }
+
       if (status == AuthStatus.authenticated) {
         if (isLoginPage || isSplashPage || isChangePassword) return '/home';
 
@@ -90,8 +97,6 @@ GoRouter appRouter(AppRouterRef ref) {
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/change-password', builder: (_, __) => const ChangePasswordScreen()),
 
-      // All authenticated routes live inside the ShellRoute so they always
-      // have the shared AppBar + BottomNav.
       ShellRoute(
         builder: (context, state, child) {
           return MainLayout(
@@ -100,12 +105,17 @@ GoRouter appRouter(AppRouterRef ref) {
           );
         },
         routes: [
-          // ── Shell Tabs ──────────────────────────────────────────────────
           GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
           GoRoute(path: '/memo-capture', builder: (_, __) => const MemoCaptureScreen()),
           GoRoute(
             path: '/scan-to-find',
-            builder: (context, state) => const ScanToFindScreen(initialManualMode: false),
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return ScanToFindScreen(
+                initialManualMode: false,
+                returnResult: extra?['returnResult'] as bool? ?? false,
+              );
+            },
           ),
           GoRoute(
             path: '/manual-search',
@@ -121,7 +131,6 @@ GoRouter appRouter(AppRouterRef ref) {
           GoRoute(path: '/checking-list', builder: (_, __) => const CheckingListScreen()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
 
-          // ── Sub-pages (now inside shell for consistent nav) ─────────────
           GoRoute(
             path: '/ocr-review',
             builder: (context, state) {
@@ -161,7 +170,6 @@ GoRouter appRouter(AppRouterRef ref) {
           GoRoute(path: '/parts-master', builder: (_, __) => const PartsMasterScreen()),
           GoRoute(path: '/red-label-scan', builder: (_, __) => const RedLabelScanScreen()),
 
-          // ── Dev / Diagnostic routes (kept in shell for nav consistency) ─
           GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
           GoRoute(path: '/settings/ocr-sandbox', builder: (_, __) => const OcrSandboxScreen()),
           GoRoute(path: '/settings/pipeline-sandbox', builder: (_, __) => const PipelineSandboxScreen()),

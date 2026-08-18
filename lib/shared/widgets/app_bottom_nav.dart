@@ -1,12 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/screens/session_expired_sheet.dart';
 import '../../features/notifications/providers/notification_provider.dart';
+import '../../features/settings/repositories/inventory_repository.dart';
 import '../utils/notifications_helper.dart';
+import '../utils/permissions_helper.dart';
+import 'sync_progress_dialog.dart';
 
 /// Canonical page-title map. Sub-pages not in the shell tabs
 /// declare their title here; shell tabs also live here for the
@@ -79,11 +84,30 @@ class MainLayout extends ConsumerStatefulWidget {
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
   bool _showingSessionSheet = false;
+  StreamSubscription<RemoteMessage>? _fcmSub;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkSessionExpiry());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkSessionExpiry();
+      requestAppPermissions();
+    });
+    _fcmSub = FirebaseMessaging.onMessage.listen((msg) {
+      if (msg.data['type'] == 'INVENTORY_UPDATE') {
+        if (!mounted) return;
+        SyncProgressDialog.show(
+          context,
+          (onProgress) => ref.read(inventoryRepositoryProvider).syncInventory(force: true, skipCheck: false, onProgress: onProgress)
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _fcmSub?.cancel();
+    super.dispose();
   }
 
   @override

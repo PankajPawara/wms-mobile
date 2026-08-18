@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' hide Column, Table;
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/sync_progress_dialog.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../repositories/inventory_repository.dart';
 import '../../picking/repositories/order_repository.dart';
 
@@ -133,14 +136,15 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
   }
 
   Future<void> _handleForceSync() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Starting manual synchronization...')),
-    );
-    final repo = ref.read(inventoryRepositoryProvider);
-    final ordersRepo = ref.read(orderRepositoryProvider);
-    
-    await repo.syncInventory(force: true);
-    await ordersRepo.syncOrdersFromServer();
+    try {
+      final repo = ref.read(inventoryRepositoryProvider);
+      final ordersRepo = ref.read(orderRepositoryProvider);
+      
+      await SyncProgressDialog.show(
+        context,
+        (onProgress) => repo.syncInventory(force: true, skipCheck: false, onProgress: onProgress)
+      );
+      await ordersRepo.syncOrdersFromServer();
 
     await _loadSyncAndDiagnosticData();
     await _loadLocalCatalog();
@@ -148,6 +152,69 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sync execution finished. Status updated!')),
+      );
+    }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sync failed: $e')),
+        );
+      }
+    }
+  }
+
+  // Native Android file picker via MethodChannel — no external package needed
+  static const _fileChannel = MethodChannel('com.example.wms_mobile/file_picker');
+
+  Future<void> _handleUploadExcel() async {
+    try {
+      // Invoke Android's native ACTION_OPEN_DOCUMENT intent
+      final String? filePath = await _fileChannel.invokeMethod('pickExcelFile');
+
+      if (filePath != null) {
+        final repo = ref.read(inventoryRepositoryProvider);
+
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
+
+        final success = await repo.uploadInventoryExcel(filePath);
+
+        if (!mounted) return;
+        Navigator.pop(context);
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Excel file uploaded successfully! Syncing now...'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _handleForceSync();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to upload Excel file.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting file: ${e.message}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -239,17 +306,39 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                   ],
                   
                   const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _handleForceSync,
-                    icon: const Icon(Icons.sync_rounded),
-                    label: const Text('Force Sync Catalog'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _handleForceSync,
+                            icon: const Icon(Icons.sync_rounded),
+                            label: const Text('Force Sync Catalog'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        if (ref.watch(authNotifierProvider).user?.role == 'admin') ...[
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _handleUploadExcel,
+                              icon: const Icon(Icons.upload_file_rounded),
+                              label: const Text('Upload Excel'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFD97706),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ]
+                      ],
                     ),
-                  ),
                 ],
               ),
             ),

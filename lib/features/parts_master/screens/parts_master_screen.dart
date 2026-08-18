@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
@@ -216,6 +217,14 @@ class _PartsMasterScreenState extends ConsumerState<PartsMasterScreen> {
             onClear: () {
               _searchCtrl.clear();
               _applyFilter();
+            },
+            onScanPressed: () async {
+              FocusScope.of(context).unfocus();
+              final result = await context.push<String>('/scan-to-find', extra: {'returnResult': true});
+              if (result != null && result.isNotEmpty) {
+                _searchCtrl.text = result;
+                _applyFilter();
+              }
             },
             searchField: _searchByField,
             onSearchFieldChanged: (val) {

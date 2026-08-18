@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -41,11 +43,25 @@ class InventoryRepository {
     }
   }
 
+  Future<bool> uploadInventoryExcel(String filePath) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath),
+      });
+      await _api.post(ApiEndpoints.inventoryImport, data: formData);
+      return true;
+    } catch (e) {
+      if (kDebugMode) print('Excel upload error: $e');
+      return false;
+    }
+  }
+
   /// Run check and sync inventory version
-  Future<bool> syncInventory({bool force = false, bool skipCheck = false}) async {
+  Future<bool> syncInventory({bool force = false, bool skipCheck = false, void Function(double)? onProgress}) async {
     try {
       String serverVersion = 'v0';
       int totalProducts = 0;
+      final localMeta = await _db.select(_db.inventoryMetas).getSingleOrNull();
 
       if (!skipCheck) {
         // 1. Fetch current server version
@@ -56,17 +72,21 @@ class InventoryRepository {
         serverVersion = data['version'] as String? ?? 'v0';
         totalProducts = int.parse((data['total_products'] ?? 0).toString());
 
-        // 2. Fetch local meta
-        final localMeta = await _db.select(_db.inventoryMetas).getSingleOrNull();
-
         if (!force && localMeta != null && localMeta.currentVersion == serverVersion) {
           // Already up to date
           return false;
         }
       }
 
-      // 3. Download full inventory
-      final downloadRes = await _api.get(ApiEndpoints.inventoryDownload);
+      // 3. Download inventory (use delta if we have a lastUpdated date)
+      String url = ApiEndpoints.inventoryDownload;
+      if (localMeta != null) {
+        url += '?since_date=${Uri.encodeComponent(localMeta.lastUpdated)}';
+      }
+
+      onProgress?.call(0.1); // 10% for download started
+
+      final downloadRes = await _api.get(url);
       final downloadData = downloadRes['data'] as Map<String, dynamic>?;
       final items = downloadData?['items'] as List<dynamic>?;
 
@@ -74,31 +94,45 @@ class InventoryRepository {
         // If skipCheck is true, we didn't fetch the version above, so we extract it from the payload if possible
         if (skipCheck) {
           serverVersion = downloadData?['version'] ?? 'v0';
-          totalProducts = items.length;
+          totalProducts = items.length; // Approximate, but better than nothing
         }
 
-        // Drop local inventory
-        await _db.delete(_db.inventory).go();
+        // Drop local inventory ONLY if it's an initial sync
+        if (localMeta == null) {
+          await _db.delete(_db.inventory).go();
+        }
 
-        // Batch insert items
-        await _db.batch((batch) {
-          for (final rawItem in items) {
-            final item = rawItem as Map<String, dynamic>;
-            batch.insert(
-              _db.inventory,
-              InventoryCompanion.insert(
-                partNo: item['part_no'] ?? '',
-                barcode: item['barcode'] ?? '',
-                description: Value(item['description']),
-                location: item['location'] ?? '',
-                price: Value(double.tryParse(item['price']?.toString() ?? '') ?? 0.0),
-                stock: Value(int.tryParse(item['stock']?.toString() ?? '') ?? 0),
-                version: serverVersion,
-              ),
-              mode: InsertMode.insertOrReplace,
-            );
-          }
-        });
+        // Process in chunks to prevent UI thread blocking
+        const chunkSize = 500;
+        for (var i = 0; i < items.length; i += chunkSize) {
+          final end = (i + chunkSize < items.length) ? i + chunkSize : items.length;
+          final chunk = items.sublist(i, end);
+
+          await _db.batch((batch) {
+            for (final rawItem in chunk) {
+              final item = rawItem as Map<String, dynamic>;
+              batch.insert(
+                _db.inventory,
+                InventoryCompanion.insert(
+                  partNo: item['part_no'] ?? '',
+                  barcode: item['barcode'] ?? '',
+                  description: Value(item['description']),
+                  location: item['location'] ?? '',
+                  price: Value(double.tryParse(item['price']?.toString() ?? '') ?? 0.0),
+                  stock: Value(int.tryParse(item['stock']?.toString() ?? '') ?? 0),
+                  version: serverVersion,
+                ),
+                mode: InsertMode.insertOrReplace,
+              );
+            }
+          });
+          
+          final percentage = 0.1 + (0.9 * (end / items.length));
+          onProgress?.call(percentage);
+
+          // Yield execution to the event loop so the UI remains responsive
+          await Future.delayed(Duration.zero);
+        }
 
         // Update local meta
         await _db.delete(_db.inventoryMetas).go();
