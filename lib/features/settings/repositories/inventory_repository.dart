@@ -43,12 +43,20 @@ class InventoryRepository {
     }
   }
 
-  Future<bool> uploadInventoryExcel(String filePath) async {
+  Future<bool> uploadInventoryExcel(String filePath, {void Function(double)? onProgress}) async {
     try {
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(filePath),
       });
-      await _api.post(ApiEndpoints.inventoryImport, data: formData);
+      await _api.post(
+        ApiEndpoints.inventoryImport, 
+        data: formData,
+        onSendProgress: (int sent, int total) {
+          if (onProgress != null && total > 0) {
+            onProgress(sent / total);
+          }
+        },
+      );
       return true;
     } catch (e) {
       if (kDebugMode) print('Excel upload error: $e');

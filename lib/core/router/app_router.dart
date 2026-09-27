@@ -47,16 +47,11 @@ GoRouter appRouter(AppRouterRef ref) {
       final authState = ref.read(authNotifierProvider);
       final isUnauthenticatedEvent = ref.read(unauthenticatedEventProvider);
 
-      // Mid-session 401: mark session expired, show re-login sheet
+      // Mid-session 401: log out
       if (isUnauthenticatedEvent) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ref.read(unauthenticatedEventProvider.notifier).state = false;
-          final user = authState.user;
-          if (user != null) {
-            ref.read(authNotifierProvider.notifier).markSessionExpired();
-          } else {
-            ref.read(authNotifierProvider.notifier).logout();
-          }
+          ref.read(authNotifierProvider.notifier).logout();
         });
       }
 
@@ -68,11 +63,6 @@ GoRouter appRouter(AppRouterRef ref) {
 
       // Still initialising — stay on splash, don't flicker
       if (status == AuthStatus.unknown) return null;
-
-      if (status == AuthStatus.sessionExpired) {
-        if (isSplashPage || isLoginPage) return '/home';
-        return null;
-      }
 
       if (status == AuthStatus.unauthenticated) {
         if (!isLoginPage) return '/login';

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../features/auth/providers/auth_provider.dart';
-import '../../features/auth/screens/session_expired_sheet.dart';
 import '../../features/notifications/providers/notification_provider.dart';
 import '../../features/settings/repositories/inventory_repository.dart';
 import '../utils/notifications_helper.dart';
@@ -83,14 +82,12 @@ class MainLayout extends ConsumerStatefulWidget {
 }
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
-  bool _showingSessionSheet = false;
   StreamSubscription<RemoteMessage>? _fcmSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkSessionExpiry();
       requestAppPermissions();
     });
     _fcmSub = FirebaseMessaging.onMessage.listen((msg) {
@@ -111,36 +108,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   }
 
   @override
-  void didUpdateWidget(MainLayout oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkSessionExpiry());
-  }
-
-  Future<void> _checkSessionExpiry() async {
-    if (_showingSessionSheet) return;
-    final authState = ref.read(authNotifierProvider);
-    if (authState.status == AuthStatus.sessionExpired && authState.user != null) {
-      if (!mounted) return;
-      _showingSessionSheet = true;
-      await showSessionExpiredSheet(
-        context,
-        ref,
-        employeeId: authState.user!.employeeId,
-        displayName: authState.user!.name,
-        logoutOnDismiss: true,
-      );
-      _showingSessionSheet = false;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // Watch auth state to react to sessionExpired triggered mid-session
-    ref.listen(authNotifierProvider, (previous, next) {
-      if (next.status == AuthStatus.sessionExpired && !_showingSessionSheet) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _checkSessionExpiry());
-      }
-    });
 
     // Read the actual path dynamically from the router state so pushed routes update the title
     final actualPath = GoRouterState.of(context).uri.path;

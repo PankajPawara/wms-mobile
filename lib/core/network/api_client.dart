@@ -97,9 +97,9 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> post(String path, {dynamic data}) async {
+  Future<Map<String, dynamic>> post(String path, {dynamic data, ProgressCallback? onSendProgress}) async {
     try {
-      final response = await _dio.post(path, data: data);
+      final response = await _dio.post(path, data: data, onSendProgress: onSendProgress);
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.error is ApiException) throw e.error!;

@@ -174,33 +174,20 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       if (filePath != null) {
         final repo = ref.read(inventoryRepositoryProvider);
 
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const Center(child: CircularProgressIndicator()),
+        final success = await SyncProgressDialog.show(
+          context,
+          (onProgress) => repo.uploadInventoryExcel(filePath, onProgress: onProgress),
+          title: 'Uploading Excel',
+          description: 'Transferring data and processing the file on the server. Please wait...',
+          successMessage: 'Upload Successful!',
+          errorMessage: 'Upload Failed',
+          errorDescription: 'An error occurred while uploading the excel file. Please try again later.',
         );
 
-        final success = await repo.uploadInventoryExcel(filePath);
-
         if (!mounted) return;
-        Navigator.pop(context);
 
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Excel file uploaded successfully! Syncing now...'),
-              backgroundColor: Colors.green,
-            ),
-          );
           _handleForceSync();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to upload Excel file.'),
-              backgroundColor: Colors.red,
-            ),
-          );
         }
       }
     } on PlatformException catch (e) {

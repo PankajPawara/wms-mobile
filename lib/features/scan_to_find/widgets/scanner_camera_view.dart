@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/barcode_util.dart';
@@ -44,6 +45,24 @@ class ScannerCameraViewState extends State<ScannerCameraView> with WidgetsBindin
   }
 
   Future<void> _initialize() async {
+    final status = await Permission.camera.request();
+    if (status.isPermanentlyDenied) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Camera Permission'),
+            content: const Text('Camera access is required to scan barcodes. Please enable it in app settings.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(onPressed: () => openAppSettings(), child: const Text('Settings')),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
     if (_cameras.isEmpty) {
       try {
         _cameras = await availableCameras();

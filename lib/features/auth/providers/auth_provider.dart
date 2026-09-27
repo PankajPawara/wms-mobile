@@ -10,7 +10,7 @@ import '../repositories/auth_repository.dart';
 
 part 'auth_provider.g.dart';
 
-enum AuthStatus { unknown, authenticated, unauthenticated, sessionExpired }
+enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthState {
   final AuthStatus status;
@@ -65,23 +65,8 @@ class AuthNotifier extends _$AuthNotifier {
         if (dbUser != null && dbUser.tokenExpiry.isNotEmpty) {
           final expiry = DateTime.tryParse(dbUser.tokenExpiry);
           if (expiry != null && DateTime.now().isAfter(expiry)) {
-            // Token has expired — set sessionExpired state so UI can show
-            // the quick re-login sheet instead of full logout.
-            final user = UserModel(
-              id: cachedUser['id']!,
-              employeeId: cachedUser['employeeId'] ?? '',
-              name: cachedUser['name'] ?? '',
-              role: cachedUser['role'] ?? 'employee',
-              email: '',
-              mobile: '',
-              status: 'active',
-              isFirstLogin: false,
-            );
-            state = AuthState(
-              status: AuthStatus.sessionExpired,
-              user: user,
-              isFirstLogin: false,
-            );
+            // Token has expired — log out
+            state = const AuthState(status: AuthStatus.unauthenticated);
             return;
           }
         }
@@ -181,12 +166,6 @@ class AuthNotifier extends _$AuthNotifier {
     }
   }
 
-  /// Called when a mid-session 401 is received. Keeps the user data in state
-  /// so the re-login sheet can pre-fill the username, but blocks further
-  /// authenticated actions until they re-authenticate.
-  void markSessionExpired() {
-    state = state.copyWith(status: AuthStatus.sessionExpired);
-  }
 
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
