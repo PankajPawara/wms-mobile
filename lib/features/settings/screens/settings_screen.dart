@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' hide Column;
 
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+
+import '../../../shared/widgets/sync_progress_dialog.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
@@ -112,7 +115,7 @@ class SettingsScreen extends ConsumerWidget {
                         iconColor: const Color(0xFF16A34A),
                         title: 'Import Excel File',
                         subtitle: 'Import or update inventory data',
-                        onTap: () => _showImportExcelDialog(context)),
+                        onTap: () => _handleUploadExcel(context, ref)),
                     _SettingsItem(
                         icon: Icons.storage_rounded,
                         iconColor: const Color(0xFF16A34A),
@@ -255,27 +258,36 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showImportExcelDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Excel Master Import'),
-        content: const Text(
-          'To import a new Excel inventory master file:\n\n'
-          '1. Log in to the WMS Web Admin Dashboard on your computer.\n'
-          '2. Click "Import Excel File" and select your spreadsheet.\n'
-          '3. Once complete, tap "Re-import Database" under Settings in this app to pull all new data onto your phone.\n\n'
-          'This ensures catalog consistency across all scanner terminals.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => context.pop(),
-            child: const Text('Understood', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+  static const _fileChannel = MethodChannel('com.example.wms_mobile/file_picker');
+
+  Future<void> _handleUploadExcel(BuildContext context, WidgetRef ref) async {
+    try {
+      final String? filePath = await _fileChannel.invokeMethod('pickExcelFile');
+      
+      if (filePath != null && context.mounted) {
+        final repo = ref.read(inventoryRepositoryProvider);
+
+        final success = await SyncProgressDialog.show(
+          context,
+          (onProgress) => repo.uploadInventoryExcel(filePath, onProgress: onProgress),
+        );
+
+        if (success && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Excel file uploaded successfully!')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick/upload Excel file: $e'),
+            backgroundColor: Colors.red,
           ),
-        ],
-      ),
-    );
+        );
+      }
+    }
   }
 
   void _showHelpSupportDialog(BuildContext context) {
