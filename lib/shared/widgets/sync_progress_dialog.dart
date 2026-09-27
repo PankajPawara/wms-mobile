@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
@@ -5,7 +6,6 @@ import '../../core/constants/app_colors.dart';
 class SyncProgressDialog extends StatefulWidget {
   final Future<bool> Function(void Function(double) onProgress) syncTask;
   final String title;
-  final String description;
   final String successMessage;
   final String errorMessage;
   final String errorDescription;
@@ -14,7 +14,6 @@ class SyncProgressDialog extends StatefulWidget {
     super.key, 
     required this.syncTask,
     this.title = 'Syncing Database',
-    this.description = 'Please wait a moment while the database is being downloaded and updated...',
     this.successMessage = 'Sync Successful!',
     this.errorMessage = 'Sync Failed',
     this.errorDescription = 'An error occurred while updating the database. You can continue your work and try again later.',
@@ -24,7 +23,6 @@ class SyncProgressDialog extends StatefulWidget {
     BuildContext context, 
     Future<bool> Function(void Function(double)) syncTask, {
     String title = 'Syncing Database',
-    String description = 'Please wait a moment while the database is being downloaded and updated...',
     String successMessage = 'Sync Successful!',
     String errorMessage = 'Sync Failed',
     String errorDescription = 'An error occurred while updating the database. You can continue your work and try again later.',
@@ -35,7 +33,6 @@ class SyncProgressDialog extends StatefulWidget {
       builder: (context) => SyncProgressDialog(
         syncTask: syncTask,
         title: title,
-        description: description,
         successMessage: successMessage,
         errorMessage: errorMessage,
         errorDescription: errorDescription,
@@ -53,25 +50,66 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
   bool _isError = false;
   late AnimationController _successAnimController;
   late Animation<double> _scaleAnimation;
+  
+  Timer? _messageTimer;
+  Timer? _fakeProgressTimer;
+  int _messageIndex = 0;
+  
+  final List<String> _messages = [
+    'Please wait a moment...',
+    'Just a few seconds left...',
+    'Almost there...',
+    'Processing data...',
+    'Taking longer than expected, please hold on...',
+    'Finalizing details...',
+  ];
 
   @override
   void initState() {
     super.initState();
     _successAnimController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _scaleAnimation = CurvedAnimation(parent: _successAnimController, curve: Curves.elasticOut);
+    
+    _messageTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (mounted && !_isSuccess && !_isError) {
+        setState(() {
+          _messageIndex = (_messageIndex + 1) % _messages.length;
+        });
+      }
+    });
+
+    _fakeProgressTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (mounted && !_isSuccess && !_isError && _progress < 0.95) {
+        setState(() {
+          // Slow down progress as it reaches 95%
+          double increment = (0.95 - _progress) * 0.05;
+          if (increment < 0.001) increment = 0.001;
+          _progress += increment;
+          if (_progress > 0.95) _progress = 0.95;
+        });
+      }
+    });
+
     _startSync();
+  }
+  
+  @override
+  void dispose() {
+    _messageTimer?.cancel();
+    _fakeProgressTimer?.cancel();
+    _successAnimController.dispose();
+    super.dispose();
   }
 
   Future<void> _startSync() async {
-    setState(() {
-      _progress = 0.0;
-      _isSuccess = false;
-      _isError = false;
-    });
-
     try {
-      final result = await widget.syncTask((progress) {
-        if (mounted) setState(() => _progress = progress);
+      final result = await widget.syncTask((realProgress) {
+        // Only use real progress if it's faster, but cap it at 0.95 until actually done.
+        if (mounted && realProgress > _progress) {
+          setState(() {
+            _progress = realProgress > 0.95 ? 0.95 : realProgress;
+          });
+        }
       });
 
       if (mounted) {
@@ -84,7 +122,6 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
               if (mounted) Navigator.pop(context, true);
             });
           } else {
-            // Already up to date (returns false when no sync needed)
             _isSuccess = true;
             _successAnimController.forward();
             Future.delayed(const Duration(seconds: 1), () {
@@ -103,32 +140,59 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
   }
 
   @override
-  void dispose() {
-    _successAnimController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!_isSuccess && !_isError) ...[
-              Text(
-                widget.title,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              _isError ? widget.errorMessage : (_isSuccess ? widget.successMessage : widget.title),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: _isError ? AppColors.danger : const Color(0xFF111827),
               ),
-              const SizedBox(height: 8),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            if (_isError) ...[
+              const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 64),
+              const SizedBox(height: 16),
               Text(
-                widget.description,
+                widget.errorDescription,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black54),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF4B5563), height: 1.5),
               ),
               const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF3F4F6),
+                    foregroundColor: const Color(0xFF374151),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ] else if (_isSuccess) ...[
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 64),
+              ),
+            ] else ...[
               Stack(
                 alignment: Alignment.center,
                 children: [
@@ -136,56 +200,27 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
                     width: 80,
                     height: 80,
                     child: CircularProgressIndicator(
-                      value: _progress >= 1.0 ? null : _progress,
+                      value: _progress,
                       strokeWidth: 6,
-                      backgroundColor: Colors.grey[200],
+                      backgroundColor: const Color(0xFFF3F4F6),
                       valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                     ),
                   ),
                   Text(
-                    _progress >= 1.0 ? 'Wait...' : '${(_progress * 100).toInt()}%',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    '${(_progress * 100).toInt()}%',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ],
-              ),
-            ] else if (_isSuccess) ...[
-              ScaleTransition(
-                scale: _scaleAnimation,
-                child: const Icon(Icons.check_circle, color: Colors.green, size: 80),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                widget.successMessage,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
-              ),
-            ] else if (_isError) ...[
-              const Icon(Icons.error, color: Colors.red, size: 80),
-              const SizedBox(height: 16),
-              Text(
-                widget.errorMessage,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.errorDescription,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black54),
               ),
               const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Continue'),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: _startSync,
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                    child: const Text('Try Again', style: TextStyle(color: Colors.white)),
-                  ),
-                ],
+              Text(
+                _messages[_messageIndex],
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               ),
             ],
           ],

@@ -61,15 +61,6 @@ class AuthNotifier extends _$AuthNotifier {
         // ── Check local SQLite token expiry ────────────────────────────────
         final db = ref.read(appDatabaseProvider);
         final dbUser = await (db.select(db.currentUsers)).getSingleOrNull();
-
-        if (dbUser != null && dbUser.tokenExpiry.isNotEmpty) {
-          final expiry = DateTime.tryParse(dbUser.tokenExpiry);
-          if (expiry != null && DateTime.now().isAfter(expiry)) {
-            // Token has expired — log out
-            state = const AuthState(status: AuthStatus.unauthenticated);
-            return;
-          }
-        }
         // ── Token still valid — restore session ────────────────────────────
         final user = UserModel(
           id: cachedUser['id']!,

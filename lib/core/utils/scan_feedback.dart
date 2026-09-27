@@ -1,38 +1,67 @@
 import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/database/app_database.dart';
 
 class ScanFeedback {
   ScanFeedback._();
 
   static const _soundChannel = MethodChannel('com.example.wms_mobile/sound');
 
-  /// Trigger successful scan feedback (beep + haptic vibration)
-  static Future<void> triggerSuccess() async {
+  static Future<bool> _isEnabled(WidgetRef ref, String key) async {
     try {
-      // Platform Haptic Vibration
-      HapticFeedback.mediumImpact();
-      
-      // Native Sound Beep
-      await _soundChannel.invokeMethod('playBeep', {'type': 'success'});
+      final db = ref.read(appDatabaseProvider);
+      final settings = await db.select(db.appSettings).get();
+      return settings.firstWhere((e) => e.key == key, orElse: () => AppSetting(key: key, value: 'true')).value == 'true';
     } catch (_) {
-      // Fallback to standard vibration if method channel fails
-      HapticFeedback.vibrate();
+      return true;
+    }
+  }
+
+  /// Trigger successful scan feedback (beep + haptic vibration)
+  static Future<void> triggerSuccess(WidgetRef ref) async {
+    final vibrate = await _isEnabled(ref, 'vibrate_on_scan');
+    final beep = await _isEnabled(ref, 'beep_on_scan');
+
+    try {
+            if (vibrate) {
+        bool? hasVibrator = await Vibration.hasVibrator();
+        if (hasVibrator == true) {
+          Vibration.vibrate(duration: 150);
+        } else {
+          HapticFeedback.mediumImpact();
+        }
+      }
+      if (beep) {
+        await _soundChannel.invokeMethod('playBeep', {'type': 'success'});
+      }
+    } catch (_) {
+      if (vibrate) HapticFeedback.vibrate();
     }
   }
 
   /// Trigger failed scan feedback (error beep + double haptic vibration)
-  static Future<void> triggerError() async {
-    try {
-      // Platform Haptic Vibration
-      HapticFeedback.heavyImpact();
-      Future.delayed(const Duration(milliseconds: 100), () {
-        HapticFeedback.heavyImpact();
-      });
+  static Future<void> triggerError(WidgetRef ref) async {
+    final vibrate = await _isEnabled(ref, 'vibrate_on_scan');
+    final beep = await _isEnabled(ref, 'beep_on_scan');
 
-      // Native Sound Beep
-      await _soundChannel.invokeMethod('playBeep', {'type': 'error'});
+    try {
+            if (vibrate) {
+        bool? hasVibrator = await Vibration.hasVibrator();
+        if (hasVibrator == true) {
+          Vibration.vibrate(pattern: [0, 150, 100, 150]);
+        } else {
+          HapticFeedback.heavyImpact();
+          Future.delayed(const Duration(milliseconds: 100), () {
+            HapticFeedback.heavyImpact();
+          });
+        }
+      }
+      if (beep) {
+        await _soundChannel.invokeMethod('playBeep', {'type': 'error'});
+      }
     } catch (_) {
-      // Fallback
-      HapticFeedback.vibrate();
+      if (vibrate) HapticFeedback.vibrate();
     }
   }
 }

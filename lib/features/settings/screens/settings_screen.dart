@@ -113,8 +113,8 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsItem(
                         icon: Icons.file_upload_outlined,
                         iconColor: const Color(0xFF16A34A),
-                        title: 'Import Excel File',
-                        subtitle: 'Import or update inventory data',
+                        title: 'Upload Excel File',
+                        subtitle: 'Update inventory data',
                         onTap: () => _handleUploadExcel(context, ref)),
                     _SettingsItem(
                         icon: Icons.storage_rounded,
@@ -165,21 +165,7 @@ class SettingsScreen extends ConsumerWidget {
             // ── SCANNER SETTINGS ─────────────────────────────────────────────
             const _SectionLabel('SCANNER SETTINGS'),
             const SizedBox(height: 8),
-            _SettingsGroup(items: [
-              _SettingsItem(
-                  icon: Icons.document_scanner_rounded,
-                  iconColor: const Color(0xFF1D4ED8),
-                  title: 'Scanner Settings',
-                  subtitle: 'Configure scanner preferences',
-                  onTap: () => _showScannerSettingsSheet(context, ref)),
-              _SettingsItem(
-                  icon: Icons.text_fields_rounded,
-                  iconColor: const Color(0xFF16A34A),
-                  title: 'OCR Settings',
-                  subtitle: 'Configure OCR preferences',
-                  onTap: () => _showOcrSettingsSheet(context, ref),
-                  showDivider: false),
-            ]),
+            const _ScannerSettingsSection(),
             const SizedBox(height: 16),
 
             // ── THEME SETTINGS ───────────────────────────────────────────────
@@ -268,9 +254,12 @@ class SettingsScreen extends ConsumerWidget {
         final repo = ref.read(inventoryRepositoryProvider);
 
         final success = await SyncProgressDialog.show(
-          context,
-          (onProgress) => repo.uploadInventoryExcel(filePath, onProgress: onProgress),
-        );
+            context,
+            (onProgress) => repo.uploadInventoryExcel(filePath, onProgress: onProgress),
+            title: 'Uploading file',
+            successMessage: 'Upload Successful!',
+            errorMessage: 'Upload Failed',
+          );
 
         if (success && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -341,91 +330,20 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _runManualSync(BuildContext context, WidgetRef ref) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Synchronising data with WMS Server...'), duration: Duration(seconds: 1)),
+    void _runManualSync(BuildContext context, WidgetRef ref) async {
+    final success = await SyncProgressDialog.show(
+      context,
+      (onProgress) async {
+        final updated = await ref.read(inventoryRepositoryProvider).syncInventory(force: true, skipCheck: false, onProgress: onProgress);
+        await ref.read(orderRepositoryProvider).syncOrdersFromServer();
+        return updated;
+      },
+      title: 'Syncing Database',
     );
-
-    final updated = await ref.read(inventoryRepositoryProvider).syncInventory(force: true);
-    await ref.read(orderRepositoryProvider).syncOrdersFromServer();
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(updated ? 'Sync complete. Inventory updated!' : 'Sync complete. Local database up to date!')),
-    );
-  }
-
-  void _showScannerSettingsSheet(BuildContext context, WidgetRef ref) {
-    final db = ref.read(appDatabaseProvider);
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return FutureBuilder<List<AppSetting>>(
-              future: db.select(db.appSettings).get(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const SizedBox(
-                    height: 200,
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final settings = snapshot.data!;
-                final vibrate = settings.firstWhere((e) => e.key == 'vibrate_on_scan', orElse: () => const AppSetting(key: 'vibrate_on_scan', value: 'true')).value == 'true';
-                final beep = settings.firstWhere((e) => e.key == 'beep_on_scan', orElse: () => const AppSetting(key: 'beep_on_scan', value: 'true')).value == 'true';
-
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Scanner Preferences',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      SwitchListTile(
-                        title: const Text('Vibrate on successful scan'),
-                        value: vibrate,
-                        activeThumbColor: AppColors.primary,
-                        onChanged: (val) async {
-                          await db.into(db.appSettings).insertOnConflictUpdate(
-                            AppSettingsCompanion(
-                              key: const Value('vibrate_on_scan'),
-                              value: Value(val.toString()),
-                            ),
-                          );
-                          setModalState(() {});
-                        },
-                      ),
-                      SwitchListTile(
-                        title: const Text('Beep on successful scan'),
-                        value: beep,
-                        activeThumbColor: AppColors.primary,
-                        onChanged: (val) async {
-                          await db.into(db.appSettings).insertOnConflictUpdate(
-                            AppSettingsCompanion(
-                              key: const Value('beep_on_scan'),
-                              value: Value(val.toString()),
-                            ),
-                          );
-                          setModalState(() {});
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
+      SnackBar(content: Text(success ? 'Sync complete. Inventory updated!' : 'Sync complete. Local database up to date!')),
     );
   }
 
@@ -502,7 +420,7 @@ class SettingsScreen extends ConsumerWidget {
                   );
                 }
                 final settings = snapshot.data!;
-                final autoTrigger = settings.firstWhere((e) => e.key == 'ocr_auto_trigger', orElse: () => const AppSetting(key: 'ocr_auto_trigger', value: 'false')).value == 'true';
+                final autoTrigger = settings.firstWhere((e) => e.key == 'ocr_auto_trigger', orElse: () => const AppSetting(key: 'ocr_auto_trigger', value: 'true')).value == 'true';
                 final defaultQty = int.tryParse(settings.firstWhere((e) => e.key == 'ocr_default_qty', orElse: () => const AppSetting(key: 'ocr_default_qty', value: '1')).value) ?? 1;
 
                 return Padding(
@@ -585,7 +503,7 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _SettingsGroup extends StatelessWidget {
-  final List<_SettingsItem> items;
+  final List<Widget> items;
   const _SettingsGroup({required this.items});
 
   @override
@@ -607,16 +525,18 @@ class _SettingsItem extends StatelessWidget {
   final Color iconColor;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool showDivider;
+  final Widget? trailing;
 
   const _SettingsItem({
     required this.icon,
     required this.iconColor,
     required this.title,
     required this.subtitle,
-    required this.onTap,
+    this.onTap,
     this.showDivider = true,
+    this.trailing,
   });
 
   @override
@@ -655,7 +575,7 @@ class _SettingsItem extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded,
+                  trailing ?? Icon(Icons.chevron_right_rounded,
                       color: Theme.of(context).colorScheme.outline, size: 20),
               ],
             ),
@@ -664,6 +584,104 @@ class _SettingsItem extends StatelessWidget {
         if (showDivider)
           const Divider(height: 1, indent: 66, endIndent: 14),
       ],
+    );
+  }
+}
+class _ScannerSettingsSection extends ConsumerWidget {
+  const _ScannerSettingsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(appDatabaseProvider);
+    
+    return StreamBuilder<List<AppSetting>>(
+      stream: db.select(db.appSettings).watch(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final settings = snapshot.data!;
+        final vibrate = settings.firstWhere((e) => e.key == 'vibrate_on_scan', orElse: () => const AppSetting(key: 'vibrate_on_scan', value: 'true')).value == 'true';
+        final beep = settings.firstWhere((e) => e.key == 'beep_on_scan', orElse: () => const AppSetting(key: 'beep_on_scan', value: 'true')).value == 'true';
+        final autoProcess = settings.firstWhere((e) => e.key == 'ocr_auto_trigger', orElse: () => const AppSetting(key: 'ocr_auto_trigger', value: 'true')).value == 'true';
+
+        return _SettingsGroup(
+          items: [
+            _SettingsItem(
+              icon: Icons.vibration_rounded,
+              iconColor: const Color(0xFF1D4ED8),
+              title: 'Vibrate on scan',
+              subtitle: 'Haptic feedback upon successful scan',
+              onTap: null,
+              trailing: Switch(
+                value: vibrate,
+                activeColor: AppColors.primary,
+                onChanged: (val) async {
+                  await db.into(db.appSettings).insertOnConflictUpdate(
+                    AppSettingsCompanion(
+                      key: const Value('vibrate_on_scan'),
+                      value: Value(val.toString()),
+                    ),
+                  );
+                },
+              ),
+            ),
+            _SettingsItem(
+              icon: Icons.volume_up_rounded,
+              iconColor: const Color(0xFF16A34A),
+              title: 'Beep sound on scan',
+              subtitle: 'Play sound upon successful scan',
+              onTap: null,
+              trailing: Switch(
+                value: beep,
+                activeColor: AppColors.primary,
+                onChanged: (val) async {
+                  await db.into(db.appSettings).insertOnConflictUpdate(
+                    AppSettingsCompanion(
+                      key: const Value('beep_on_scan'),
+                      value: Value(val.toString()),
+                    ),
+                  );
+                },
+              ),
+            ),
+            _SettingsItem(
+              icon: Icons.auto_mode_rounded,
+              iconColor: const Color(0xFF9333EA),
+              title: 'Auto process image after click',
+              subtitle: 'Process OCR automatically without manual confirmation',
+              onTap: null,
+              showDivider: false,
+                            trailing: Switch(
+                value: autoProcess,
+                activeColor: AppColors.primary,
+                onChanged: (val) async {
+                  if (!val) {
+                    final proceed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Disable Auto Process?'),
+                        content: const Text('By turning this off, you will have to manually click the process button for each scan.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Turn Off')),
+                        ],
+                      ),
+                    );
+                    if (proceed != true) return;
+                  }
+                  await db.into(db.appSettings).insertOnConflictUpdate(
+                    AppSettingsCompanion(
+                      key: const Value('ocr_auto_trigger'),
+                      value: Value(val.toString()),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

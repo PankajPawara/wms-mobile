@@ -67,7 +67,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
     final expected = current.partNo;
 
     if (barcode.toUpperCase() == expected.toUpperCase()) {
-      ScanFeedback.triggerSuccess();
+      ScanFeedback.triggerSuccess(ref);
       final picked = current.pickedQty + 1;
       final status = picked >= current.requiredQty ? 'picked' : 'pending';
 
@@ -84,7 +84,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
         _lastScanCorrect = true;
       });
     } else {
-      ScanFeedback.triggerError();
+      ScanFeedback.triggerError(ref);
       setState(() {
         _lastScanResult = barcode;
         _lastScanCorrect = false;

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
+import '../../../core/utils/scan_feedback.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/pipeline/red_label_parser.dart';
@@ -58,6 +60,8 @@ class _RedLabelScanScreenState extends ConsumerState<RedLabelScanScreen> {
 
     if (qrValue.isEmpty || qrValue == _lastProcessedQr) return;
     _lastProcessedQr = qrValue;
+
+    ScanFeedback.triggerSuccess(ref);
 
     // Use the QR value as the part number (primary path — no OCR needed for part no)
     // The QR on Honda labels encodes the raw part number without dashes (e.g. "33610KSP860")

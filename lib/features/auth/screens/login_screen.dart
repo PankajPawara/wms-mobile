@@ -29,13 +29,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-    final success = await ref.read(authNotifierProvider.notifier).login(
+    await ref.read(authNotifierProvider.notifier).login(
           _employeeIdController.text.trim(),
           _passwordController.text,
         );
-    if (success && mounted) {
-      context.go('/home');
-    }
+    
   }
 
   void _showForgotPasswordDialog() {
@@ -90,9 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           if (!formKey.currentState!.validate()) return;
                           setState(() => isSubmitting = true);
                           final empId = controller.text.trim().toUpperCase();
-                          final success = await ref
-                              .read(notificationNotifierProvider.notifier)
-                              .requestPasswordReset(empId);
+                          final success = await ref.read(notificationNotifierProvider.notifier).requestPasswordReset(empId);
                           if (context.mounted) {
                             context.pop();
                             ScaffoldMessenger.of(context).showSnackBar(

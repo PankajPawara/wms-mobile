@@ -90,4 +90,14 @@ class NotificationNotifier extends _$NotificationNotifier {
       state = AsyncValue.data(items.map((e) => NotificationModel.fromJson(e as Map<String, dynamic>)).toList());
     } catch (_) {}
   }
+  Future<bool> deleteNotification(String id) async {
+    final client = ref.read(apiClientProvider);
+    try {
+      await client.delete('/notifications/$id');
+      await refresh();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../features/notifications/providers/notification_provider.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/settings/repositories/inventory_repository.dart';
+import '../widgets/sync_progress_dialog.dart';
 
 void showNotificationsDialog(BuildContext context, WidgetRef ref) {
-  // Mark all as read when opening notifications panel
-  ref.read(notificationNotifierProvider.notifier).markAllAsRead();
 
   showModalBottomSheet(
     context: context,
@@ -40,13 +40,21 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                                                    const Text(
                             'Notifications',
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded),
-                            onPressed: () => Navigator.pop(context),
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () => ref.read(notificationNotifierProvider.notifier).markAllAsRead(),
+                                child: const Text('Mark all as read', style: TextStyle(fontSize: 12)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -84,7 +92,10 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                                 onTap: () {
                                   if (item.type == 'APP_UPDATE') {
                                     Navigator.pop(context); // close bottom sheet
-                                    context.push('/inventory-updated');
+                                    SyncProgressDialog.show(
+                                      context,
+                                      (onProgress) => ref.read(inventoryRepositoryProvider).syncInventory(force: true, skipCheck: false, onProgress: onProgress)
+                                    );
                                   }
                                 },
                                 borderRadius: BorderRadius.circular(12),
@@ -100,8 +111,15 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                                   child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
+                                                                        Row(
                                       children: [
+                                        if (!item.isRead)
+                                          Container(
+                                            margin: const EdgeInsets.only(right: 8),
+                                            width: 8,
+                                            height: 8,
+                                            decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+                                          ),
                                         Icon(
                                           isPasswordRequest
                                               ? Icons.lock_reset_rounded
@@ -125,6 +143,12 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                                         Text(
                                           _formatTime(item.createdAt),
                                           style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.grey),
+                                          constraints: const BoxConstraints(),
+                                          padding: const EdgeInsets.only(left: 8),
+                                          onPressed: () => ref.read(notificationNotifierProvider.notifier).deleteNotification(item.id),
                                         ),
                                       ],
                                     ),

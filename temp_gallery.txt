@@ -1,0 +1,65 @@
+﻿  Future<void> _scanFromGallery() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image == null || !mounted) return;
+
+    final db = ref.read(appDatabaseProvider);
+    final settings = await db.select(db.appSettings).get();
+    final autoProcess = settings.firstWhere((e) => e.key == 'ocr_auto_trigger', orElse: () => const AppSetting(key: 'ocr_auto_trigger', value: 'false')).value == 'true';
+
+    if (!autoProcess) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Process selected image?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(File(image.path), height: 200, fit: BoxFit.cover),
+              ),
+              const SizedBox(height: 16),
+              const Text('Do you want to run OCR on this image?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('Process'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Analyzing image...',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final inputImage = InputImage.fromFilePath(image.path);
+      final barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);

@@ -178,8 +178,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
           context,
           (onProgress) => repo.uploadInventoryExcel(filePath, onProgress: onProgress),
           title: 'Uploading Excel',
-          description: 'Transferring data and processing the file on the server. Please wait...',
-          successMessage: 'Upload Successful!',
+                    successMessage: 'Upload Successful!',
           errorMessage: 'Upload Failed',
           errorDescription: 'An error occurred while uploading the excel file. Please try again later.',
         );

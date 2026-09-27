@@ -1,0 +1,59 @@
+﻿  Future<void> _triggerCameraScan() async {
+    setState(() {
+      _isDetecting = true;
+    });
+
+    try {
+      final image = await _scannerKey.currentState?.takePicture();
+      if (image == null) {
+        setState(() {
+          _isDetecting = false;
+        });
+        return;
+      }
+
+      final db = ref.read(appDatabaseProvider);
+      final settings = await db.select(db.appSettings).get();
+      final autoProcess = settings.firstWhere((e) => e.key == 'ocr_auto_trigger', orElse: () => const AppSetting(key: 'ocr_auto_trigger', value: 'false')).value == 'true';
+
+      if (!autoProcess) {
+        if (mounted) setState(() { _isDetecting = false; });
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Process captured image?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(File(image.path), height: 200, fit: BoxFit.cover),
+                ),
+                const SizedBox(height: 16),
+                const Text('Do you want to run OCR on this image?'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Retake'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                child: const Text('Process'),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) {
+          if (mounted) _scannerKey.currentState?.restartFeed();
+          return;
+        }
+        if (mounted) setState(() { _isDetecting = true; });
+      }
+
+      final inputImage = InputImage.fromFilePath(image.path);
+
+      // Also try barcode scanning on the captured image just in case
+      final barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.all]);

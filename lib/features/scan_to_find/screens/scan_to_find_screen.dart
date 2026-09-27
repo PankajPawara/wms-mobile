@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -228,7 +229,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         : parsed.normalized;
 
     if (widget.returnResult) {
-      ScanFeedback.triggerSuccess();
+      ScanFeedback.triggerSuccess(ref);
       if (mounted) Navigator.pop(context, bestCandidate.isNotEmpty ? bestCandidate : rawInput);
       return true;
     }
@@ -336,7 +337,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
 
       // ── Handle local DB match ─────────────────────────────────────────────
       if (matches.isNotEmpty) {
-        ScanFeedback.triggerSuccess();
+        ScanFeedback.triggerSuccess(ref);
         _addRecordToHistory({
           'partNo': matches.first.partNo,
           'description': matches.first.description ?? '',
@@ -379,7 +380,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
           final product = data?['product'] as Map<String, dynamic>?;
 
           if (product != null) {
-            ScanFeedback.triggerSuccess();
+            ScanFeedback.triggerSuccess(ref);
             _addRecordToHistory({
               'partNo': product['part_no'] ?? '',
               'description': product['description'] ?? '',
@@ -419,7 +420,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       }
 
       if (!mounted) return true;
-      ScanFeedback.triggerError();
+      ScanFeedback.triggerError(ref);
       _showNotFoundInline(bestCandidate.isNotEmpty ? bestCandidate : rawInput);
       return true;
     } catch (e) {
@@ -434,7 +435,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
       }
       
       if (!mounted) return true;
-      ScanFeedback.triggerError();
+      ScanFeedback.triggerError(ref);
       _showNotFoundInline(rawInput);
       return true;
     }
@@ -1320,6 +1321,47 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
         return;
       }
 
+      final db = ref.read(appDatabaseProvider);
+      final settings = await db.select(db.appSettings).get();
+      final autoProcess = settings.firstWhere((e) => e.key == 'ocr_auto_trigger', orElse: () => const AppSetting(key: 'ocr_auto_trigger', value: 'true')).value == 'true';
+
+      if (!autoProcess) {
+        if (mounted) setState(() { _isDetecting = false; });
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Process captured image?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(File(image.path), height: 200, fit: BoxFit.cover),
+                ),
+                const SizedBox(height: 16),
+                const Text('Do you want to run OCR on this image?'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Retake'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                child: const Text('Process'),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) {
+          if (mounted) _scannerKey.currentState?.restartFeed();
+          return;
+        }
+        if (mounted) setState(() { _isDetecting = true; });
+      }
+
       final inputImage = InputImage.fromFilePath(image.path);
 
       // Also try barcode scanning on the captured image just in case
@@ -1367,7 +1409,7 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
   }
 
   void _showScanFailedDialog() {
-    ScanFeedback.triggerError();
+    ScanFeedback.triggerError(ref);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1406,6 +1448,42 @@ class _ScanToFindScreenState extends ConsumerState<ScanToFindScreen>
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null || !mounted) return;
+
+    final db = ref.read(appDatabaseProvider);
+    final settings = await db.select(db.appSettings).get();
+    final autoProcess = settings.firstWhere((e) => e.key == 'ocr_auto_trigger', orElse: () => const AppSetting(key: 'ocr_auto_trigger', value: 'true')).value == 'true';
+
+    if (!autoProcess) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Process selected image?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(File(image.path), height: 200, fit: BoxFit.cover),
+              ),
+              const SizedBox(height: 16),
+              const Text('Do you want to run OCR on this image?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('Process'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
 
     showDialog(
       context: context,

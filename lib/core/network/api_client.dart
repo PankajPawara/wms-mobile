@@ -126,6 +126,15 @@ class ApiClient {
       rethrow;
     }
   }
+  Future<Map<String, dynamic>> delete(String path, {dynamic data}) async {
+    try {
+      final response = await _dio.delete(path, data: data);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.error is ApiException) throw e.error!;
+      rethrow;
+    }
+  }
 }
 
 final unauthenticatedEventProvider = StateProvider<bool>((ref) => false);
