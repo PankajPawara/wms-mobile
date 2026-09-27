@@ -21,6 +21,7 @@ import '../../features/history/screens/picked_items_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/settings/screens/diagnostics_screen.dart';
+import '../../features/settings/screens/inventory_updated_screen.dart';
 import '../../features/settings/screens/ocr_sandbox_screen.dart';
 import '../../features/settings/screens/pipeline_sandbox_screen.dart';
 import '../../features/scan_to_find/screens/ai_vision_test_screen.dart';
@@ -161,6 +162,7 @@ GoRouter appRouter(AppRouterRef ref) {
           GoRoute(path: '/red-label-scan', builder: (_, __) => const RedLabelScanScreen()),
 
           GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
+          GoRoute(path: '/inventory-updated', builder: (_, __) => const InventoryUpdatedScreen()),
           GoRoute(path: '/settings/ocr-sandbox', builder: (_, __) => const OcrSandboxScreen()),
           GoRoute(path: '/settings/pipeline-sandbox', builder: (_, __) => const PipelineSandboxScreen()),
           GoRoute(path: '/ai-vision-test', builder: (_, __) => const AIVisionTestScreen()),

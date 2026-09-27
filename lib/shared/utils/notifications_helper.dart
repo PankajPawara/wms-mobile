@@ -84,7 +84,7 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                                 onTap: () {
                                   if (item.type == 'APP_UPDATE') {
                                     Navigator.pop(context); // close bottom sheet
-                                    context.push('/settings/diagnostics');
+                                    context.push('/inventory-updated');
                                   }
                                 },
                                 borderRadius: BorderRadius.circular(12),
