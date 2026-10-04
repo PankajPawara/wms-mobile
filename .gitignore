@@ -44,3 +44,6 @@ build/
 
 # Added by ggshield
 .cache_ggshield
+
+# Firebase config
+android/app/google-services.json
