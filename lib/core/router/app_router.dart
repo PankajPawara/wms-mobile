@@ -70,7 +70,11 @@ GoRouter appRouter(AppRouterRef ref) {
       }
 
       if (status == AuthStatus.authenticated) {
-        if (isLoginPage || isSplashPage || isChangePassword) return '/home';
+        if (authState.isFirstLogin) {
+          if (!isChangePassword) return '/change-password';
+        } else {
+          if (isLoginPage || isSplashPage || isChangePassword) return '/home';
+        }
 
         final userRole = authState.user?.role ?? 'picker';
         final isDevRoute = path.startsWith('/settings/ocr-sandbox') ||
@@ -172,3 +176,4 @@ GoRouter appRouter(AppRouterRef ref) {
     ],
   );
 }
+
