@@ -23,6 +23,7 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/settings/screens/diagnostics_screen.dart';
 import '../../features/settings/screens/ocr_sandbox_screen.dart';
 import '../../features/settings/screens/pipeline_sandbox_screen.dart';
+import '../../features/settings/screens/notification_sandbox_screen.dart';
 import '../../features/scan_to_find/screens/ai_vision_test_screen.dart';
 import '../../shared/widgets/app_bottom_nav.dart';
 import '../../core/models/extracted_memo.dart';
@@ -74,6 +75,7 @@ GoRouter appRouter(AppRouterRef ref) {
         final userRole = authState.user?.role ?? 'picker';
         final isDevRoute = path.startsWith('/settings/ocr-sandbox') ||
                            path.startsWith('/settings/pipeline-sandbox') ||
+                           path.startsWith('/settings/notification-sandbox') ||
                            path.startsWith('/ai-vision-test');
 
         if (isDevRoute && userRole != 'developer') {
@@ -163,6 +165,7 @@ GoRouter appRouter(AppRouterRef ref) {
           GoRoute(path: '/diagnostics', builder: (_, __) => const DiagnosticsScreen()),
           GoRoute(path: '/settings/ocr-sandbox', builder: (_, __) => const OcrSandboxScreen()),
           GoRoute(path: '/settings/pipeline-sandbox', builder: (_, __) => const PipelineSandboxScreen()),
+          GoRoute(path: '/settings/notification-sandbox', builder: (_, __) => const NotificationSandboxScreen()),
           GoRoute(path: '/ai-vision-test', builder: (_, __) => const AIVisionTestScreen()),
         ],
       ),
