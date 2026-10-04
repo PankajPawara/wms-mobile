@@ -198,7 +198,14 @@ class SettingsScreen extends ConsumerWidget {
                     iconColor: const Color(0xFF06B6D4),
                     title: 'Pipeline Sandbox (v2.0)',
                     subtitle: 'Document Processing Pipeline — Engine 01 · 02 · 02A',
-                    onTap: () => context.push('/settings/pipeline-sandbox'),
+                    onTap: () => context.push('/settings/pipeline-sandbox')
+                ),
+                _SettingsItem(
+                    icon: Icons.notifications_active_rounded,
+                    iconColor: const Color(0xFFEAB308),
+                    title: 'Notification Sandbox',
+                    subtitle: 'Test FCM pushing and local notifications',
+                    onTap: () => context.push('/settings/notification-sandbox'),
                     showDivider: false),
               ]),
               const SizedBox(height: 16),
@@ -685,3 +692,4 @@ class _ScannerSettingsSection extends ConsumerWidget {
     );
   }
 }
+
