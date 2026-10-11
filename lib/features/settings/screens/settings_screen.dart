@@ -22,7 +22,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authNotifierProvider).user;
     final name = user?.name ?? 'User';
-    final roleRaw = user?.role ?? 'picker';
+    final roleRaw = (user?.role ?? 'picker').toLowerCase().trim();
     String roleDisplay = roleRaw.split('_').map((s) => s[0].toUpperCase() + s.substring(1)).join(' ');
     final isAdminOrDev = roleRaw == 'admin' || roleRaw == 'acting_admin' || roleRaw == 'developer';
     final empId = user?.employeeId ?? 'EMP000';
@@ -151,7 +151,7 @@ class SettingsScreen extends ConsumerWidget {
                   title: 'Scanner Test (Diagnostic)',
                   subtitle: 'Test camera, barcode, OCR etc.',
                   onTap: () => context.push('/scan-to-find')),
-              if (roleRaw == 'developer')
+              if (isAdminOrDev)
                 _SettingsItem(
                     icon: Icons.auto_awesome_rounded,
                     iconColor: const Color(0xFF8B5CF6),
@@ -183,7 +183,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // ── DEVELOPER TOOLS ───────────────────────────────────────────────
-            if (roleRaw == 'developer') ...[
+            if (isAdminOrDev) ...[
               const _SectionLabel('DEVELOPER TOOLS'),
               const SizedBox(height: 8),
               _SettingsGroup(items: [

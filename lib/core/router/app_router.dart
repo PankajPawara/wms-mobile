@@ -82,7 +82,9 @@ GoRouter appRouter(AppRouterRef ref) {
                            path.startsWith('/settings/notification-sandbox') ||
                            path.startsWith('/ai-vision-test');
 
-        if (isDevRoute && userRole != 'developer') {
+        final normalizedRole = userRole.toLowerCase().trim();
+        final isDevOrAdmin = normalizedRole == 'developer' || normalizedRole == 'admin' || normalizedRole == 'acting_admin';
+        if (isDevRoute && !isDevOrAdmin) {
           return '/home';
         }
       }

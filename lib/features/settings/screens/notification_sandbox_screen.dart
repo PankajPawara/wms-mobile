@@ -90,10 +90,10 @@ class _NotificationSandboxScreenState extends ConsumerState<NotificationSandboxS
           'body': 'This was sent via Firebase Admin SDK from the backend.',
         },
       );
-      if (res['success'] == true) {
-        _addLog('Backend successfully pushed message to FCM.');
+      if (res['success'] == true && res['data']?['success'] != false) {
+        _addLog('Backend successfully pushed message to FCM! Message ID: ${res['data']?['messageId'] ?? 'OK'}');
       } else {
-        _addLog('Backend returned failure: $res');
+        _addLog('Backend returned failure: ${res['data']?['error'] ?? res['message'] ?? res}');
       }
     } catch (e) {
       _addLog('Error calling backend API: $e');
