@@ -4,9 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
-import '../../notifications/providers/notification_provider.dart';
 import '../../../core/database/app_database.dart';
-import '../../settings/repositories/inventory_repository.dart';
 import '../../settings/providers/app_config_provider.dart';
 
 // ── Top-level provider (MUST be outside the class) ──────────────────────────
@@ -27,19 +25,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(notificationNotifierProvider.notifier).refresh();
-      _checkUpdates();
+      _checkApkUpdate();
     });
   }
 
-  Future<void> _checkUpdates() async {
-    // 1. Check App Version Update
+  Future<void> _checkApkUpdate() async {
     try {
       final appConfig = await ref.read(appConfigNotifierProvider.future);
       if (appConfig != null && mounted) {
-        // Simple string comparison for versions (e.g. '1.0.1' > '1.0.0')
-        // In a real app, use the package_info_plus package to get current version.
-        // For now, we assume current app version is 1.0.0.
         const currentVersion = '1.0.0';
         if (appConfig.latestApkVersion.compareTo(currentVersion) > 0) {
           showDialog(
@@ -56,7 +49,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 FilledButton(
                   onPressed: () {
-                    // Normally launch appConfig.apkDownloadUrl using url_launcher
                     if (!appConfig.forceApkUpdate) Navigator.pop(ctx);
                   },
                   child: const Text('Update'),
@@ -67,55 +59,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
       }
     } catch (_) {}
-
-    if (!mounted) return;
-
-    // 2. Check Inventory Updates
-    final repo = ref.read(inventoryRepositoryProvider);
-    final status = await repo.checkUpdateStatus();
-
-    if (!mounted) return;
-
-    if (status == InventoryUpdateStatus.needsInitialSync || status == InventoryUpdateStatus.updateAvailable) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: Text(status == InventoryUpdateStatus.needsInitialSync ? 'Initial Sync Required' : 'Inventory Update Available'),
-          content: Text(status == InventoryUpdateStatus.needsInitialSync
-              ? 'You must download the inventory database to use the app.'
-              : 'New inventory locations have been published. You must sync the database to continue.'),
-          actions: [
-            FilledButton(
-              onPressed: () async {
-                Navigator.pop(ctx); // Close prompt dialog
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (ctx2) => const AlertDialog(
-                    content: Row(
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(width: 16),
-                        Expanded(child: Text("Syncing database...")),
-                      ],
-                    ),
-                  ),
-                );
-                await repo.syncInventory(force: true, skipCheck: true);
-                if (mounted) {
-                  Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog safely
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Inventory synced successfully!')),
-                  );
-                }
-              },
-              child: const Text('Sync Now'),
-            ),
-          ],
-        ),
-      );
-    }
   }
 
   @override

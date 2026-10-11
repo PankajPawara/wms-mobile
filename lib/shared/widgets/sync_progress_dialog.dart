@@ -18,6 +18,8 @@ class SyncProgressDialog extends StatefulWidget {
     this.errorDescription = 'An error occurred while updating the database. You can continue your work and try again later.',
   });
 
+  static bool isDialogActive = false;
+
   static Future<bool> show(
     BuildContext context, 
     Future<bool> Function(void Function(double)) syncTask, {
@@ -25,18 +27,26 @@ class SyncProgressDialog extends StatefulWidget {
     String successMessage = 'Sync Successful!',
     String errorMessage = 'Sync Failed',
     String errorDescription = 'An error occurred while updating the database. You can continue your work and try again later.',
-  }) {
-    return showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => SyncProgressDialog(
-        syncTask: syncTask,
-        title: title,
-        successMessage: successMessage,
-        errorMessage: errorMessage,
-        errorDescription: errorDescription,
-      ),
-    ).then((value) => value ?? false);
+  }) async {
+    if (isDialogActive) return false;
+    isDialogActive = true;
+    try {
+      final res = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (context) => SyncProgressDialog(
+          syncTask: syncTask,
+          title: title,
+          successMessage: successMessage,
+          errorMessage: errorMessage,
+          errorDescription: errorDescription,
+        ),
+      );
+      return res ?? false;
+    } finally {
+      isDialogActive = false;
+    }
   }
 
   @override
@@ -53,6 +63,7 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
   
   Timer? _messageTimer;
   Timer? _fakeProgressTimer;
+  Timer? _autoDismissTimer;
   int _messageIndex = 0;
   
   final List<String> _messages = [
@@ -81,7 +92,6 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
     _fakeProgressTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (mounted && !_isSuccess && !_isError && _progress < 0.95) {
         setState(() {
-          // Slow down progress as it reaches 95%
           double increment = (0.95 - _progress) * 0.05;
           if (increment < 0.001) increment = 0.001;
           _progress += increment;
@@ -97,6 +107,7 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
   void dispose() {
     _messageTimer?.cancel();
     _fakeProgressTimer?.cancel();
+    _autoDismissTimer?.cancel();
     _successAnimController.dispose();
     super.dispose();
   }
@@ -104,7 +115,6 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
   Future<void> _startSync() async {
     try {
       final result = await widget.syncTask((realProgress) {
-        // Only use real progress if it's faster, but cap it at 0.95 until actually done.
         if (mounted && realProgress > _progress) {
           setState(() {
             _progress = realProgress > 0.95 ? 0.95 : realProgress;
@@ -118,8 +128,10 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
           if (result) {
             _isSuccess = true;
             _successAnimController.forward();
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) Navigator.pop(context, true);
+            _autoDismissTimer = Timer(const Duration(seconds: 3), () {
+              if (mounted) {
+                Navigator.of(context, rootNavigator: true).pop(true);
+              }
             });
           } else {
             _isError = true;
@@ -174,7 +186,7 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context, false),
+                  onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF3F4F6),
                     foregroundColor: const Color(0xFF374151),
@@ -189,6 +201,36 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
               ScaleTransition(
                 scale: _scaleAnimation,
                 child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 64),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                widget.successMessage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Auto closing in 3 seconds...',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    _autoDismissTimer?.cancel();
+                    if (mounted) Navigator.of(context, rootNavigator: true).pop(true);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
               ),
             ] else ...[
               Stack(

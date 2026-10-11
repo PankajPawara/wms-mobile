@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../features/notifications/providers/notification_provider.dart';
 import '../../features/auth/providers/auth_provider.dart';
@@ -13,7 +12,7 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) {
+    builder: (sheetContext) {
       return DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.5,
@@ -52,7 +51,7 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                               ),
                               IconButton(
                                 icon: const Icon(Icons.close_rounded),
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: () => Navigator.of(sheetContext).pop(),
                               ),
                             ],
                           ),
@@ -89,13 +88,60 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                               final isPasswordRequest = item.type == 'PASSWORD_RESET_REQUEST';
 
                               return InkWell(
-                                onTap: () {
-                                  if (item.type == 'APP_UPDATE') {
-                                    Navigator.pop(context); // close bottom sheet
-                                    SyncProgressDialog.show(
-                                      context,
-                                      (onProgress) => ref.read(inventoryRepositoryProvider).syncInventory(force: true, skipCheck: false, onProgress: onProgress)
+                                onTap: () async {
+                                  // Mark as read immediately on click
+                                  if (!item.isRead) {
+                                    ref.read(notificationNotifierProvider.notifier).markAsRead(item.id);
+                                  }
+
+                                  if (item.type == 'APP_UPDATE' || item.type == 'INVENTORY_UPDATE') {
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                        title: const Row(
+                                          children: [
+                                            Icon(Icons.system_update_rounded, color: AppColors.primary),
+                                            SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text('Sync Inventory Database?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
+                                        content: Text(
+                                          '${item.message}\n\nWould you like to sync now to get the latest product locations?',
+                                          style: const TextStyle(fontSize: 14, height: 1.4),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(false),
+                                            child: const Text('Later', style: TextStyle(color: Colors.grey)),
+                                          ),
+                                          FilledButton(
+                                            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                                            onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(true),
+                                            child: const Text('Sync Now'),
+                                          ),
+                                        ],
+                                      ),
                                     );
+
+                                    if (confirmed == true && sheetContext.mounted) {
+                                      Navigator.of(sheetContext).pop(); // close bottom sheet
+                                      if (context.mounted) {
+                                        SyncProgressDialog.show(
+                                          context,
+                                          (onProgress) => ref.read(inventoryRepositoryProvider).syncInventory(
+                                            force: true, 
+                                            skipCheck: false, 
+                                            onProgress: onProgress,
+                                          ),
+                                          title: 'Updating Inventory',
+                                          successMessage: 'Database Updated Successfully!',
+                                          errorMessage: 'Update Failed',
+                                        );
+                                      }
+                                    }
                                   }
                                 },
                                 borderRadius: BorderRadius.circular(12),
@@ -123,12 +169,12 @@ void showNotificationsDialog(BuildContext context, WidgetRef ref) {
                                         Icon(
                                           isPasswordRequest
                                               ? Icons.lock_reset_rounded
-                                              : item.type == 'APP_UPDATE'
+                                              : (item.type == 'APP_UPDATE' || item.type == 'INVENTORY_UPDATE')
                                                   ? Icons.system_update_rounded
                                                   : Icons.info_outline_rounded,
                                           color: isPasswordRequest
                                               ? AppColors.primary
-                                              : item.type == 'APP_UPDATE'
+                                              : (item.type == 'APP_UPDATE' || item.type == 'INVENTORY_UPDATE')
                                                   ? const Color(0xFFD97706)
                                                   : const Color(0xFF0EA5E9),
                                           size: 20,

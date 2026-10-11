@@ -5,7 +5,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
-import '../../features/auth/providers/auth_provider.dart';
 import '../../features/notifications/providers/notification_provider.dart';
 import '../../features/settings/repositories/inventory_repository.dart';
 import '../utils/notifications_helper.dart';
@@ -81,30 +80,150 @@ class MainLayout extends ConsumerStatefulWidget {
   ConsumerState<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends ConsumerState<MainLayout> {
+class _MainLayoutState extends ConsumerState<MainLayout> with WidgetsBindingObserver {
   StreamSubscription<RemoteMessage>? _fcmSub;
+  StreamSubscription<RemoteMessage>? _fcmOpenedSub;
+  static bool _isUpdatePromptActive = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       requestAppPermissions();
+      // Ensure in-app notification count is fetched & displayed on every screen immediately
+      ref.read(notificationNotifierProvider.notifier).refresh();
+      _checkInventoryUpdate();
     });
+
+    // Foreground FCM message arrival
     _fcmSub = FirebaseMessaging.onMessage.listen((msg) {
+      if (!mounted) return;
+      // Refresh badge immediately so it stays in sync across all pages
+      ref.read(notificationNotifierProvider.notifier).refresh();
+
       if (msg.data['type'] == 'INVENTORY_UPDATE') {
-        if (!mounted) return;
-        SyncProgressDialog.show(
-          context,
-          (onProgress) => ref.read(inventoryRepositoryProvider).syncInventory(force: true, skipCheck: false, onProgress: onProgress)
-        );
+        _checkInventoryUpdate();
+      }
+    });
+
+    // When tapping a notification banner from background
+    _fcmOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      if (!mounted) return;
+      ref.read(notificationNotifierProvider.notifier).refresh();
+      if (msg.data['type'] == 'INVENTORY_UPDATE') {
+        _checkInventoryUpdate();
+      }
+    });
+
+    // When opened from terminated state via push notification
+    FirebaseMessaging.instance.getInitialMessage().then((msg) {
+      if (msg != null && mounted) {
+        ref.read(notificationNotifierProvider.notifier).refresh();
+        if (msg.data['type'] == 'INVENTORY_UPDATE') {
+          _checkInventoryUpdate();
+        }
       }
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(notificationNotifierProvider.notifier).refresh();
+      _checkInventoryUpdate();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _fcmSub?.cancel();
+    _fcmOpenedSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkInventoryUpdate() async {
+    if (_isUpdatePromptActive || SyncProgressDialog.isDialogActive) return;
+    if (!mounted) return;
+
+    try {
+      final repo = ref.read(inventoryRepositoryProvider);
+      final status = await repo.checkUpdateStatus();
+      if (!mounted) return;
+
+      if (status == InventoryUpdateStatus.needsInitialSync ||
+          status == InventoryUpdateStatus.updateAvailable) {
+        if (_isUpdatePromptActive || SyncProgressDialog.isDialogActive) return;
+        _isUpdatePromptActive = true;
+
+        final isInitial = status == InventoryUpdateStatus.needsInitialSync;
+
+        final shouldSync = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          useRootNavigator: true,
+          builder: (ctx) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Icon(
+                    isInitial ? Icons.cloud_download_rounded : Icons.system_update_rounded,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      isInitial ? 'Initial Setup Required' : 'Inventory Update Available',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                isInitial
+                    ? 'The local product inventory database must be downloaded before you can start picking or searching.'
+                    : 'New inventory data has been uploaded to the server. You must update your local database to get the latest product locations and stock.',
+                style: const TextStyle(fontSize: 14, height: 1.5, color: Color(0xFF4B5563)),
+              ),
+              actions: [
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(true),
+                  child: const Text('Update Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        );
+
+        if (shouldSync == true && mounted) {
+          await SyncProgressDialog.show(
+            context,
+            (onProgress) => ref.read(inventoryRepositoryProvider).syncInventory(
+              force: true,
+              skipCheck: false,
+              onProgress: onProgress,
+            ),
+            title: isInitial ? 'Downloading Database' : 'Updating Inventory',
+            successMessage: 'Database Updated Successfully!',
+            errorMessage: 'Update Failed',
+            errorDescription: 'Failed to complete database sync. Please verify network connection and try again.',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking inventory update: $e');
+    } finally {
+      _isUpdatePromptActive = false;
+    }
   }
 
   @override
