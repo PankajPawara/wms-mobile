@@ -18,6 +18,30 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint("Handling a background message: ${message.messageId}");
+
+  final notification = message.notification;
+  final title = notification?.title ?? message.data['title'];
+  final body = notification?.body ?? message.data['body'] ?? message.data['message'];
+
+  if (notification == null && body != null && body.isNotEmpty) {
+    final localNotifications = FlutterLocalNotificationsPlugin();
+    const androidDetails = AndroidNotificationDetails(
+      'inventory_updates_channel_v2',
+      'Inventory Updates',
+      channelDescription: 'Notifications for location data updates.',
+      icon: '@mipmap/ic_launcher',
+      importance: Importance.max,
+      priority: Priority.max,
+      playSound: true,
+      enableVibration: true,
+    );
+    await localNotifications.show(
+      message.hashCode,
+      title ?? 'Location Data Updated',
+      body,
+      const NotificationDetails(android: androidDetails),
+    );
+  }
 }
 
 Future<void> _setupFirebase() async {
@@ -61,17 +85,20 @@ Future<void> _setupFirebase() async {
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = message.notification?.android;
 
-    if (notification != null && android != null) {
+    final title = notification?.title ?? message.data['title'] ?? 'Inventory Update';
+    final body = notification?.body ?? message.data['body'] ?? message.data['message'];
+
+    if (body != null && body.isNotEmpty) {
       flutterLocalNotificationsPlugin.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
+        message.hashCode,
+        title,
+        body,
         NotificationDetails(
           android: AndroidNotificationDetails(
             channel.id,
             channel.name,
             channelDescription: channel.description,
-            icon: android.smallIcon ?? '@mipmap/ic_launcher',
+            icon: android?.smallIcon ?? '@mipmap/ic_launcher',
             playSound: true,
             enableVibration: true,
             priority: Priority.max,

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 
 class SyncProgressDialog extends StatefulWidget {
@@ -48,6 +47,7 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
   double _progress = 0.0;
   bool _isSuccess = false;
   bool _isError = false;
+  String _errorDescriptionText = '';
   late AnimationController _successAnimController;
   late Animation<double> _scaleAnimation;
   
@@ -122,11 +122,8 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
               if (mounted) Navigator.pop(context, true);
             });
           } else {
-            _isSuccess = true;
-            _successAnimController.forward();
-            Future.delayed(const Duration(seconds: 1), () {
-              if (mounted) Navigator.pop(context, true);
-            });
+            _isError = true;
+            _errorDescriptionText = widget.errorDescription;
           }
         });
       }
@@ -134,6 +131,7 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
       if (mounted) {
         setState(() {
           _isError = true;
+          _errorDescriptionText = e.toString().replaceFirst('Exception: ', '');
         });
       }
     }
@@ -168,7 +166,7 @@ class _SyncProgressDialogState extends State<SyncProgressDialog> with SingleTick
               const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 64),
               const SizedBox(height: 16),
               Text(
-                widget.errorDescription,
+                _errorDescriptionText.isNotEmpty ? _errorDescriptionText : widget.errorDescription,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 14, color: Color(0xFF4B5563), height: 1.5),
               ),

@@ -35,9 +35,9 @@ class ApiClient {
       : _dio = Dio(
           BaseOptions(
             baseUrl: ApiEndpoints.baseUrl,
-            connectTimeout: const Duration(seconds: 15),
-            receiveTimeout: const Duration(seconds: 30),
-            headers: {'Content-Type': 'application/json'},
+            connectTimeout: const Duration(seconds: 45),
+            receiveTimeout: const Duration(seconds: 120),
+            sendTimeout: const Duration(seconds: 120),
           ),
         ) {
     _dio.interceptors.add(_authInterceptor());
@@ -50,6 +50,9 @@ class ApiClient {
         final token = await _storage.getToken();
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
+        }
+        if (options.data is FormData) {
+          options.headers.remove('Content-Type');
         }
         handler.next(options);
       },
@@ -75,10 +78,28 @@ class ApiClient {
           ));
           return;
         }
+
+        String message = 'Unable to connect to server. Please check your network connection.';
+        String code = 'NETWORK_ERROR';
+
+        if (error.type == DioExceptionType.connectionTimeout) {
+          message = 'Connection timed out. Server may be spinning up (cold start). Please retry.';
+          code = 'CONNECTION_TIMEOUT';
+        } else if (error.type == DioExceptionType.sendTimeout) {
+          message = 'Upload timed out. Please check your internet speed and retry.';
+          code = 'SEND_TIMEOUT';
+        } else if (error.type == DioExceptionType.receiveTimeout) {
+          message = 'Server took too long to process the data. Please try again.';
+          code = 'RECEIVE_TIMEOUT';
+        } else if (error.type == DioExceptionType.connectionError) {
+          message = 'Cannot connect to server. Please verify your internet connection or server availability.';
+          code = 'CONNECTION_ERROR';
+        }
+
         handler.reject(error.copyWith(
           error: ApiException(
-            message: 'No internet connection. Working offline.',
-            errorCode: 'NETWORK_ERROR',
+            message: message,
+            errorCode: code,
             statusCode: 0,
           ),
         ));

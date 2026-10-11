@@ -45,8 +45,12 @@ class InventoryRepository {
 
   Future<bool> uploadInventoryExcel(String filePath, {void Function(double)? onProgress}) async {
     try {
+      final fileName = filePath.split(RegExp(r'[\\/]')).last;
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(filePath),
+        'file': await MultipartFile.fromFile(
+          filePath,
+          filename: fileName,
+        ),
       });
       await _api.post(
         ApiEndpoints.inventoryImport, 
@@ -60,7 +64,7 @@ class InventoryRepository {
       return true;
     } catch (e) {
       if (kDebugMode) print('Excel upload error: $e');
-      return false;
+      rethrow;
     }
   }
 
